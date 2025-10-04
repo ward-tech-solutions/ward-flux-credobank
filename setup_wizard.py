@@ -172,7 +172,7 @@ async def get_groups(config: ZabbixConfig):
 
 
 @router.post("/complete")
-async def complete_setup(setup_data: SetupData, db: Session = Depends(get_db)):
+async def complete_setup(request: Request, setup_data: SetupData, db: Session = Depends(get_db)):
     """Complete the setup wizard and save configuration"""
     try:
         # Check if already setup
