@@ -1976,6 +1976,84 @@ async def websocket_endpoint(websocket: WebSocket):
         except:
             pass
 
+# ============================================
+# Settings Routes
+# ============================================
+
+@app.get("/settings")
+async def settings_page(request: Request, current_user: User = Depends(get_current_active_user)):
+    """Settings page"""
+    return templates.TemplateResponse("settings.html", {"request": request})
+
+
+@app.get("/api/v1/settings/zabbix")
+async def get_zabbix_settings(current_user: User = Depends(get_current_active_user)):
+    """Get current Zabbix settings"""
+    import os
+    return {
+        "zabbix_url": os.getenv("ZABBIX_URL", ""),
+        "zabbix_user": os.getenv("ZABBIX_USER", "")
+    }
+
+
+@app.post("/api/v1/settings/test-zabbix")
+async def test_zabbix_settings(
+    config: dict,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Test Zabbix connection"""
+    from pyzabbix import ZabbixAPI
+
+    try:
+        zapi = ZabbixAPI(config["url"].replace('/api_jsonrpc.php', ''), timeout=10)
+        zapi.login(config["user"], config["password"])
+        version = zapi.apiinfo.version()
+
+        return {
+            "success": True,
+            "version": version
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@app.post("/api/v1/settings/zabbix")
+async def save_zabbix_settings(
+    request: Request,
+    config: dict,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Save Zabbix settings and reconfigure"""
+    from dotenv import set_key
+    import os
+
+    try:
+        # Save to .env file
+        env_file = ".env"
+        set_key(env_file, "ZABBIX_URL", config["zabbix_url"])
+        set_key(env_file, "ZABBIX_USER", config["zabbix_user"])
+        set_key(env_file, "ZABBIX_PASSWORD", config["zabbix_password"])
+
+        # Update environment variables
+        os.environ["ZABBIX_URL"] = config["zabbix_url"]
+        os.environ["ZABBIX_USER"] = config["zabbix_user"]
+        os.environ["ZABBIX_PASSWORD"] = config["zabbix_password"]
+
+        # Reconfigure Zabbix client
+        request.app.state.zabbix.reconfigure(
+            url=config["zabbix_url"],
+            user=config["zabbix_user"],
+            password=config["zabbix_password"]
+        )
+
+        return {"success": True, "message": "Settings saved successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=5001)
