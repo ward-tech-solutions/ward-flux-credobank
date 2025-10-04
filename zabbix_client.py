@@ -181,12 +181,13 @@ class ZabbixClient:
     def connect(self):
         """Connect to Zabbix API"""
         try:
-            self.zapi = ZabbixAPI(self.url.replace('/api_jsonrpc.php', ''))
+            self.zapi = ZabbixAPI(self.url.replace('/api_jsonrpc.php', ''), timeout=10)
             self.zapi.login(self.user, self.password)
-            print("Successfully connected to Zabbix")
+            logger.info("Successfully connected to Zabbix")
         except Exception as e:
-            print(f"Failed to connect to Zabbix: {e}")
-            raise
+            logger.error(f"Failed to connect to Zabbix: {e}")
+            self.zapi = None
+            # Don't raise - allow app to start in degraded mode
 
     def _get_cached(self, key):
         """Get cached data if still valid"""
