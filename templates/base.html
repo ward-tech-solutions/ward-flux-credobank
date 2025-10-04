@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}WARD TECH SOLUTIONS{% endblock %}</title>
+    <title>{% block title %}WARD Tech Solutions{% endblock %}</title>
     <!-- Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>" type="image/svg+xml">
-    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>" type="image/svg+xml">
+    <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
     <meta name="description" content="WARD TECH SOLUTIONS - Enterprise Network Monitoring and Management Platform">
     <meta name="theme-color" content="#5EBBA8">
 
@@ -139,8 +139,7 @@
     <nav class="topnav">
         <div class="topnav-left">
             <div class="logo">
-                <img src="{{ url_for('static', filename='img/logo-ward.svg') }}" alt="WARD TECH" class="nav-logo-img">
-                <span class="logo-text">WARD TECH</span>
+                <img src="{{ url_for('static', filename='img/logo-ward.svg') }}" alt="WARD OPS" class="nav-logo-img">
             </div>
         </div>
 

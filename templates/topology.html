@@ -90,10 +90,9 @@
                 <span>Payboxes</span>
             </label>
             <div class="filter-divider"></div>
-            <label class="filter-label" style="min-width: 200px;">
-                <span style="margin-right: 8px;">Core Device:</span>
-                <select id="core-device-selector" onchange="setCoreDevice()" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd;">
-                    <option value="">Auto-detect</option>
+            <label class="filter-label" style="min-width: 250px;">
+                <span style="margin-right: 8px;">Core Devices:</span>
+                <select id="core-device-selector" multiple onchange="setCoreDevices()" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; height: 60px; min-width: 180px;">
                 </select>
             </label>
             <div class="filter-divider"></div>
@@ -884,8 +883,8 @@ function populateCoreDeviceSelector() {
     const selector = document.getElementById('core-device-selector');
     if (!selector || !window.allNodes) return;
 
-    // Clear existing options except first
-    selector.innerHTML = '<option value="">Auto-detect</option>';
+    // Clear existing options
+    selector.innerHTML = '';
 
     // Get all devices
     const devices = allNodes.get();
@@ -896,34 +895,35 @@ function populateCoreDeviceSelector() {
         selector.appendChild(option);
     });
 
-    // Set current core device if exists
-    const currentCore = localStorage.getItem('core_device_id');
-    if (currentCore) {
-        selector.value = currentCore;
-    }
+    // Set current core devices if exists
+    const coreDevices = JSON.parse(localStorage.getItem('core_device_ids') || '[]');
+    Array.from(selector.options).forEach(option => {
+        if (coreDevices.includes(option.value)) {
+            option.selected = true;
+        }
+    });
 }
 
-// Set core device
-function setCoreDevice() {
+// Set core devices (multiple selection)
+function setCoreDevices() {
     const selector = document.getElementById('core-device-selector');
-    const selectedId = selector.value;
+    const selectedIds = Array.from(selector.selectedOptions).map(opt => opt.value);
 
-    if (selectedId) {
-        localStorage.setItem('core_device_id', selectedId);
-        // Update all nodes to set the core device
-        const devices = allNodes.get();
-        devices.forEach(device => {
-            if (device.id === selectedId) {
-                device.level = 0;
-                device.deviceType = 'Core Router';
-            } else if (device.level === 0) {
-                device.level = 1; // Reset other core devices
-            }
-        });
-        allNodes.update(devices);
-    } else {
-        localStorage.removeItem('core_device_id');
-    }
+    // Save to localStorage
+    localStorage.setItem('core_device_ids', JSON.stringify(selectedIds));
+
+    // Update all nodes
+    const devices = allNodes.get();
+    devices.forEach(device => {
+        if (selectedIds.includes(device.id)) {
+            device.level = 0;
+            device.deviceType = 'Core Router';
+        } else if (device.level === 0 && device.deviceType === 'Core Router') {
+            device.level = 1; // Reset non-selected core devices
+            delete device.deviceType;
+        }
+    });
+    allNodes.update(devices);
 
     // Redraw topology
     if (typeof applyLayout === 'function') {
