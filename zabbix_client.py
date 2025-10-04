@@ -845,6 +845,91 @@ class ZabbixClient:
             'device_type': device_type
         }
 
+    def calculate_availability(self, hostid, period_hours=168):
+        """
+        Calculate device availability from Zabbix history
+
+        Args:
+            hostid: Zabbix host ID
+            period_hours: Time period in hours (default 168 = 7 days)
+
+        Returns:
+            dict with availability_percent, downtime_hours, incidents
+        """
+        try:
+            # Get ICMP ping item for this host
+            items = self.zapi.item.get(
+                hostids=hostid,
+                search={'key_': 'icmpping'},
+                output=['itemid', 'lastvalue', 'lastclock']
+            )
+
+            if not items:
+                # No ping item found, return defaults
+                return {
+                    'availability_percent': 0,
+                    'downtime_hours': 0,
+                    'incidents': 0
+                }
+
+            # Calculate time range
+            import time
+            time_till = int(time.time())
+            time_from = time_till - (period_hours * 3600)
+
+            # Get history data (type 3 = unsigned int for icmpping)
+            history = self.zapi.history.get(
+                itemids=items[0]['itemid'],
+                history=3,  # Type: Unsigned int
+                time_from=time_from,
+                time_till=time_till,
+                sortfield='clock',
+                sortorder='ASC'
+            )
+
+            if not history:
+                # No history data, use current status
+                current_status = int(items[0].get('lastvalue', 1))
+                return {
+                    'availability_percent': 100.0 if current_status == 1 else 0.0,
+                    'downtime_hours': 0 if current_status == 1 else period_hours,
+                    'incidents': 0 if current_status == 1 else 1
+                }
+
+            # Calculate uptime from history
+            # icmpping: 1 = up, 0 = down
+            total_checks = len(history)
+            up_checks = sum(1 for h in history if int(h.get('value', 0)) == 1)
+
+            # Calculate availability percentage
+            availability = (up_checks / total_checks * 100) if total_checks > 0 else 0
+
+            # Calculate downtime hours
+            downtime_hours = period_hours * (1 - up_checks / total_checks) if total_checks > 0 else 0
+
+            # Count incidents (transitions from up to down)
+            incidents = 0
+            for i in range(1, len(history)):
+                prev_value = int(history[i-1].get('value', 1))
+                curr_value = int(history[i].get('value', 1))
+                if prev_value == 1 and curr_value == 0:
+                    incidents += 1
+
+            return {
+                'availability_percent': round(availability, 2),
+                'downtime_hours': round(downtime_hours, 2),
+                'incidents': incidents
+            }
+
+        except Exception as e:
+            print(f"Error calculating availability for host {hostid}: {e}")
+            # Return safe defaults
+            return {
+                'availability_percent': 0,
+                'downtime_hours': 0,
+                'incidents': 0
+            }
+
     @staticmethod
     def get_availability_status(available):
         """Convert availability code to text"""

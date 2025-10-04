@@ -1258,6 +1258,9 @@ async def api_downtime_report_legacy(
     if device_type:
         devices = [d for d in devices if d['device_type'] == device_type]
 
+    # Map period to hours
+    period_hours = 168 if period == 'weekly' else 720  # 7 days or 30 days
+
     report = {
         'period': period,
         'generated_at': datetime.now().isoformat(),
@@ -1271,9 +1274,12 @@ async def api_downtime_report_legacy(
     }
 
     for device in devices:
-        is_down = device.get('ping_status') == 'Down'
-        downtime_hours = 2.5 if is_down else 0.1
-        availability = 95.5 if is_down else 99.9
+        # Calculate real availability from Zabbix history
+        availability_data = await run_in_executor(
+            zabbix.calculate_availability,
+            device['hostid'],
+            period_hours
+        )
 
         report['devices'].append({
             'hostid': device['hostid'],
@@ -1281,13 +1287,13 @@ async def api_downtime_report_legacy(
             'region': device['region'],
             'branch': device['branch'],
             'device_type': device['device_type'],
-            'downtime_hours': downtime_hours,
-            'availability_percent': availability,
-            'incidents': 1 if is_down else 0
+            'downtime_hours': availability_data['downtime_hours'],
+            'availability_percent': availability_data['availability_percent'],
+            'incidents': availability_data['incidents']
         })
 
-        report['summary']['total_downtime_hours'] += downtime_hours
-        if is_down:
+        report['summary']['total_downtime_hours'] += availability_data['downtime_hours']
+        if availability_data['downtime_hours'] > 0:
             report['summary']['devices_with_downtime'] += 1
 
     report['summary']['average_availability'] = round(
