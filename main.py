@@ -1593,6 +1593,11 @@ async def topology_page_legacy(request: Request):
     """Serve network topology visualization"""
     return templates.TemplateResponse("topology.html", {"request": request})
 
+@app.get("/diagnostics", response_class=HTMLResponse)
+async def diagnostics_page(request: Request):
+    """Serve network diagnostics page"""
+    return templates.TemplateResponse("diagnostics.html", {"request": request})
+
 @app.get("/reports", response_class=HTMLResponse)
 async def reports_legacy(request: Request):
     """Serve old reports page"""

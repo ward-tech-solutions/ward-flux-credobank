@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+
+{% block title %}Network Diagnostics - Network Monitoring{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/network-diagnostics.css') }}">
+<style>
+.diagnostics-page {
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.device-selector-card {
+    background: var(--bg-secondary, #1a1a1a);
+    border: 1px solid var(--border-light, #3A3A3A);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+.selector-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #5EBBA8;
+}
+
+.selector-header i {
+    font-size: 24px;
+    color: #5EBBA8;
+}
+
+.selector-header h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary, #F3F4F6);
+}
+
+.device-search-container {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 15px;
+    align-items: end;
+}
+
+.search-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.search-input-group label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary, #9CA3AF);
+}
+
+#device-search {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-tertiary, #0f0f0f);
+    border: 1px solid var(--border-light, #3A3A3A);
+    border-radius: 8px;
+    color: var(--text-primary, #F3F4F6);
+    font-size: 14px;
+}
+
+#device-search:focus {
+    outline: none;
+    border-color: #5EBBA8;
+    box-shadow: 0 0 0 3px rgba(94, 187, 168, 0.1);
+}
+
+.search-btn {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #5EBBA8 0%, #4A9B8A 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.search-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(94, 187, 168, 0.3);
+}
+
+.device-suggestions {
+    position: relative;
+    margin-top: -8px;
+}
+
+.suggestions-dropdown {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-tertiary, #0f0f0f);
+    border: 1px solid var(--border-light, #3A3A3A);
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    display: none;
+}
+
+.suggestions-dropdown.active {
+    display: block;
+}
+
+.suggestion-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-light, #3A3A3A);
+    transition: background 0.2s ease;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item:hover {
+    background: rgba(94, 187, 168, 0.1);
+}
+
+.suggestion-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary, #F3F4F6);
+    margin-bottom: 4px;
+}
+
+.suggestion-details {
+    font-size: 12px;
+    color: var(--text-muted, #6B7280);
+}
+
+.selected-device-info {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--bg-tertiary, #0f0f0f);
+    border: 1px solid var(--border-light, #3A3A3A);
+    border-radius: 8px;
+    display: none;
+}
+
+.selected-device-info.active {
+    display: block;
+}
+
+.selected-device-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.selected-device-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary, #F3F4F6);
+}
+
+.clear-selection {
+    background: transparent;
+    border: none;
+    color: #EF4444;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+}
+
+.clear-selection:hover {
+    text-decoration: underline;
+}
+
+.device-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.device-info-item {
+    font-size: 13px;
+}
+
+.device-info-item strong {
+    color: var(--text-secondary, #9CA3AF);
+    font-weight: 500;
+}
+
+.device-info-item span {
+    color: var(--text-primary, #F3F4F6);
+}
+
+.no-device-selected {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted, #6B7280);
+}
+
+.no-device-selected i {
+    font-size: 64px;
+    margin-bottom: 20px;
+    opacity: 0.3;
+}
+
+.no-device-selected p {
+    font-size: 16px;
+    margin: 10px 0 0 0;
+}
+
+/* Light Theme */
+[data-theme="light"] .device-selector-card,
+[data-theme="light"] .diagnostics-section {
+    background: #ffffff;
+    border-color: #e5e7eb;
+}
+
+[data-theme="light"] #device-search,
+[data-theme="light"] .selected-device-info,
+[data-theme="light"] .suggestions-dropdown {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+}
+
+[data-theme="light"] .suggestion-item {
+    border-bottom-color: #e5e7eb;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="diagnostics-page">
+    <div class="page-header">
+        <h2 class="page-title">Network Diagnostics</h2>
+    </div>
+
+    <!-- Device Selector -->
+    <div class="device-selector-card">
+        <div class="selector-header">
+            <i class="fas fa-search"></i>
+            <h3>Select Device</h3>
+        </div>
+
+        <div class="device-search-container">
+            <div class="search-input-group">
+                <label for="device-search">Search by device name, IP address, or branch</label>
+                <input
+                    type="text"
+                    id="device-search"
+                    placeholder="Type to search devices..."
+                    autocomplete="off"
+                >
+            </div>
+            <button class="search-btn" onclick="focusSearch()">
+                <i class="fas fa-search"></i>
+                Search
+            </button>
+        </div>
+
+        <div class="device-suggestions">
+            <div class="suggestions-dropdown" id="suggestions-dropdown"></div>
+        </div>
+
+        <div class="selected-device-info" id="selected-device-info">
+            <div class="selected-device-header">
+                <span class="selected-device-name" id="selected-device-name"></span>
+                <button class="clear-selection" onclick="clearSelection()">
+                    <i class="fas fa-times"></i> Clear
+                </button>
+            </div>
+            <div class="device-info-grid">
+                <div class="device-info-item">
+                    <strong>IP:</strong> <span id="selected-ip"></span>
+                </div>
+                <div class="device-info-item">
+                    <strong>Branch:</strong> <span id="selected-branch"></span>
+                </div>
+                <div class="device-info-item">
+                    <strong>Type:</strong> <span id="selected-type"></span>
+                </div>
+                <div class="device-info-item">
+                    <strong>Groups:</strong> <span id="selected-groups"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diagnostics Tools -->
+    <div class="diagnostics-section" id="diagnostics-tools" style="display: none;">
+        <div class="diagnostics-header">
+            <i class="fas fa-network-wired"></i>
+            <h3>Diagnostic Tools</h3>
+        </div>
+
+        <div class="diagnostics-grid">
+            <!-- Ping Tool -->
+            <div class="diagnostic-tool">
+                <div class="tool-header">
+                    <div class="tool-title">
+                        <i class="fas fa-satellite-dish"></i>
+                        <span>Ping Check</span>
+                    </div>
+                    <button class="diagnostic-btn" id="ping-button" onclick="runPing()">
+                        <i class="fas fa-satellite-dish"></i>
+                        Run Ping Check
+                    </button>
+                </div>
+                <div id="ping-results"></div>
+            </div>
+
+            <!-- Traceroute Tool -->
+            <div class="diagnostic-tool">
+                <div class="tool-header">
+                    <div class="tool-title">
+                        <i class="fas fa-route"></i>
+                        <span>Network Path Trace</span>
+                    </div>
+                    <button class="diagnostic-btn" id="traceroute-button" onclick="runTraceroute()">
+                        <i class="fas fa-route"></i>
+                        Trace Network Path
+                    </button>
+                </div>
+                <div id="traceroute-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Device Selected Message -->
+    <div class="no-device-selected" id="no-device-message">
+        <i class="fas fa-network-wired"></i>
+        <p>Select a device to start running network diagnostics</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/network-diagnostics.js') }}"></script>
+<script>
+    let allDevices = [];
+    let selectedDevice = null;
+    let diagnostics = null;
+
+    // Load all devices on page load
+    async function loadDevices() {
+        try {
+            const response = await auth.fetch('/api/v1/devices');
+            const data = await response.json();
+            allDevices = data.devices || [];
+        } catch (error) {
+            console.error('Error loading devices:', error);
+        }
+    }
+
+    // Search devices as user types
+    document.getElementById('device-search').addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase().trim();
+        const dropdown = document.getElementById('suggestions-dropdown');
+
+        if (query.length < 2) {
+            dropdown.classList.remove('active');
+            return;
+        }
+
+        const matches = allDevices.filter(device => {
+            return device.display_name.toLowerCase().includes(query) ||
+                   device.ip.toLowerCase().includes(query) ||
+                   (device.groups && device.groups.some(g => g.toLowerCase().includes(query)));
+        }).slice(0, 10);
+
+        if (matches.length === 0) {
+            dropdown.innerHTML = '<div class="suggestion-item"><div class="suggestion-name">No devices found</div></div>';
+            dropdown.classList.add('active');
+            return;
+        }
+
+        dropdown.innerHTML = matches.map(device => `
+            <div class="suggestion-item" onclick="selectDevice('${device.hostid}')">
+                <div class="suggestion-name">${device.display_name}</div>
+                <div class="suggestion-details">
+                    ${device.ip} • ${device.groups ? device.groups.join(', ') : 'No groups'}
+                </div>
+            </div>
+        `).join('');
+
+        dropdown.classList.add('active');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.device-search-container')) {
+            document.getElementById('suggestions-dropdown').classList.remove('active');
+        }
+    });
+
+    // Select a device
+    function selectDevice(hostid) {
+        selectedDevice = allDevices.find(d => d.hostid === hostid);
+
+        if (!selectedDevice) return;
+
+        // Update selected device info
+        document.getElementById('selected-device-name').textContent = selectedDevice.display_name;
+        document.getElementById('selected-ip').textContent = selectedDevice.ip;
+        document.getElementById('selected-branch').textContent = selectedDevice.groups ? selectedDevice.groups.join(', ') : 'N/A';
+        document.getElementById('selected-type').textContent = selectedDevice.type || 'Unknown';
+        document.getElementById('selected-groups').textContent = selectedDevice.groups ? selectedDevice.groups.join(', ') : 'None';
+
+        // Show selected device info
+        document.getElementById('selected-device-info').classList.add('active');
+
+        // Hide no device message, show diagnostics tools
+        document.getElementById('no-device-message').style.display = 'none';
+        document.getElementById('diagnostics-tools').style.display = 'block';
+
+        // Clear search and close dropdown
+        document.getElementById('device-search').value = '';
+        document.getElementById('suggestions-dropdown').classList.remove('active');
+
+        // Initialize diagnostics
+        diagnostics = new NetworkDiagnostics(selectedDevice.ip, selectedDevice.display_name);
+    }
+
+    // Clear selection
+    function clearSelection() {
+        selectedDevice = null;
+        diagnostics = null;
+
+        document.getElementById('selected-device-info').classList.remove('active');
+        document.getElementById('diagnostics-tools').style.display = 'none';
+        document.getElementById('no-device-message').style.display = 'block';
+
+        // Clear results
+        document.getElementById('ping-results').innerHTML = '';
+        document.getElementById('traceroute-results').innerHTML = '';
+    }
+
+    // Focus search
+    function focusSearch() {
+        document.getElementById('device-search').focus();
+    }
+
+    // Run ping
+    function runPing() {
+        if (!diagnostics) {
+            alert('Please select a device first');
+            return;
+        }
+        diagnostics.performPing(5);
+    }
+
+    // Run traceroute
+    function runTraceroute() {
+        if (!diagnostics) {
+            alert('Please select a device first');
+            return;
+        }
+        diagnostics.performTraceroute(30);
+    }
+
+    // Load devices on page load
+    loadDevices();
+    startAutoRefresh(60000);
+</script>
+{% endblock %}
