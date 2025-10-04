@@ -15,7 +15,6 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from contextlib import asynccontextmanager
@@ -145,13 +144,6 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
 
     return response
-
-# Trusted Hosts Middleware
-allowed_hosts = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=allowed_hosts
-)
 
 # CORS middleware
 cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
