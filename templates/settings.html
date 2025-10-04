@@ -122,11 +122,13 @@
 </div>
 
 <style>
+/* Use CSS Variables for theme support */
 .zabbix-settings-page {
     padding: 30px 40px;
     max-width: 1400px;
     margin: 0 auto;
     min-height: 100vh;
+    background: var(--bg-primary, #FFFFFF);
 }
 
 .settings-header {
@@ -135,7 +137,7 @@
     align-items: center;
     margin-bottom: 40px;
     padding-bottom: 25px;
-    border-bottom: 2px solid #e5e7eb;
+    border-bottom: 2px solid var(--border-light, #e5e7eb);
 }
 
 .header-content {
@@ -160,13 +162,13 @@
 .header-text h1 {
     font-size: 32px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text-primary, #1a1a1a);
     margin: 0 0 8px 0;
 }
 
 .header-text p {
     font-size: 16px;
-    color: #6b7280;
+    color: var(--text-secondary, #6b7280);
     margin: 0;
 }
 
@@ -175,25 +177,26 @@
     align-items: center;
     gap: 8px;
     padding: 10px 20px;
-    background: #f3f4f6;
+    background: var(--bg-tertiary, #f3f4f6);
     border-radius: 20px;
     font-size: 14px;
     font-weight: 500;
+    color: var(--text-secondary, #6b7280);
 }
 
 .connection-status i {
     font-size: 10px;
-    color: #9ca3af;
+    color: var(--text-tertiary, #9ca3af);
 }
 
 .connection-status.connected i {
-    color: #10b981;
+    color: var(--success, #10b981);
     animation: pulse 2s infinite;
 }
 
 .connection-status.connected {
-    background: #d1fae5;
-    color: #065f46;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success, #10b981);
 }
 
 @keyframes pulse {
@@ -208,22 +211,23 @@
 }
 
 .settings-card {
-    background: white;
+    background: var(--bg-secondary, white);
     border-radius: 16px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     overflow: hidden;
+    border: 1px solid var(--border-light, transparent);
 }
 
 .card-header {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    background: var(--bg-tertiary, #f8f9fa);
     padding: 25px 30px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-light, #e5e7eb);
 }
 
 .card-header h3 {
     font-size: 20px;
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--text-primary, #1a1a1a);
     margin: 0 0 8px 0;
     display: flex;
     align-items: center;
@@ -232,7 +236,7 @@
 
 .card-header p {
     font-size: 14px;
-    color: #6b7280;
+    color: var(--text-secondary, #6b7280);
     margin: 0;
 }
 
@@ -257,7 +261,7 @@
     margin-bottom: 10px;
     font-weight: 600;
     font-size: 14px;
-    color: #374151;
+    color: var(--text-primary, #374151);
 }
 
 .form-group label i {
@@ -268,11 +272,11 @@
 .form-control {
     width: 100%;
     padding: 12px 16px;
-    border: 2px solid #e5e7eb;
+    border: 2px solid var(--border-light, #e5e7eb);
     border-radius: 10px;
     font-size: 15px;
-    color: #1a1a1a;
-    background: #ffffff;
+    color: var(--text-primary, #1a1a1a);
+    background: var(--bg-primary, #ffffff);
     transition: all 0.3s ease;
 }
 
@@ -283,18 +287,18 @@
 }
 
 .form-control::placeholder {
-    color: #9ca3af;
+    color: var(--text-tertiary, #9ca3af);
 }
 
 .form-hint {
     display: block;
     margin-top: 6px;
     font-size: 13px;
-    color: #6b7280;
+    color: var(--text-secondary, #6b7280);
 }
 
 #password-status {
-    color: #10b981;
+    color: var(--success, #10b981);
     font-weight: 500;
 }
 
@@ -303,7 +307,7 @@
     gap: 15px;
     margin-top: 35px;
     padding-top: 25px;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--border-light, #e5e7eb);
 }
 
 .btn-test, .btn-save {
@@ -322,12 +326,12 @@
 }
 
 .btn-test {
-    background: #f3f4f6;
-    color: #374151;
+    background: var(--bg-tertiary, #f3f4f6);
+    color: var(--text-primary, #374151);
 }
 
 .btn-test:hover {
-    background: #e5e7eb;
+    background: var(--border-light, #e5e7eb);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
@@ -365,6 +369,7 @@
     font-size: 20px;
     font-weight: 600;
     margin: 0;
+    color: white;
 }
 
 .info-content {
@@ -389,18 +394,21 @@
     justify-content: center;
     font-weight: 700;
     font-size: 14px;
+    color: white;
 }
 
 .info-item strong {
     display: block;
     font-size: 15px;
     margin-bottom: 4px;
+    color: white;
 }
 
 .info-item p {
     font-size: 13px;
     margin: 0;
     opacity: 0.9;
+    color: white;
 }
 
 .info-item code {
@@ -409,6 +417,7 @@
     border-radius: 4px;
     font-family: 'Monaco', 'Courier New', monospace;
     font-size: 12px;
+    color: white;
 }
 
 .alert {
@@ -436,21 +445,21 @@
 }
 
 .alert-success {
-    background: #d1fae5;
-    color: #065f46;
-    border: 2px solid #10b981;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success, #065f46);
+    border: 2px solid var(--success, #10b981);
 }
 
 .alert-error {
-    background: #fee2e2;
-    color: #991b1b;
-    border: 2px solid #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger, #991b1b);
+    border: 2px solid var(--danger, #ef4444);
 }
 
 .alert-info {
-    background: #dbeafe;
-    color: #1e40af;
-    border: 2px solid #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--info, #1e40af);
+    border: 2px solid var(--info, #3b82f6);
 }
 
 @media (max-width: 1024px) {
@@ -460,6 +469,10 @@
 
     .form-row {
         grid-template-columns: 1fr;
+    }
+    
+    .zabbix-settings-page {
+        padding: 20px;
     }
 }
 </style>
