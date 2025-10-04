@@ -33,6 +33,8 @@ class User(Base):
     full_name = Column(String(100))
     hashed_password = Column(String(255), nullable=False)
     role = Column(SQLEnum(UserRole), default=UserRole.VIEWER)
+    organization_id = Column(Integer, nullable=True)  # For multi-tenant support
+    is_superuser = Column(Boolean, default=False)  # For admin users
     region = Column(String(50), nullable=True)  # For regional managers
     branches = Column(String(500), nullable=True)  # Comma-separated branch names
     is_active = Column(Boolean, default=True)
