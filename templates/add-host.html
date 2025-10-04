@@ -1,0 +1,497 @@
+{% extends "base.html" %}
+
+{% block title %}Add Device - Network Monitoring{% endblock %}
+
+{% block content %}
+<div class="add-device-page">
+    <div class="page-header">
+        <div class="page-title">
+            <h1><i class="fas fa-plus-circle"></i> Add New Device</h1>
+            <span class="page-subtitle">Configure and add a new device to your network</span>
+        </div>
+        <div class="page-actions">
+            <button class="btn-secondary" onclick="window.location.href='/devices'">
+                <i class="fas fa-arrow-left"></i>
+                <span>Back to Devices</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="form-container">
+        <div id="error-alert" class="alert alert-error" style="display: none;"></div>
+        <div id="success-alert" class="alert alert-success" style="display: none;"></div>
+
+        <form id="add-host-form" onsubmit="handleSubmit(event)">
+            <!-- Basic Information -->
+            <div class="form-card">
+                <div class="form-card-header">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Basic Information</span>
+                </div>
+                <div class="form-card-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="hostname">Hostname *</label>
+                            <input type="text" id="hostname" required placeholder="e.g., Tbilisi-Switch-01" onblur="checkHostExists()" oninput="autoDetectTemplate()">
+                            <small>Technical hostname for Zabbix (must be unique)</small>
+                            <div id="hostname-check"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="visible_name">Display Name *</label>
+                            <input type="text" id="visible_name" required placeholder="e.g., Tbilisi Branch Switch 1">
+                            <small>Friendly name shown in interface</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="ip_address">IP Address *</label>
+                            <input type="text" id="ip_address" required pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" placeholder="e.g., 192.168.1.100" oninput="autoDetectTemplate()">
+                            <small>Must be a valid IPv4 address</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration -->
+            <div class="form-card">
+                <div class="form-card-header">
+                    <i class="fas fa-cog"></i>
+                    <span>Configuration</span>
+                </div>
+                <div class="form-card-body">
+                    <div class="form-group">
+                        <label for="groups">Host Groups *</label>
+                        <div class="select-wrapper">
+                            <select id="groups" multiple required size="8">
+                                <option disabled>Loading groups...</option>
+                            </select>
+                        </div>
+                        <small>Hold Ctrl/Cmd to select multiple groups</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="templates">Templates *</label>
+                        <div class="select-wrapper">
+                            <select id="templates" multiple required size="8">
+                                <option disabled>Loading templates...</option>
+                            </select>
+                        </div>
+                        <small>Select monitoring templates</small>
+
+                        <div class="quick-select-bar">
+                            <span class="quick-label">Quick Select:</span>
+                            <button type="button" class="quick-tag" onclick="selectTemplate('ICMP Ping')">ICMP Ping</button>
+                            <button type="button" class="quick-tag" onclick="selectTemplate('Linux by Zabbix agent')">Linux</button>
+                            <button type="button" class="quick-tag" onclick="selectTemplate('Windows by Zabbix agent')">Windows</button>
+                            <button type="button" class="quick-tag" onclick="selectTemplate('Cisco IOS by SNMP')">Cisco IOS</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="window.location.href='/devices'">
+                    <i class="fas fa-times"></i>
+                    <span>Cancel</span>
+                </button>
+                <button type="submit" class="btn-add" id="submit-btn">
+                    <i class="fas fa-check"></i>
+                    <span>Create Device</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.add-device-page {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-8);
+}
+
+.page-title h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--space-2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.page-title h1 i {
+    color: var(--ward-green);
+}
+
+.page-subtitle {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.btn-secondary {
+    padding: var(--space-3) var(--space-4);
+    background: white;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    transition: all var(--transition-fast);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-medium);
+}
+
+.form-container {
+    margin-top: var(--space-6);
+}
+
+.form-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-6);
+    box-shadow: var(--shadow-sm);
+}
+
+.form-card-header {
+    background: var(--bg-secondary);
+    padding: var(--space-4) var(--space-6);
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.form-card-header i {
+    color: var(--ward-green);
+}
+
+.form-card-body {
+    padding: var(--space-6);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-5);
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.form-group label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.form-group input,
+.form-group select {
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    background: white;
+    transition: all var(--transition-fast);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--ward-green);
+    box-shadow: 0 0 0 3px rgba(94, 187, 168, 0.1);
+}
+
+.form-group input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.form-group small {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.select-wrapper {
+    position: relative;
+}
+
+.select-wrapper select {
+    width: 100%;
+    background: white;
+    cursor: pointer;
+}
+
+.quick-select-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+    margin-top: var(--space-4);
+    padding: var(--space-4);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+}
+
+.quick-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.quick-tag {
+    padding: var(--space-2) var(--space-3);
+    background: white;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    color: var(--text-primary);
+}
+
+.quick-tag:hover {
+    background: var(--ward-green);
+    color: white;
+    border-color: var(--ward-green);
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    padding-top: var(--space-6);
+}
+
+.btn-add {
+    padding: var(--space-3) var(--space-6);
+    background: var(--ward-green);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    transition: all var(--transition-fast);
+}
+
+.btn-add:hover {
+    background: var(--ward-green-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(94, 187, 168, 0.3);
+}
+
+.btn-add:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#hostname-check {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-top: var(--space-2);
+}
+
+.success-text {
+    color: var(--success-green);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.error-text {
+    color: var(--danger-red);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.alert {
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.alert-success {
+    background: #d1fae5;
+    color: var(--success-green);
+    border: 1px solid var(--success-green);
+}
+
+.alert-error {
+    background: #fee2e2;
+    color: var(--danger-red);
+    border: 1px solid var(--danger-red);
+}
+</style>
+
+<script>
+let allTemplates = [];
+let existingHosts = [];
+
+// Wait for auth to be ready
+function loadData() {
+    auth.fetch('/api/v1/config/monitored-hostgroups').then(r => r.json()).then(data => {
+    const groups = data.monitored_groups || [];
+    if (groups.length === 0) {
+        document.getElementById('groups').innerHTML = '<option disabled>No host groups configured</option>';
+    } else {
+        document.getElementById('groups').innerHTML = groups.map(g =>
+            `<option value="${g.groupid}">${g.display_name || g.name}</option>`
+        ).join('');
+    }
+}).catch(err => {
+    console.error('Failed to load host groups:', err);
+    document.getElementById('groups').innerHTML = '<option disabled>Failed to load groups</option>';
+});
+
+auth.fetch('/api/v1/templates').then(r => r.json()).then(templates => {
+    // Filter to only show ICMP Ping and Cisco IOS templates
+    const allowedTemplates = ['ICMP Ping', 'Cisco IOS by SNMP'];
+    allTemplates = templates.filter(t => allowedTemplates.includes(t.name));
+
+    if (allTemplates.length === 0) {
+        document.getElementById('templates').innerHTML = '<option disabled>No templates available</option>';
+    } else {
+        document.getElementById('templates').innerHTML = allTemplates.map(t =>
+            `<option value="${t.templateid}">${t.name}</option>`
+        ).join('');
+    }
+}).catch(err => {
+    console.error('Failed to load templates:', err);
+    document.getElementById('templates').innerHTML = '<option disabled>Failed to load templates</option>';
+});
+
+auth.fetch('/api/v1/devices').then(r => r.json()).then(devices => {
+    existingHosts = devices.map(d => d.hostname.toLowerCase());
+}).catch(err => {
+    console.error('Failed to load devices:', err);
+});
+}
+
+// Call loadData when page is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadData);
+} else {
+    loadData();
+}
+
+function autoDetectTemplate() {
+    const hostname = document.getElementById('hostname').value.trim();
+    const ipAddress = document.getElementById('ip_address').value.trim();
+
+    // Check if hostname contains device type indicators
+    const isNonNetworkDevice = /-AP\b|-ATM\b|-NVR\b|-Paybox\b|-Biostar\b/i.test(hostname);
+
+    // Check if IP ends in .5 (router)
+    const isRouter = ipAddress.endsWith('.5');
+
+    // Auto-select template based on logic
+    let templateToSelect = '';
+
+    if (isNonNetworkDevice) {
+        // Devices with -AP, -ATM, -NVR, etc. use ICMP Ping
+        templateToSelect = 'ICMP Ping';
+    } else if (isRouter) {
+        // IP ending in .5 = Router = Cisco IOS
+        templateToSelect = 'Cisco IOS by SNMP';
+    } else if (ipAddress && ipAddress.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+        // Other valid IPs = Switch = Cisco IOS
+        templateToSelect = 'Cisco IOS by SNMP';
+    }
+
+    // Auto-select the template if determined
+    if (templateToSelect) {
+        selectTemplate(templateToSelect);
+    }
+}
+
+function checkHostExists() {
+    const hostname = document.getElementById('hostname').value.trim();
+    const check = document.getElementById('hostname-check');
+
+    if (!hostname) {
+        check.innerHTML = '';
+        return;
+    }
+
+    if (existingHosts.includes(hostname.toLowerCase())) {
+        check.innerHTML = '<span class="error-text"><i class="fas fa-times-circle"></i> Hostname already exists</span>';
+        document.getElementById('submit-btn').disabled = true;
+    } else {
+        check.innerHTML = '<span class="success-text"><i class="fas fa-check-circle"></i> Hostname available</span>';
+        document.getElementById('submit-btn').disabled = false;
+    }
+}
+
+function selectTemplate(name) {
+    const template = allTemplates.find(t => t.name === name);
+    if (template) {
+        const option = document.querySelector(`#templates option[value="${template.templateid}"]`);
+        if (option) option.selected = true;
+    }
+}
+
+function handleSubmit(event) {
+    event.preventDefault();
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Creating...</span>';
+
+    const groups = Array.from(document.getElementById('groups').selectedOptions).map(o => o.value);
+    const templates = Array.from(document.getElementById('templates').selectedOptions).map(o => o.value);
+
+    fetch('/api/host/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            hostname: document.getElementById('hostname').value,
+            visible_name: document.getElementById('visible_name').value,
+            ip_address: document.getElementById('ip_address').value,
+            group_ids: groups,
+            template_ids: templates
+        })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            document.getElementById('success-alert').textContent = result.message;
+            document.getElementById('success-alert').style.display = 'flex';
+            setTimeout(() => window.location.href = '/devices', 2000);
+        } else {
+            document.getElementById('error-alert').textContent = result.message;
+            document.getElementById('error-alert').style.display = 'flex';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check"></i><span>Create Device</span>';
+        }
+    });
+}
+</script>
+{% endblock %}

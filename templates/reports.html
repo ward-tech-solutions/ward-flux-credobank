@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% set show_sidebar = False %}
+
+{% block title %}Reports - Network Monitoring{% endblock %}
+
+{% block content %}
+<div class="reports-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title">
+            <h1><i class="fas fa-chart-bar"></i> Reports & Analytics</h1>
+            <span class="page-subtitle">Comprehensive network performance reports</span>
+        </div>
+        <div class="page-actions">
+            <button class="btn-refresh" onclick="loadAllReports()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Report Type Tabs -->
+    <div class="report-tabs">
+        <button class="report-tab active" data-tab="downtime" onclick="switchReportTab('downtime')">
+            <i class="fas fa-clock"></i> Downtime Report
+        </button>
+        <button class="report-tab" data-tab="mttr" onclick="switchReportTab('mttr')">
+            <i class="fas fa-wrench"></i> MTTR Trends
+        </button>
+        <button class="report-tab" data-tab="sla" onclick="switchReportTab('sla')">
+            <i class="fas fa-tasks"></i> SLA Compliance
+        </button>
+    </div>
+
+    <!-- Downtime Report -->
+    <div id="downtime-report" class="report-section active">
+        <div class="card">
+            <div class="card-header">
+                <h2>Device Availability Report</h2>
+                <div class="report-controls">
+                    <select id="downtime-period" class="filter-dropdown" onchange="loadDowntimeReport()">
+                        <option value="weekly">Last 7 Days</option>
+                        <option value="monthly">Last 30 Days</option>
+                    </select>
+                    <select id="downtime-region" class="filter-dropdown" onchange="loadDowntimeReport()">
+                        <option value="">All Regions</option>
+                    </select>
+                    <button class="btn-export" onclick="exportReport('downtime')">
+                        <i class="fas fa-download"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+            <div class="card-content">
+                <!-- Summary Cards -->
+                <div class="report-summary-grid">
+                    <div class="summary-card">
+                        <div class="summary-icon" style="background: var(--primary-blue);">
+                            <i class="fas fa-server"></i>
+                        </div>
+                        <div class="summary-content">
+                            <div class="summary-value" id="total-devices-report">-</div>
+                            <div class="summary-label">Total Devices</div>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-icon" style="background: var(--success-green);">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <div class="summary-content">
+                            <div class="summary-value" id="avg-availability">-</div>
+                            <div class="summary-label">Average Availability</div>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-icon" style="background: var(--danger-red);">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="summary-content">
+                            <div class="summary-value" id="total-downtime">-</div>
+                            <div class="summary-label">Total Downtime</div>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-icon" style="background: var(--warning-orange);">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="summary-content">
+                            <div class="summary-value" id="devices-with-issues">-</div>
+                            <div class="summary-label">Devices with Issues</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Downtime Chart -->
+                <div class="chart-container">
+                    <canvas id="downtime-chart"></canvas>
+                </div>
+
+                <!-- Detailed Table -->
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Device Name</th>
+                                <th>Region</th>
+                                <th>Type</th>
+                                <th>Availability</th>
+                                <th>Downtime</th>
+                                <th>Incidents</th>
+                            </tr>
+                        </thead>
+                        <tbody id="downtime-table-body">
+                            <tr><td colspan="6" class="loading-cell">Loading report...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MTTR Report -->
+    <div id="mttr-report" class="report-section">
+        <div class="card">
+            <div class="card-header">
+                <h2>Mean Time To Repair (MTTR) Analysis</h2>
+            </div>
+            <div class="card-content">
+                <!-- MTTR Summary -->
+                <div class="mttr-summary">
+                    <div class="mttr-card">
+                        <h3>Overall MTTR</h3>
+                        <div class="mttr-value" id="overall-mttr">-</div>
+                        <div class="mttr-label">minutes</div>
+                    </div>
+                    <div class="mttr-card">
+                        <h3>Total Incidents</h3>
+                        <div class="mttr-value" id="total-incidents">-</div>
+                        <div class="mttr-label">this month</div>
+                    </div>
+                    <div class="mttr-card trend-improving" id="trend-card">
+                        <h3>Trend</h3>
+                        <div class="mttr-value"><i class="fas fa-arrow-down"></i></div>
+                        <div class="mttr-label" id="trend-label">Improving</div>
+                    </div>
+                </div>
+
+                <!-- MTTR by Region Chart -->
+                <div class="chart-container">
+                    <h3>MTTR by Region</h3>
+                    <canvas id="mttr-region-chart"></canvas>
+                </div>
+
+                <!-- Top Problem Devices -->
+                <div class="card" style="margin-top: 2rem;">
+                    <div class="card-header">
+                        <h3>Top 10 Devices Requiring Attention</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Device</th>
+                                        <th>Region</th>
+                                        <th>Incidents</th>
+                                        <th>Total Downtime</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="problem-devices-tbody">
+                                    <tr><td colspan="6" class="loading-cell">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLA Compliance Report -->
+    <div id="sla-report" class="report-section">
+        <div class="card">
+            <div class="card-header">
+                <h2>SLA Compliance Dashboard</h2>
+            </div>
+            <div class="card-content">
+                <div class="sla-grid">
+                    <div class="sla-card sla-met">
+                        <h3>99.9% SLA</h3>
+                        <div class="sla-value">85%</div>
+                        <div class="sla-label">Devices Meeting SLA</div>
+                    </div>
+                    <div class="sla-card sla-warning">
+                        <h3>99.5% SLA</h3>
+                        <div class="sla-value">92%</div>
+                        <div class="sla-label">Devices Meeting SLA</div>
+                    </div>
+                    <div class="sla-card sla-critical">
+                        <h3>Below Target</h3>
+                        <div class="sla-value">12</div>
+                        <div class="sla-label">Devices Need Attention</div>
+                    </div>
+                </div>
+                <p class="info-text"><i class="fas fa-info-circle"></i> SLA tracking requires historical data from Zabbix. This feature will be enhanced once connected to Zabbix history API.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}

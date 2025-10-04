@@ -1,0 +1,40 @@
+# ═══════════════════════════════════════════════════════════════════
+# WARD TECH SOLUTIONS - Docker Compose Configuration
+# ═══════════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  ward-app:
+    build: .
+    container_name: ward-tech-solutions
+    image: wardtechsolutions/network-monitor:latest
+    ports:
+      - "5001:5001"
+    volumes:
+      - ward-data:/app/data
+      - ward-logs:/app/logs
+    environment:
+      - DEBUG=False
+      - PORT=5001
+      - SETUP_MODE=enabled
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ward-network
+
+networks:
+  ward-network:
+    driver: bridge
+
+# Optional: Add volumes for persistence
+volumes:
+  ward-data:
+    driver: local
+  ward-logs:
+    driver: local

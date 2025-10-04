@@ -1,0 +1,130 @@
+/* Compact Device Grid - Shows many devices at once with status indicators */
+.device-compact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 0.5rem;
+    padding: 0.5rem;
+    max-width: 100%;
+}
+
+.device-compact-card {
+    position: relative;
+    background: var(--card-bg, #1e1e1e);
+    border-radius: 6px;
+    padding: 0.5rem 0.25rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 2px solid transparent;
+    text-align: center;
+    min-height: 90px;
+    max-height: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.device-compact-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Status-based styling */
+.device-compact-card.online {
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+}
+
+.device-compact-card.offline {
+    border-color: #ef4444;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%);
+}
+
+.device-compact-card.unknown {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+}
+
+.device-compact-card.online:hover {
+    border-color: #10b981;
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+}
+
+.device-compact-card.offline:hover {
+    border-color: #ef4444;
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+}
+
+.device-compact-card.unknown:hover {
+    border-color: #f59e0b;
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3);
+}
+
+/* Problem badge */
+.compact-badge {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.625rem;
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(239, 68, 68, 0.4);
+    line-height: 1;
+}
+
+/* Icon */
+.compact-icon {
+    font-size: 1.75rem;
+    margin-bottom: 0.375rem;
+    opacity: 0.9;
+}
+
+.device-compact-card.online .compact-icon {
+    color: #10b981;
+}
+
+.device-compact-card.offline .compact-icon {
+    color: #ef4444;
+}
+
+.device-compact-card.unknown .compact-icon {
+    color: #f59e0b;
+}
+
+/* Device name */
+.compact-name {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary, #ffffff);
+    margin-top: 0.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+    line-height: 1.3;
+    padding: 0 0.125rem;
+}
+
+/* Responsive adjustments */
+@media (min-width: 1600px) {
+    .device-compact-grid {
+        grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .device-compact-grid {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    }
+
+    .compact-icon {
+        font-size: 1.5rem;
+    }
+}

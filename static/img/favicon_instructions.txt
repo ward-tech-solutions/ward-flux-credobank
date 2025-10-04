@@ -1,0 +1,8 @@
+# Favicon Instructions
+
+Please create a proper favicon.ico file and place it in this directory.
+A network icon would be appropriate for this application.
+
+You can use online tools like https://favicon.io/ to create a favicon.
+
+Until a proper favicon is created, the application will use a Font Awesome icon as a fallback.

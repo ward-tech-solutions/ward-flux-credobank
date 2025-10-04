@@ -1,0 +1,689 @@
+// Optimized Network Topology Visualization
+
+let network = null;
+let allNodes = null;
+let allEdges = null;
+let visibleNodes = null;
+let visibleEdges = null;
+let selectedNodeId = null;
+let physicsEnabled = false;
+let currentView = 'hierarchical';
+
+function initTopology() {
+    console.log('Initializing topology...');
+
+    if (typeof vis === 'undefined') {
+        showError('Visualization library not loaded. Please refresh.');
+        return;
+    }
+
+    showLoading(true);
+    loadTopologyData(currentView);
+}
+
+function loadTopologyData(view) {
+    fetch(`/api/topology?view=${view}&limit=200`)
+        .then(r => r.ok ? r.json() : Promise.reject('API Error'))
+        .then(data => {
+            console.log('Data loaded:', data.stats);
+
+            allNodes = new vis.DataSet(data.nodes);
+            allEdges = new vis.DataSet(data.edges);
+            visibleNodes = new vis.DataSet(data.nodes);
+            visibleEdges = new vis.DataSet(data.edges);
+
+            updateStats(data.stats);
+            populateRegionFilter();
+            createNetwork();
+            showLoading(false);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showError('Failed to load topology data');
+            showLoading(false);
+        });
+}
+
+function createNetwork() {
+    const container = document.getElementById('topology-network');
+    if (!container) return;
+
+    // Dark theme optimized options
+    const options = {
+        nodes: {
+            shape: 'dot',
+            size: 20,
+            font: {
+                size: 14,
+                color: '#e0e0e0',
+                background: 'rgba(10, 14, 26, 0.8)',
+                strokeWidth: 0
+            },
+            borderWidth: 2,
+            shadow: {
+                enabled: true,
+                color: 'rgba(0, 217, 255, 0.3)',
+                size: 8,
+                x: 0,
+                y: 0
+            }
+        },
+        edges: {
+            width: 5,
+            smooth: {
+                enabled: true,
+                type: 'cubicBezier',
+                roundness: 0.4
+            },
+            font: {
+                size: 18,
+                color: '#FFFFFF',
+                background: 'rgba(10, 14, 26, 0.95)',
+                strokeWidth: 3,
+                strokeColor: '#000000',
+                align: 'middle',
+                face: 'Monaco, Consolas, Courier, monospace',
+                vadjust: -2,
+                bold: {
+                    face: 'Monaco, Consolas, Courier, monospace',
+                    color: '#FFFFFF',
+                    size: 18,
+                    mod: 'bold'
+                }
+            }
+        },
+        physics: {
+            enabled: true,
+            stabilization: {
+                enabled: true,
+                iterations: 500,
+                fit: true,
+                updateInterval: 20
+            },
+            hierarchicalRepulsion: {
+                nodeDistance: 450,
+                centralGravity: 0.0,
+                springLength: 500,
+                springConstant: 0.001,
+                damping: 0.09,
+                avoidOverlap: 1.2
+            },
+            solver: 'hierarchicalRepulsion',
+            timestep: 0.25,
+            adaptiveTimestep: true,
+            maxVelocity: 30,
+            minVelocity: 0.3
+        },
+        layout: {
+            hierarchical: {
+                enabled: true,
+                direction: 'UD',
+                sortMethod: 'directed',
+                nodeSpacing: 350,
+                treeSpacing: 400,
+                levelSeparation: 400,
+                blockShifting: true,
+                edgeMinimization: true,
+                parentCentralization: true,
+                shakeTowards: 'leaves'
+            }
+        },
+        interaction: {
+            hover: true,
+            tooltipDelay: 100,
+            hideEdgesOnDrag: true,
+            hideEdgesOnZoom: true,
+            zoomView: true,
+            dragView: true
+        }
+    };
+
+    try {
+        network = new vis.Network(container, {
+            nodes: visibleNodes,
+            edges: visibleEdges
+        }, options);
+
+        console.log('Network created');
+        setupEventHandlers();
+
+        // Auto-fit after stabilization
+        network.once('stabilizationIterationsDone', () => {
+            network.fit({
+                animation: {
+                    duration: 500,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
+            network.setOptions({ physics: false });
+            physicsEnabled = false;
+        });
+
+    } catch (error) {
+        console.error('Error creating network:', error);
+        showError('Rendering failed: ' + error.message);
+    }
+}
+
+// setupEventHandlers moved to end of file with interface monitoring code
+
+function updateStats(stats) {
+    document.getElementById('node-count').textContent = stats.total_nodes || 0;
+    document.getElementById('edge-count').textContent = stats.total_edges || 0;
+
+    const nodes = allNodes ? allNodes.get() : [];
+    // Count by status in title or by color (red = down, others = up)
+    const onlineCount = nodes.filter(n => {
+        if (n.title && n.title.includes('Status: Up')) return true;
+        if (n.color && n.color !== '#dc3545' && n.color !== '#ef4444') return true;
+        return false;
+    }).length;
+    const offlineCount = nodes.filter(n => {
+        if (n.title && n.title.includes('Status: Down')) return true;
+        if (n.color && (n.color === '#dc3545' || n.color === '#ef4444')) return true;
+        return false;
+    }).length;
+
+    document.getElementById('online-count').textContent = onlineCount;
+    document.getElementById('offline-count').textContent = offlineCount;
+}
+
+function showNodeInfo(nodeId) {
+    const node = allNodes.get(nodeId);
+    if (!node) return;
+
+    const panel = document.getElementById('node-info-panel');
+    panel.style.display = 'block';
+
+    document.getElementById('panel-title').textContent = node.label || 'Node';
+
+    const deviceData = node.deviceData;
+    if (deviceData) {
+        document.getElementById('node-type').textContent = deviceData.device_type || 'N/A';
+        document.getElementById('node-status').innerHTML = deviceData.ping_status ?
+            `<span class="status-badge ${deviceData.ping_status.toLowerCase()}">${deviceData.ping_status}</span>` : 'N/A';
+        document.getElementById('node-region').textContent = deviceData.region || 'N/A';
+        document.getElementById('node-branch').textContent = deviceData.branch || 'N/A';
+        document.getElementById('node-ip').textContent = deviceData.ip || 'N/A';
+    } else {
+        document.getElementById('node-type').textContent = node.type || 'Group';
+        document.getElementById('node-status').textContent = '-';
+        document.getElementById('node-region').textContent = '-';
+        document.getElementById('node-branch').textContent = '-';
+        document.getElementById('node-ip').textContent = '-';
+    }
+
+    const connections = allEdges.get().filter(e => e.from === nodeId || e.to === nodeId).length;
+    document.getElementById('node-connections').textContent = connections;
+}
+
+function closeNodePanel() {
+    document.getElementById('node-info-panel').style.display = 'none';
+}
+
+function viewDeviceDetails() {
+    if (selectedNodeId && !selectedNodeId.startsWith('region_') && !selectedNodeId.startsWith('branch_')) {
+        window.location.href = `/device/${selectedNodeId}`;
+    }
+}
+
+function changeView(view) {
+    currentView = view;
+    showLoading(true);
+    loadTopologyData(view);
+}
+
+function searchTopology(query) {
+    if (!allNodes || !network) return;
+
+    query = query.toLowerCase().trim();
+
+    if (!query) {
+        network.unselectAll();
+        return;
+    }
+
+    const matchingNodes = allNodes.get().filter(node => {
+        const label = (node.label || '').toLowerCase();
+        const title = (node.title || '').toLowerCase();
+        const deviceData = node.deviceData || {};
+        const ip = (deviceData.ip || '').toLowerCase();
+
+        return label.includes(query) || title.includes(query) || ip.includes(query);
+    });
+
+    if (matchingNodes.length > 0) {
+        const ids = matchingNodes.map(n => n.id);
+        network.selectNodes(ids);
+        network.fit({
+            nodes: ids,
+            animation: { duration: 500 }
+        });
+    }
+}
+
+function filterByStatus(status) {
+    if (!allNodes) return;
+
+    if (status === 'all') {
+        visibleNodes = new vis.DataSet(allNodes.get());
+        visibleEdges = new vis.DataSet(allEdges.get());
+    } else {
+        const filtered = allNodes.get().filter(node =>
+            node.group === status || node.group === 'region' || node.group === 'branch'
+        );
+        const nodeIds = filtered.map(n => n.id);
+        const filteredEdges = allEdges.get().filter(edge =>
+            nodeIds.includes(edge.from) && nodeIds.includes(edge.to)
+        );
+
+        visibleNodes = new vis.DataSet(filtered);
+        visibleEdges = new vis.DataSet(filteredEdges);
+    }
+
+    network.setData({ nodes: visibleNodes, edges: visibleEdges });
+}
+
+function populateRegionFilter() {
+    if (!allNodes) return;
+
+    const regions = new Set();
+    allNodes.get().forEach(node => {
+        if (node.deviceData && node.deviceData.region) {
+            regions.add(node.deviceData.region);
+        }
+    });
+
+    const select = document.getElementById('region-filter');
+    // Clear existing options except "All Regions"
+    select.innerHTML = '<option value="all">🌍 All Regions</option>';
+
+    // Add region options
+    Array.from(regions).sort().forEach(region => {
+        const option = document.createElement('option');
+        option.value = region;
+        option.textContent = `📍 ${region}`;
+        select.appendChild(option);
+    });
+}
+
+function filterByRegion(region) {
+    if (!allNodes || !network) return;
+
+    if (region === 'all') {
+        // Show all nodes
+        visibleNodes = new vis.DataSet(allNodes.get());
+        visibleEdges = new vis.DataSet(allEdges.get());
+        network.setData({ nodes: visibleNodes, edges: visibleEdges });
+        network.fit({ animation: { duration: 500 } });
+        updateStats({
+            total_nodes: visibleNodes.length,
+            total_edges: visibleEdges.length,
+            regions: new Set(allNodes.get().filter(n => n.deviceData).map(n => n.deviceData.region)).size
+        });
+        return;
+    }
+
+    // Filter nodes by region
+    const filtered = allNodes.get().filter(node => {
+        // Keep region nodes, branch nodes in the region, and devices in the region
+        if (node.id === `region_${region}`) return true;
+        if (node.deviceData && node.deviceData.region === region) return true;
+        if (node.id.startsWith('branch_') && node.region === region) return true;
+        return false;
+    });
+
+    const nodeIds = filtered.map(n => n.id);
+    const filteredEdges = allEdges.get().filter(edge =>
+        nodeIds.includes(edge.from) && nodeIds.includes(edge.to)
+    );
+
+    visibleNodes = new vis.DataSet(filtered);
+    visibleEdges = new vis.DataSet(filteredEdges);
+
+    network.setData({ nodes: visibleNodes, edges: visibleEdges });
+    network.fit({ animation: { duration: 500 } });
+
+    // Update stats for filtered view
+    const devices = filtered.filter(n => n.deviceData);
+    updateStats({
+        total_nodes: filtered.length,
+        total_edges: filteredEdges.length,
+        regions: 1
+    });
+}
+
+function zoomIn() {
+    const scale = network.getScale();
+    network.moveTo({ scale: scale * 1.3, animation: { duration: 300 } });
+}
+
+function zoomOut() {
+    const scale = network.getScale();
+    network.moveTo({ scale: scale * 0.7, animation: { duration: 300 } });
+}
+
+function resetTopology() {
+    if (network) {
+        network.fit({ animation: { duration: 800 } });
+    }
+}
+
+function togglePhysics() {
+    physicsEnabled = !physicsEnabled;
+    network.setOptions({ physics: physicsEnabled });
+
+    const button = document.getElementById('physics-toggle');
+    button.innerHTML = physicsEnabled ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+}
+
+function changeLayout(layoutType) {
+    let options = {};
+
+    switch (layoutType) {
+        case 'hierarchical':
+            options = {
+                layout: {
+                    hierarchical: {
+                        enabled: true,
+                        direction: 'UD',
+                        sortMethod: 'directed',
+                        nodeSpacing: 200,
+                        levelSeparation: 250
+                    }
+                },
+                physics: { enabled: false }
+            };
+            break;
+        case 'force':
+            options = {
+                layout: { hierarchical: { enabled: false } },
+                physics: {
+                    enabled: true,
+                    barnesHut: {
+                        gravitationalConstant: -4000,
+                        centralGravity: 0.3,
+                        springLength: 200,
+                        springConstant: 0.04
+                    }
+                }
+            };
+            physicsEnabled = true;
+            break;
+        case 'circular':
+            options = {
+                layout: { hierarchical: { enabled: false } },
+                physics: { enabled: false }
+            };
+
+            const nodeIds = visibleNodes.getIds().filter(id =>
+                !id.startsWith('region_') && !id.startsWith('branch_')
+            );
+            const radius = 600;
+            const angleStep = (2 * Math.PI) / nodeIds.length;
+
+            nodeIds.forEach((id, index) => {
+                const angle = index * angleStep;
+                visibleNodes.update({
+                    id: id,
+                    x: radius * Math.cos(angle),
+                    y: radius * Math.sin(angle)
+                });
+            });
+            break;
+    }
+
+    network.setOptions(options);
+    const button = document.getElementById('physics-toggle');
+    button.innerHTML = physicsEnabled ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+}
+
+function takeScreenshot() {
+    const canvas = document.querySelector('#topology-network canvas');
+    if (canvas) {
+        canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `topology-${new Date().toISOString().split('T')[0]}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showNotification('Screenshot saved', 'success');
+        });
+    }
+}
+
+function toggleFullscreen() {
+    const elem = document.querySelector('.topology-page');
+    if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(err => console.log(err));
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+function showLoading(show) {
+    const loading = document.getElementById('topology-loading');
+    if (loading) loading.style.display = show ? 'flex' : 'none';
+}
+
+function showError(message) {
+    const container = document.getElementById('topology-network');
+    if (container) {
+        container.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem; text-align: center;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #dc3545; margin-bottom: 1rem;"></i>
+                <h3 style="margin: 0 0 0.5rem 0;">Failed to Load Topology</h3>
+                <p style="color: #666; margin: 0 0 1rem 0;">${message}</p>
+                <button onclick="location.reload()" style="padding: 0.75rem 1.5rem; background: #1a8fff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    <i class="fas fa-redo"></i> Reload Page
+                </button>
+            </div>
+        `;
+    }
+}
+
+// ============================================
+// Router Interface Monitoring
+// ============================================
+
+let interfaceWebSocket = null;
+let currentRouterHostId = null;
+
+function setupEventHandlers() {
+    network.on('click', params => {
+        if (params.nodes.length > 0) {
+            selectedNodeId = params.nodes[0];
+            const node = allNodes.get(selectedNodeId);
+
+            // Reset scroll position for panels
+            const interfacePanel = document.getElementById('interface-panel');
+            const nodePanel = document.getElementById('node-info-panel');
+            if (interfacePanel) {
+                const content = interfacePanel.querySelector('.panel-content');
+                if (content) content.scrollTop = 0;
+            }
+            if (nodePanel) {
+                const content = nodePanel.querySelector('.panel-content');
+                if (content) content.scrollTop = 0;
+            }
+
+            // Check if clicked node is a core router
+            if (node && node.deviceType === 'Core Router') {
+                showRouterInterfaces(selectedNodeId, node.label);
+            } else {
+                showNodeInfo(selectedNodeId);
+            }
+        } else {
+            closeNodePanel();
+            closeInterfacePanel();
+        }
+    });
+
+    network.on('doubleClick', params => {
+        if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0];
+            if (!nodeId.startsWith('region_') && !nodeId.startsWith('branch_')) {
+                window.location.href = `/device/${nodeId}`;
+            }
+        }
+    });
+
+    network.on('hoverNode', () => document.body.style.cursor = 'pointer');
+    network.on('blurNode', () => document.body.style.cursor = 'default');
+}
+
+function showRouterInterfaces(hostid, routerName) {
+    currentRouterHostId = hostid;
+
+    // Close node panel if open
+    closeNodePanel();
+
+    // Show interface panel
+    const panel = document.getElementById('interface-panel');
+    panel.style.display = 'block';
+
+    // Update title
+    document.getElementById('interface-panel-title').innerHTML =
+        `<i class="fas fa-network-wired"></i> ${routerName} Interfaces`;
+
+    // Show loading
+    document.getElementById('interface-list').innerHTML = `
+        <div class="loading-interfaces">
+            <i class="fas fa-spinner fa-spin"></i> Connecting to live feed...
+        </div>
+    `;
+
+    // Connect WebSocket for live updates
+    connectInterfaceWebSocket(hostid);
+}
+
+function connectInterfaceWebSocket(hostid) {
+    // Close existing connection
+    if (interfaceWebSocket) {
+        interfaceWebSocket.close();
+    }
+
+    // Determine WebSocket protocol (ws or wss)
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/router-interfaces/${hostid}`;
+
+    try {
+        interfaceWebSocket = new WebSocket(wsUrl);
+
+        interfaceWebSocket.onopen = () => {
+            console.log(`WebSocket connected for router ${hostid}`);
+        };
+
+        interfaceWebSocket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'interface_update') {
+                updateInterfacePanel(data);
+            }
+        };
+
+        interfaceWebSocket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            const container = document.getElementById('interfaces-container') || document.getElementById('interface-list');
+            if (container) {
+                container.innerHTML = `
+                    <div class="loading-state" style="color: #ef4444;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Connection error - Check server logs</span>
+                    </div>
+                `;
+            }
+        };
+
+        interfaceWebSocket.onclose = () => {
+            console.log('WebSocket closed');
+        };
+
+    } catch (error) {
+        console.error('Failed to connect WebSocket:', error);
+    }
+}
+
+function updateInterfacePanel(data) {
+    // Update summary stats - handle both old and new element IDs
+    const upEl = document.getElementById('iface-up') || document.getElementById('interfaces-up');
+    const downEl = document.getElementById('iface-down') || document.getElementById('interfaces-down');
+    const bwInEl = document.getElementById('total-bw-in') || document.getElementById('bandwidth-in');
+    const bwOutEl = document.getElementById('total-bw-out') || document.getElementById('bandwidth-out');
+
+    if (upEl) upEl.textContent = data.summary.up;
+    if (downEl) downEl.textContent = data.summary.down;
+    if (bwInEl) bwInEl.textContent = data.summary.bandwidth_in_mbps.toFixed(1);
+    if (bwOutEl) bwOutEl.textContent = data.summary.bandwidth_out_mbps.toFixed(1);
+
+    // Update interface list - handle both old and new container IDs
+    const interfaceList = document.getElementById('interfaces-container') || document.getElementById('interface-list');
+
+    if (!interfaceList) {
+        console.error('Interface list container not found');
+        return;
+    }
+
+    if (!data.interfaces || data.interfaces.length === 0) {
+        interfaceList.innerHTML = `
+            <div class="loading-state">
+                <i class="fas fa-info-circle"></i>
+                <span>No interfaces found</span>
+            </div>
+        `;
+        return;
+    }
+
+    // Use modern card design
+    interfaceList.innerHTML = data.interfaces.map(iface => `
+        <div class="interface-card">
+            <div class="interface-header">
+                <div class="interface-name">${iface.name}</div>
+                <span class="interface-badge ${iface.status}">${iface.status.toUpperCase()}</span>
+            </div>
+            ${iface.description ? `<div class="interface-desc">${iface.description}</div>` : ''}
+            <div class="interface-metrics">
+                <div class="metric">
+                    <i class="fas fa-arrow-down"></i>
+                    <span class="metric-value">${iface.bandwidth_in_mbps.toFixed(2)}</span> Mbps
+                </div>
+                <div class="metric">
+                    <i class="fas fa-arrow-up"></i>
+                    <span class="metric-value">${iface.bandwidth_out_mbps.toFixed(2)}</span> Mbps
+                </div>
+                ${iface.errors_in > 0 || iface.errors_out > 0 ? `
+                    <div class="error-indicator">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Errors: ${iface.errors_in} in / ${iface.errors_out} out
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function closeInterfacePanel() {
+    const panel = document.getElementById('router-panel') || document.getElementById('interface-panel');
+    if (panel) {
+        panel.style.display = 'none';
+    }
+
+    // Close WebSocket connection
+    if (interfaceWebSocket) {
+        interfaceWebSocket.close();
+        interfaceWebSocket = null;
+    }
+
+    currentRouterHostId = null;
+}
+
+// Make closeRouterPanel an alias
+function closeRouterPanel() {
+    closeInterfacePanel();
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initTopology, 100);
+});

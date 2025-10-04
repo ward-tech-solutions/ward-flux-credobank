@@ -1,0 +1,20 @@
+# Existing
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+httpx==0.26.0
+pyzabbix==1.3.0
+python-dotenv==1.0.0
+
+# NEW - Authentication
+python-jose[cryptography]==3.3.0  # JWT tokens
+passlib[bcrypt]==1.7.4            # Password hashing
+python-multipart==0.0.6           # Form data
+
+# NEW - Database
+sqlalchemy==2.0.25                # ORM
+alembic==1.13.1                   # Database migrations
+
+# NEW - Bulk Operations
+pandas==2.2.0                     # CSV processing
+openpyxl==3.1.2                   # Excel support

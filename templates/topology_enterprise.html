@@ -1,0 +1,795 @@
+{% extends "base.html" %}
+{% set show_sidebar = False %}
+
+{% block title %}Network Topology - WARD OPS{% endblock %}
+
+{% block content %}
+<div class="topology-enterprise">
+    <!-- Top Control Bar -->
+    <div class="topology-toolbar">
+        <div class="toolbar-left">
+            <div class="topology-title">
+                <i class="fas fa-sitemap"></i>
+                <span>Network Infrastructure Map</span>
+            </div>
+            <div class="view-selector">
+                <button class="view-btn active" data-view="hierarchical">
+                    <i class="fas fa-layer-group"></i> Hierarchical
+                </button>
+                <button class="view-btn" data-view="geographic">
+                    <i class="fas fa-map-marked-alt"></i> Geographic
+                </button>
+            </div>
+        </div>
+
+        <div class="toolbar-center">
+            <div class="search-container">
+                <i class="fas fa-search"></i>
+                <input type="text" id="topo-search" placeholder="Search devices, IP, location..." autocomplete="off">
+            </div>
+        </div>
+
+        <div class="toolbar-right">
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="zoomIn()"><i class="fas fa-search-plus"></i></button>
+                <button class="zoom-btn" onclick="resetZoom()"><i class="fas fa-compress-arrows-alt"></i></button>
+                <button class="zoom-btn" onclick="zoomOut()"><i class="fas fa-search-minus"></i></button>
+            </div>
+            <button class="toolbar-btn" onclick="toggleMiniMap()">
+                <i class="fas fa-map"></i> Mini Map
+            </button>
+            <button class="toolbar-btn" onclick="exportTopology()">
+                <i class="fas fa-download"></i> Export
+            </button>
+            <button class="toolbar-btn" onclick="toggleFullscreen()">
+                <i class="fas fa-expand"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Dashboard -->
+    <div class="stats-dashboard">
+        <div class="stat-card">
+            <div class="stat-icon core"><i class="fas fa-server"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Core Routers</div>
+                <div class="stat-value" id="core-count">2</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon branch"><i class="fas fa-network-wired"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Branch Switches</div>
+                <div class="stat-value" id="branch-count">0</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon device"><i class="fas fa-hdd"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">End Devices</div>
+                <div class="stat-value" id="device-count">0</div>
+            </div>
+        </div>
+        <div class="stat-card success">
+            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Online</div>
+                <div class="stat-value" id="online-count">0</div>
+            </div>
+        </div>
+        <div class="stat-card danger">
+            <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Issues</div>
+                <div class="stat-value" id="offline-count">0</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-exchange-alt"></i></div>
+            <div class="stat-content">
+                <div class="stat-label">Total Links</div>
+                <div class="stat-value" id="link-count">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Visualization Area -->
+    <div class="topology-workspace">
+        <!-- Left Sidebar - Device Tree -->
+        <div class="device-tree-panel" id="device-tree">
+            <div class="panel-header">
+                <i class="fas fa-stream"></i> Device Hierarchy
+            </div>
+            <div class="tree-content" id="tree-content">
+                <div class="loading-tree">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Canvas -->
+        <div class="topology-canvas-area">
+            <div id="network-canvas"></div>
+
+            <!-- Floating Legend -->
+            <div class="floating-legend">
+                <div class="legend-title">Legend</div>
+                <div class="legend-grid">
+                    <div class="legend-row">
+                        <span class="legend-icon core-router"><i class="fas fa-server"></i></span>
+                        <span>Core Router</span>
+                    </div>
+                    <div class="legend-row">
+                        <span class="legend-icon branch-switch"><i class="fas fa-network-wired"></i></span>
+                        <span>Branch Switch</span>
+                    </div>
+                    <div class="legend-row">
+                        <span class="legend-icon atm"><i class="fas fa-credit-card"></i></span>
+                        <span>ATM</span>
+                    </div>
+                    <div class="legend-row">
+                        <span class="legend-icon nvr"><i class="fas fa-video"></i></span>
+                        <span>NVR</span>
+                    </div>
+                    <div class="legend-row">
+                        <span class="legend-icon paybox"><i class="fas fa-cash-register"></i></span>
+                        <span>Paybox</span>
+                    </div>
+                    <div class="legend-row">
+                        <span class="legend-status online"></span>
+                        <span>Online / Up</span>
+                    </div>
+                    <div class="legend-row">
+                        <span class="legend-status offline"></span>
+                        <span>Offline / Down</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini Map -->
+            <div class="mini-map" id="mini-map" style="display: none;">
+                <div class="mini-map-header">Overview</div>
+                <div id="mini-map-canvas"></div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Device Details / Router Interfaces -->
+        <div class="details-panel" id="details-panel">
+            <div class="panel-header">
+                <div class="header-title">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="details-title">Device Information</span>
+                </div>
+                <button class="close-btn" onclick="closeDetailsPanel()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="details-content">
+                <div class="empty-state">
+                    <i class="fas fa-mouse-pointer"></i>
+                    <p>Click on a device to view details</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Loading network topology...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"></script>
+<script src="{{ url_for('static', filename='js/topology_enterprise.js') }}"></script>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.css">
+<style>
+/* Enterprise NOC Topology Styles - WARD Theme */
+:root {
+    --noc-bg: #0d1117;
+    --noc-surface: #161b22;
+    --noc-elevated: #1c2128;
+    --noc-border: #21262d;
+    --noc-border-hover: #30363d;
+    --noc-text: #F3F4F6;
+    --noc-text-secondary: #9CA3AF;
+    --noc-primary: #5EBBA8;          /* WARD Green */
+    --noc-success: #5EBBA8;          /* WARD Green - unified */
+    --noc-success-light: #72CFB8;    /* WARD Green Light */
+    --noc-danger: #ef4444;
+    --noc-warning: #f59e0b;
+    --noc-core: #FF6B35;             /* Core Router Orange */
+    --noc-branch: #14b8a6;           /* Branch Teal */
+}
+
+.topology-enterprise {
+    width: 100%;
+    height: 100vh;
+    background: var(--noc-bg) !important;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Force dark theme - override any light mode */
+.topology-enterprise * {
+    color-scheme: dark;
+}
+
+body:has(.topology-enterprise) {
+    background: var(--noc-bg) !important;
+}
+
+/* Toolbar */
+.topology-toolbar {
+    background: var(--noc-surface);
+    border-bottom: 1px solid var(--noc-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    height: 60px;
+    gap: 1.5rem;
+}
+
+.toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.topology-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--noc-text);
+}
+
+.topology-title i {
+    color: var(--noc-primary);
+    font-size: 1.25rem;
+}
+
+.view-selector {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--noc-bg);
+    padding: 0.25rem;
+    border-radius: 6px;
+}
+
+.view-btn {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: none;
+    color: var(--noc-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.view-btn:hover {
+    background: var(--noc-elevated);
+    color: var(--noc-text);
+}
+
+.view-btn.active {
+    background: var(--noc-primary);
+    color: white;
+}
+
+.toolbar-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.search-container {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+}
+
+.search-container i {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--noc-text-secondary);
+}
+
+.search-container input {
+    width: 100%;
+    padding: 0.625rem 1rem 0.625rem 2.75rem;
+    background: var(--noc-bg);
+    border: 1px solid var(--noc-border);
+    border-radius: 6px;
+    color: var(--noc-text);
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.search-container input:focus {
+    outline: none;
+    border-color: var(--noc-primary);
+    background: var(--noc-elevated);
+}
+
+.toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.zoom-controls {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--noc-bg);
+    padding: 0.25rem;
+    border-radius: 6px;
+}
+
+.zoom-btn {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    color: var(--noc-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.zoom-btn:hover {
+    background: var(--noc-elevated);
+    color: var(--noc-primary);
+    transform: scale(1.1);
+}
+
+.toolbar-btn {
+    padding: 0.5rem 1rem;
+    background: var(--noc-elevated);
+    border: 1px solid var(--noc-border);
+    color: var(--noc-text);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.toolbar-btn:hover {
+    background: var(--noc-border-hover);
+    border-color: var(--noc-primary);
+    color: var(--noc-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(94, 187, 168, 0.2);
+}
+
+.toolbar-btn:active {
+    transform: translateY(0);
+}
+
+/* Stats Dashboard */
+.stats-dashboard {
+    background: var(--noc-surface);
+    border-bottom: 1px solid var(--noc-border);
+    display: flex;
+    gap: 1px;
+    padding: 0;
+}
+
+.stat-card {
+    flex: 1;
+    background: var(--noc-bg);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.3s ease;
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: transparent;
+    transition: background 0.3s;
+}
+
+.stat-card:hover {
+    background: var(--noc-elevated);
+    transform: translateY(-2px);
+}
+
+.stat-card:hover::before {
+    background: var(--noc-primary);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    background: var(--noc-elevated);
+    color: var(--noc-text-secondary);
+}
+
+.stat-icon.core {
+    background: rgba(255, 107, 53, 0.1);
+    color: var(--noc-core);
+}
+
+.stat-icon.branch {
+    background: rgba(94, 187, 168, 0.15);
+    color: var(--noc-branch);
+}
+
+.stat-icon.device {
+    background: rgba(94, 187, 168, 0.1);
+    color: var(--noc-primary);
+}
+
+.stat-card.success .stat-icon {
+    background: rgba(63, 185, 80, 0.1);
+    color: var(--noc-success);
+}
+
+.stat-card.danger .stat-icon {
+    background: rgba(248, 81, 73, 0.1);
+    color: var(--noc-danger);
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--noc-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--noc-text);
+    line-height: 1;
+}
+
+/* Workspace */
+.topology-workspace {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* Device Tree Panel */
+.device-tree-panel {
+    width: 280px;
+    background: var(--noc-surface);
+    border-right: 1px solid var(--noc-border);
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--noc-border);
+    font-weight: 600;
+    color: var(--noc-text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.panel-header i {
+    color: var(--noc-primary);
+}
+
+.tree-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem;
+}
+
+.loading-tree {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    color: var(--noc-text-secondary);
+    gap: 1rem;
+}
+
+/* Topology Canvas */
+.topology-canvas-area {
+    flex: 1;
+    position: relative;
+    background: var(--noc-bg);
+}
+
+#network-canvas {
+    width: 100%;
+    height: 100%;
+    background: var(--noc-bg);
+}
+
+#network-canvas canvas {
+    background: var(--noc-bg) !important;
+}
+
+.vis-network {
+    background: var(--noc-bg) !important;
+}
+
+/* Floating Legend */
+.floating-legend {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 1.5rem;
+    background: var(--noc-surface);
+    border: 1px solid var(--noc-border);
+    border-radius: 8px;
+    padding: 1rem;
+    min-width: 200px;
+}
+
+.legend-title {
+    font-weight: 600;
+    color: var(--noc-text);
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.legend-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.legend-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--noc-text-secondary);
+}
+
+.legend-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+}
+
+.legend-icon.core-router {
+    background: rgba(255, 107, 53, 0.15);
+    color: var(--noc-core);
+}
+
+.legend-icon.branch-switch {
+    background: rgba(20, 184, 166, 0.15);
+    color: var(--noc-branch);
+}
+
+.legend-icon.atm {
+    background: rgba(147, 51, 234, 0.15);
+    color: #9333ea;
+}
+
+.legend-icon.nvr {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+.legend-icon.paybox {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.legend-status {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.legend-status.online {
+    background: var(--noc-success);  /* WARD Green */
+    box-shadow: 0 0 8px rgba(94, 187, 168, 0.5);
+}
+
+.legend-status.offline {
+    background: var(--noc-danger);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+/* Mini Map */
+.mini-map {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    width: 220px;
+    height: 160px;
+    background: var(--noc-surface);
+    border: 1px solid var(--noc-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.mini-map-header {
+    padding: 0.5rem 0.75rem;
+    background: var(--noc-elevated);
+    border-bottom: 1px solid var(--noc-border);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--noc-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#mini-map-canvas {
+    width: 100%;
+    height: calc(100% - 32px);
+}
+
+/* Details Panel */
+.details-panel {
+    width: 380px;
+    background: var(--noc-surface);
+    border-left: 1px solid var(--noc-border);
+    display: flex;
+    flex-direction: column;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.close-btn {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    color: var(--noc-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    background: var(--noc-danger);
+    color: white;
+}
+
+.panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--noc-text-secondary);
+    text-align: center;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(13, 17, 23, 0.98);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-spinner {
+    width: 70px;
+    height: 70px;
+    border: 5px solid rgba(94, 187, 168, 0.1);
+    border-top-color: var(--noc-primary);
+    border-right-color: var(--noc-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 2rem;
+    box-shadow: 0 0 30px rgba(94, 187, 168, 0.3);
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-overlay p {
+    color: var(--noc-text);
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Vis.js Tooltip Override */
+.vis-tooltip {
+    background: var(--noc-surface) !important;
+    border: 1px solid var(--noc-border) !important;
+    color: var(--noc-text) !important;
+    padding: 0.75rem 1rem !important;
+    border-radius: 6px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+    font-size: 0.875rem !important;
+    max-width: 320px !important;
+}
+
+/* Scrollbar Styling */
+.tree-content::-webkit-scrollbar,
+.panel-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.tree-content::-webkit-scrollbar-track,
+.panel-content::-webkit-scrollbar-track {
+    background: var(--noc-bg);
+}
+
+.tree-content::-webkit-scrollbar-thumb,
+.panel-content::-webkit-scrollbar-thumb {
+    background: var(--noc-border);
+    border-radius: 4px;
+}
+
+.tree-content::-webkit-scrollbar-thumb:hover,
+.panel-content::-webkit-scrollbar-thumb:hover {
+    background: var(--noc-border-hover);
+}
+</style>
+{% endblock %}

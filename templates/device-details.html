@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Device Details - Network Monitoring{% endblock %}
+
+{% block content %}
+<div class="device-details-page">
+    <div class="page-header">
+        <h2 class="page-title" id="device-title">Device Details</h2>
+        <div class="page-actions">
+            <button class="btn-secondary" onclick="window.location.href='/devices'">← Back to Devices</button>
+            <button class="btn-danger" onclick="deleteDevice()">Delete Device</button>
+        </div>
+    </div>
+    
+    <!-- Device Info Card -->
+    <div class="section-card">
+        <h3>Device Information</h3>
+        <div class="info-grid" id="device-info">
+            <div class="loading">Loading device information...</div>
+        </div>
+    </div>
+    
+    <!-- Active Triggers -->
+    <div class="section-card">
+        <h3>Active Problems <span class="badge" id="problems-count">0</span></h3>
+        <div class="table-container">
+            <table class="data-table" id="triggers-table">
+                <thead>
+                    <tr>
+                        <th>Severity</th>
+                        <th>Description</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="triggers-body">
+                    <tr><td colspan="3">No active problems</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Monitored Items -->
+    <div class="section-card">
+        <h3>Monitored Items</h3>
+        <div class="table-container">
+            <table class="data-table" id="items-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Last Value</th>
+                        <th>Last Check</th>
+                    </tr>
+                </thead>
+                <tbody id="items-body">
+                    <tr><td colspan="3" class="loading">Loading items...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const hostid = '{{ hostid }}';
+    
+    function loadDeviceDetails() {
+        fetch(`/api/device/${hostid}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('device-info').innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+                
+                // Update title
+                document.getElementById('device-title').textContent = data.display_name;
+                
+                // Device info
+                const statusClass = data.available === 'Available' ? 'status-online' : 
+                                  data.available === 'Unavailable' ? 'status-offline' : 'status-unknown';
+                
+                document.getElementById('device-info').innerHTML = `
+                    <div class="info-item">
+                        <strong>Status:</strong>
+                        <span class="${statusClass}">${data.available}</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Hostname:</strong>
+                        <span>${data.hostname}</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>IP Address:</strong>
+                        <span>${data.ip}</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Groups:</strong>
+                        <span>${data.groups.join(', ')}</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Host ID:</strong>
+                        <span>${data.hostid}</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Enabled:</strong>
+                        <span>${data.status}</span>
+                    </div>
+                `;
+                
+                // Triggers
+                const triggers = data.triggers.filter(t => parseInt(t.value) === 1);
+                document.getElementById('problems-count').textContent = triggers.length;
+                
+                if (triggers.length > 0) {
+                    document.getElementById('triggers-body').innerHTML = triggers.map(t => `
+                        <tr>
+                            <td><span class="severity severity-${t.priority}">${getSeverityName(t.priority)}</span></td>
+                            <td>${t.description}</td>
+                            <td>${new Date(parseInt(t.lastchange) * 1000).toLocaleString()}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    document.getElementById('triggers-body').innerHTML = '<tr><td colspan="3">No active problems</td></tr>';
+                }
+                
+                // Items
+                if (data.items && data.items.length > 0) {
+                    document.getElementById('items-body').innerHTML = data.items.map(item => `
+                        <tr>
+                            <td>${item.name}</td>
+                            <td>${item.lastvalue || 'N/A'} ${item.units || ''}</td>
+                            <td>${item.lastclock ? new Date(parseInt(item.lastclock) * 1000).toLocaleString() : 'Never'}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    document.getElementById('items-body').innerHTML = '<tr><td colspan="3">No items monitored</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading device details:', error);
+                document.getElementById('device-info').innerHTML = '<div class="error">Failed to load device details</div>';
+            });
+    }
+    
+    function getSeverityName(priority) {
+        const severities = ['Not classified', 'Information', 'Warning', 'Average', 'High', 'Disaster'];
+        return severities[parseInt(priority)] || 'Unknown';
+    }
+    
+    function deleteDevice() {
+        if (!confirm('Are you sure you want to delete this device? This action cannot be undone.')) {
+            return;
+        }
+        
+        fetch(`/api/host/delete/${hostid}`, { method: 'DELETE' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Device deleted successfully');
+                    window.location.href = '/devices';
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to delete device');
+            });
+    }
+    
+    function refreshData() {
+        loadDeviceDetails();
+    }
+    
+    // Initial load
+    loadDeviceDetails();
+    startAutoRefresh(30000);
+</script>
+{% endblock %}

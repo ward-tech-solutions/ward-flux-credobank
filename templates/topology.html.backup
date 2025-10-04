@@ -1,0 +1,571 @@
+{% extends "base.html" %}
+{% set show_sidebar = False %}
+
+{% block title %}Network Topology - Network Monitoring{% endblock %}
+
+{% block content %}
+<div class="topology-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title">
+            <h1><i class="fas fa-project-diagram"></i> Network Topology</h1>
+            <span class="page-subtitle">Interactive network visualization</span>
+        </div>
+        <div class="page-actions">
+            <div class="topology-controls">
+                <!-- Search Box -->
+                <input type="text" id="topology-search" class="search-box" placeholder="Search devices..." style="width: 200px;" oninput="searchTopology(this.value)">
+
+                <!-- Region Filter - NEW! -->
+                <select id="region-filter" class="filter-dropdown" onchange="filterByRegion(this.value)" style="min-width: 150px;">
+                    <option value="all">🌍 All Regions</option>
+                </select>
+
+                <!-- View Type -->
+                <select id="view-select" class="filter-dropdown" onchange="changeView(this.value)">
+                    <option value="hierarchical">📊 Hierarchical</option>
+                    <option value="flat">🌐 Flat View</option>
+                </select>
+
+                <!-- Layout -->
+                <select id="layout-select" class="filter-dropdown" onchange="changeLayout(this.value)">
+                    <option value="hierarchical">Tree Layout</option>
+                    <option value="force">Force</option>
+                    <option value="circular">Circular</option>
+                </select>
+
+                <!-- Filter Status -->
+                <select id="status-filter" class="filter-dropdown" onchange="filterByStatus(this.value)">
+                    <option value="all">All Status</option>
+                    <option value="Up">✅ Online Only</option>
+                    <option value="Down">❌ Offline Only</option>
+                </select>
+
+                <!-- Controls -->
+                <button class="btn-control" onclick="zoomIn()" title="Zoom In">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+                <button class="btn-control" onclick="zoomOut()" title="Zoom Out">
+                    <i class="fas fa-search-minus"></i>
+                </button>
+                <button class="btn-control" onclick="resetTopology()" title="Reset View">
+                    <i class="fas fa-compress-arrows-alt"></i>
+                </button>
+                <button class="btn-control" onclick="togglePhysics()" title="Toggle Physics" id="physics-toggle">
+                    <i class="fas fa-pause"></i>
+                </button>
+                <button class="btn-control" onclick="takeScreenshot()" title="Screenshot">
+                    <i class="fas fa-camera"></i>
+                </button>
+                <button class="btn-control" onclick="toggleFullscreen()" title="Fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Topology Stats Bar -->
+    <div class="topology-stats">
+        <div class="stat-item">
+            <i class="fas fa-circle-notch"></i>
+            <span id="node-count">0</span> Nodes
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-link"></i>
+            <span id="edge-count">0</span> Connections
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-map-marker-alt"></i>
+            <span id="region-count">0</span> Regions
+        </div>
+        <div class="stat-item online">
+            <i class="fas fa-check-circle"></i>
+            <span id="online-count">0</span> Online
+        </div>
+        <div class="stat-item offline">
+            <i class="fas fa-times-circle"></i>
+            <span id="offline-count">0</span> Offline
+        </div>
+    </div>
+
+    <!-- Topology Canvas -->
+    <div class="topology-container">
+        <div id="topology-network"></div>
+
+        <!-- Node Info Panel -->
+        <div id="node-info-panel" class="node-info-panel" style="display: none;">
+            <div class="panel-header">
+                <h3 id="panel-title">Node Information</h3>
+                <button onclick="closeNodePanel()">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div class="info-row">
+                    <span class="info-label">Type:</span>
+                    <span class="info-value" id="node-type">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value" id="node-status">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Region:</span>
+                    <span class="info-value" id="node-region">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Branch:</span>
+                    <span class="info-value" id="node-branch">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">IP Address:</span>
+                    <span class="info-value" id="node-ip">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Connections:</span>
+                    <span class="info-value" id="node-connections">-</span>
+                </div>
+                <button class="btn-view-details" onclick="viewDeviceDetails()">
+                    <i class="fas fa-external-link-alt"></i> View Full Details
+                </button>
+            </div>
+        </div>
+
+        <!-- Router Interface Panel -->
+        <div id="interface-panel" class="interface-panel" style="display: none;">
+            <div class="panel-header">
+                <h3 id="interface-panel-title">
+                    <i class="fas fa-network-wired"></i> Router Interfaces
+                </h3>
+                <button onclick="closeInterfacePanel()" class="close-btn">&times;</button>
+            </div>
+            <div class="panel-content">
+                <!-- Summary Stats -->
+                <div class="interface-summary">
+                    <div class="summary-stat">
+                        <div class="stat-icon"><i class="fas fa-check-circle" style="color: #10b981;"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="interfaces-up">0</div>
+                            <div class="stat-label">Up</div>
+                        </div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="stat-icon"><i class="fas fa-times-circle" style="color: #ef4444;"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="interfaces-down">0</div>
+                            <div class="stat-label">Down</div>
+                        </div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="stat-icon"><i class="fas fa-arrow-down" style="color: #3b82f6;"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="bandwidth-in">0</div>
+                            <div class="stat-label">Mbps In</div>
+                        </div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="stat-icon"><i class="fas fa-arrow-up" style="color: #8b5cf6;"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="bandwidth-out">0</div>
+                            <div class="stat-label">Mbps Out</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Status Indicator -->
+                <div class="live-indicator">
+                    <span class="live-dot"></span> Live Data - Updates every 5s
+                </div>
+
+                <!-- Interface List -->
+                <div id="interface-list" class="interface-list">
+                    <div class="loading-interfaces">
+                        <i class="fas fa-spinner fa-spin"></i> Loading interfaces...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="topology-legend">
+            <h4>Legend</h4>
+            <div class="legend-item">
+                <div class="legend-marker" style="background: #FF6B35; box-shadow: 0 0 8px rgba(255, 107, 53, 0.5);"></div>
+                <span>Core Router</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-marker" style="background: #14b8a6; box-shadow: 0 0 8px rgba(20, 184, 166, 0.5);"></div>
+                <span>Branch Switch</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-marker" style="background: #5EBBA8; box-shadow: 0 0 8px rgba(94, 187, 168, 0.5);"></div>
+                <span>Online / Up</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-marker" style="background: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);"></div>
+                <span>Offline / Down</span>
+            </div>
+            <div class="legend-item">
+                <i class="fas fa-router"></i>
+                <span>Router</span>
+            </div>
+            <div class="legend-item">
+                <i class="fas fa-network-wired"></i>
+                <span>Switch</span>
+            </div>
+            <div class="legend-item">
+                <i class="fas fa-wifi"></i>
+                <span>Access Point</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="topology-loading" class="loading-overlay">
+        <div class="spinner-large"></div>
+        <p>Building network topology...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"></script>
+<script src="{{ url_for('static', filename='js/topology.js') }}"></script>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.css">
+<style>
+/* Interface Panel Styles */
+.interface-panel {
+    position: absolute;
+    top: 120px;
+    right: 20px;
+    width: 420px;
+    height: calc(100vh - 160px);
+    max-height: 800px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    overflow: hidden;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+}
+
+.interface-panel .panel-header {
+    padding: 15px 20px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.interface-panel .panel-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.interface-panel .close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.interface-panel .close-btn:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.interface-panel .panel-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.interface-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.summary-stat {
+    background: var(--bg-tertiary);
+    padding: 15px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.stat-icon {
+    font-size: 24px;
+}
+
+.stat-info {
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 15px;
+    background: rgba(94, 187, 168, 0.1);
+    border: 1px solid rgba(94, 187, 168, 0.3);
+    border-radius: 6px;
+    margin-bottom: 15px;
+    font-size: 13px;
+    color: #5EBBA8;
+    font-weight: 600;
+}
+
+.live-dot {
+    width: 10px;
+    height: 10px;
+    background: #5EBBA8;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+    box-shadow: 0 0 8px rgba(94, 187, 168, 0.6);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.interface-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.loading-interfaces {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.interface-item {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    padding: 12px 15px;
+    transition: all 0.2s;
+}
+
+.interface-item:hover {
+    border-color: #5EBBA8;
+    box-shadow: 0 2px 8px rgba(94, 187, 168, 0.3);
+    transform: translateX(3px);
+}
+
+.interface-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.interface-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.interface-status {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.interface-status.up {
+    background: rgba(94, 187, 168, 0.2);
+    color: #5EBBA8;
+    border: 1px solid rgba(94, 187, 168, 0.3);
+}
+
+.interface-status.down {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.interface-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    font-size: 12px;
+}
+
+.metric-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+}
+
+.metric-item i {
+    width: 14px;
+    font-size: 11px;
+}
+
+.metric-value {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.error-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Topology Container & Network Canvas - CRITICAL FIXES */
+.topology-container {
+    position: relative;
+    height: calc(100vh - 280px);
+    min-height: 600px;
+    background: var(--bg-primary);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+#topology-network {
+    width: 100%;
+    height: 100%;
+    background: var(--bg-primary) !important;
+}
+
+#topology-network canvas {
+    background: var(--bg-primary) !important;
+}
+
+/* Node Info Panel */
+.node-info-panel {
+    position: absolute;
+    top: 120px;
+    right: 20px;
+    width: 350px;
+    max-height: calc(100vh - 200px);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    overflow: hidden;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+}
+
+.node-info-panel .panel-header {
+    padding: 15px 20px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.node-info-panel .panel-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--text-primary);
+}
+
+.node-info-panel .panel-header button {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.node-info-panel .panel-header button:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.node-info-panel .panel-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Panel scrollbar */
+.panel-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.panel-content::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.panel-content::-webkit-scrollbar-thumb {
+    background: var(--border-light);
+    border-radius: 4px;
+}
+
+.panel-content::-webkit-scrollbar-thumb:hover {
+    background: #5EBBA8;
+}
+
+/* Vis.js tooltip override */
+.vis-tooltip {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-light) !important;
+    color: var(--text-primary) !important;
+    padding: 12px 16px !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+    font-size: 13px !important;
+    max-width: 300px !important;
+    line-height: 1.6 !important;
+}
+</style>
+{% endblock %}
