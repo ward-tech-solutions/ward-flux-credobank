@@ -59,3 +59,4 @@ jobs:
 
       - name: Image digest
         run: echo ${{ steps.meta.outputs.digest }}
+# Force rebuild Sat Oct  4 16:34:47 +04 2025
