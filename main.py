@@ -260,9 +260,40 @@ class SSHConnectRequest(BaseModel):
 # ============================================
 
 @app.get("/api/v1/health")
-async def health_check():
-    """Health check endpoint for load balancers"""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+async def health_check(request: Request):
+    """Health check endpoint for monitoring and load balancers"""
+    try:
+        # Check database connection
+        from database import SessionLocal
+        db = SessionLocal()
+        db.execute("SELECT 1")
+        db.close()
+        db_status = "healthy"
+    except Exception as e:
+        db_status = f"unhealthy: {str(e)}"
+
+    # Check Zabbix connection
+    try:
+        zabbix = request.app.state.zabbix
+        zabbix_status = "connected" if zabbix.zapi else "disconnected"
+    except Exception as e:
+        zabbix_status = f"error: {str(e)}"
+
+    return {
+        "status": "healthy" if db_status == "healthy" else "degraded",
+        "version": "2.0.0",
+        "timestamp": datetime.now().isoformat(),
+        "components": {
+            "database": db_status,
+            "zabbix": zabbix_status,
+            "api": "healthy"
+        }
+    }
+
+@app.get("/health")
+async def simple_health_check(request: Request):
+    """Simple health check endpoint (returns 200 OK)"""
+    return await health_check(request)
 
 @app.get("/api/v1/dashboard/stats")
 async def get_dashboard_stats(
