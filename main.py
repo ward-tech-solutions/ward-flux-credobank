@@ -122,6 +122,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Allow all hosts (for Docker deployment with any IP/domain)
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
+
 # ============================================
 # Security Middleware
 # ============================================
