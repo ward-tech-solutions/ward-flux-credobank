@@ -90,6 +90,13 @@
                 <span>Payboxes</span>
             </label>
             <div class="filter-divider"></div>
+            <label class="filter-label" style="min-width: 200px;">
+                <span style="margin-right: 8px;">Core Device:</span>
+                <select id="core-device-selector" onchange="setCoreDevice()" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd;">
+                    <option value="">Auto-detect</option>
+                </select>
+            </label>
+            <div class="filter-divider"></div>
             <label class="filter-label">
                 <input type="checkbox" id="filter-online" checked onchange="applyFilters()">
                 <span>Online</span>
@@ -870,4 +877,64 @@ html[data-theme="light"] body {
     50% { opacity: 0.5; transform: scale(0.9); }
 }
 </style>
+
+<script>
+// Populate core device selector
+function populateCoreDeviceSelector() {
+    const selector = document.getElementById('core-device-selector');
+    if (!selector || !window.allNodes) return;
+
+    // Clear existing options except first
+    selector.innerHTML = '<option value="">Auto-detect</option>';
+
+    // Get all devices
+    const devices = allNodes.get();
+    devices.forEach(device => {
+        const option = document.createElement('option');
+        option.value = device.id;
+        option.textContent = device.label || device.id;
+        selector.appendChild(option);
+    });
+
+    // Set current core device if exists
+    const currentCore = localStorage.getItem('core_device_id');
+    if (currentCore) {
+        selector.value = currentCore;
+    }
+}
+
+// Set core device
+function setCoreDevice() {
+    const selector = document.getElementById('core-device-selector');
+    const selectedId = selector.value;
+
+    if (selectedId) {
+        localStorage.setItem('core_device_id', selectedId);
+        // Update all nodes to set the core device
+        const devices = allNodes.get();
+        devices.forEach(device => {
+            if (device.id === selectedId) {
+                device.level = 0;
+                device.deviceType = 'Core Router';
+            } else if (device.level === 0) {
+                device.level = 1; // Reset other core devices
+            }
+        });
+        allNodes.update(devices);
+    } else {
+        localStorage.removeItem('core_device_id');
+    }
+
+    // Redraw topology
+    if (typeof applyLayout === 'function') {
+        applyLayout();
+    }
+}
+
+// Call this after topology loads
+if (typeof window.addEventListener !== 'undefined') {
+    window.addEventListener('topologyLoaded', populateCoreDeviceSelector);
+}
+</script>
+
 {% endblock %}
