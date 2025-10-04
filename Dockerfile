@@ -12,11 +12,14 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
+# Force rebuild of pip dependencies (cache buster)
+ARG CACHEBUST=1
+
 # Copy requirements first (for better caching)
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies with --force-reinstall to bypass cache
+RUN pip install --no-cache-dir --force-reinstall -r requirements.txt
 
 # Copy application code
 COPY . .
