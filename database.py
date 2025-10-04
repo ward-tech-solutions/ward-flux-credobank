@@ -46,6 +46,29 @@ def init_db():
     # Create all tables
     Base.metadata.create_all(bind=engine)
 
+    # Run SQL migrations for georgian_cities and other custom tables
+    import sqlite3
+    import os
+
+    migrations_dir = "migrations"
+    if os.path.exists(migrations_dir):
+        db_path = str(engine.url).replace('sqlite:///', '')
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith('.sql')])
+        for sql_file in sql_files:
+            sql_path = os.path.join(migrations_dir, sql_file)
+            with open(sql_path, 'r') as f:
+                sql_script = f.read()
+            try:
+                cursor.executescript(sql_script)
+                conn.commit()
+            except Exception:
+                pass  # Migration may already be applied
+
+        conn.close()
+
 def get_db():
     """Dependency for FastAPI routes"""
     db = SessionLocal()
