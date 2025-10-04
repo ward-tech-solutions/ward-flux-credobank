@@ -3,142 +3,464 @@
 {% block title %}Zabbix Settings - WARD OPS{% endblock %}
 
 {% block content %}
-<div class="main-content">
-    <div class="page-header">
-        <div>
-            <h1>Zabbix Configuration</h1>
-            <p class="page-description">Configure connection to your Zabbix monitoring server</p>
+<div class="zabbix-settings-page">
+    <div class="settings-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="fas fa-server"></i>
+            </div>
+            <div class="header-text">
+                <h1>Zabbix Configuration</h1>
+                <p>Configure connection to your Zabbix monitoring server</p>
+            </div>
+        </div>
+        <div class="connection-status" id="connection-status">
+            <i class="fas fa-circle"></i>
+            <span>Not Connected</span>
         </div>
     </div>
 
-    <div class="card" style="max-width: 800px; margin: 0 auto;">
+    <div class="settings-container">
         <div id="message"></div>
 
-        <form id="zabbixForm">
-            <div class="form-group">
-                <label for="zabbix_url">Zabbix API URL</label>
-                <input type="text"
-                       id="zabbix_url"
-                       name="zabbix_url"
-                       class="form-control"
-                       placeholder="http://192.168.200.178:8080/api_jsonrpc.php"
-                       required>
-                <small class="form-text">Full URL to Zabbix API endpoint</small>
+        <div class="settings-card">
+            <div class="card-header">
+                <h3><i class="fas fa-plug"></i> Connection Settings</h3>
+                <p>Enter your Zabbix server connection details</p>
             </div>
 
-            <div class="form-group">
-                <label for="zabbix_user">Zabbix Username</label>
-                <input type="text"
-                       id="zabbix_user"
-                       name="zabbix_user"
-                       class="form-control"
-                       placeholder="ops"
-                       required>
-            </div>
+            <form id="zabbixForm">
+                <div class="form-group">
+                    <label for="zabbix_url">
+                        <i class="fas fa-link"></i> Zabbix API URL
+                    </label>
+                    <input type="text"
+                           id="zabbix_url"
+                           name="zabbix_url"
+                           class="form-control"
+                           placeholder="http://192.168.200.178:8080/api_jsonrpc.php"
+                           required>
+                    <small class="form-hint">Full URL to Zabbix API endpoint</small>
+                </div>
 
-            <div class="form-group">
-                <label for="zabbix_password">Zabbix Password</label>
-                <input type="password"
-                       id="zabbix_password"
-                       name="zabbix_password"
-                       class="form-control"
-                       placeholder="Enter new password or leave blank to keep current">
-                <small class="form-text" id="password-status" style="color: #28a745;"></small>
-            </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="zabbix_user">
+                            <i class="fas fa-user"></i> Zabbix Username
+                        </label>
+                        <input type="text"
+                               id="zabbix_user"
+                               name="zabbix_user"
+                               class="form-control"
+                               placeholder="ops"
+                               required>
+                    </div>
 
-            <div class="btn-group" style="display: flex; gap: 10px; margin-top: 30px;">
-                <button type="button" class="btn btn-secondary" onclick="testConnection()">
-                    <i class="fas fa-plug"></i> Test Connection
-                </button>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-save"></i> Save Configuration
-                </button>
+                    <div class="form-group">
+                        <label for="zabbix_password">
+                            <i class="fas fa-lock"></i> Zabbix Password
+                        </label>
+                        <input type="password"
+                               id="zabbix_password"
+                               name="zabbix_password"
+                               class="form-control"
+                               placeholder="Enter password">
+                        <small class="form-hint" id="password-status"></small>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-test" onclick="testConnection()">
+                        <i class="fas fa-vial"></i>
+                        <span>Test Connection</span>
+                    </button>
+                    <button type="submit" class="btn-save">
+                        <i class="fas fa-check"></i>
+                        <span>Save Configuration</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="info-card">
+            <div class="info-header">
+                <i class="fas fa-info-circle"></i>
+                <h4>Quick Setup Guide</h4>
             </div>
-        </form>
+            <div class="info-content">
+                <div class="info-item">
+                    <span class="step-number">1</span>
+                    <div>
+                        <strong>Find your Zabbix API URL</strong>
+                        <p>Usually ends with <code>/api_jsonrpc.php</code></p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <span class="step-number">2</span>
+                    <div>
+                        <strong>Enter Zabbix credentials</strong>
+                        <p>Use your Zabbix admin or user account</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <span class="step-number">3</span>
+                    <div>
+                        <strong>Test the connection</strong>
+                        <p>Verify settings before saving</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <span class="step-number">4</span>
+                    <div>
+                        <strong>Save configuration</strong>
+                        <p>Start monitoring your network!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <style>
+.zabbix-settings-page {
+    padding: 30px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+    min-height: 100vh;
+}
+
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    padding-bottom: 25px;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.header-icon {
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: white;
+    box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+}
+
+.header-text h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0 0 8px 0;
+}
+
+.header-text p {
+    font-size: 16px;
+    color: #6b7280;
+    margin: 0;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: #f3f4f6;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.connection-status i {
+    font-size: 10px;
+    color: #9ca3af;
+}
+
+.connection-status.connected i {
+    color: #10b981;
+    animation: pulse 2s infinite;
+}
+
+.connection-status.connected {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.settings-container {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 30px;
+}
+
+.settings-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 25px 30px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.card-header h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.card-header p {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0;
+}
+
+#zabbixForm {
+    padding: 30px;
+}
+
 .form-group {
-    margin-bottom: 1.5rem;
+    margin-bottom: 25px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
 }
 
 .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
     font-weight: 600;
-    color: var(--text-primary);
+    font-size: 14px;
+    color: #374151;
+}
+
+.form-group label i {
+    color: #667eea;
+    font-size: 14px;
 }
 
 .form-control {
     width: 100%;
-    padding: 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-size: 14px;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    transition: border-color 0.3s;
+    padding: 12px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 15px;
+    color: #1a1a1a;
+    background: #ffffff;
+    transition: all 0.3s ease;
 }
 
 .form-control:focus {
     outline: none;
-    border-color: var(--ward-green);
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
 }
 
-.form-text {
+.form-control::placeholder {
+    color: #9ca3af;
+}
+
+.form-hint {
     display: block;
-    margin-top: 0.25rem;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
+    margin-top: 6px;
+    font-size: 13px;
+    color: #6b7280;
 }
 
-.btn-group {
+#password-status {
+    color: #10b981;
+    font-weight: 500;
+}
+
+.form-actions {
     display: flex;
+    gap: 15px;
+    margin-top: 35px;
+    padding-top: 25px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.btn-test, .btn-save {
+    flex: 1;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.btn-test {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.btn-test:hover {
+    background: #e5e7eb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-save {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-save:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.info-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    color: white;
+    padding: 30px;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+}
+
+.info-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 25px;
+}
+
+.info-header i {
+    font-size: 24px;
+}
+
+.info-header h4 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.info-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.info-item {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+.step-number {
+    min-width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.info-item strong {
+    display: block;
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.info-item p {
+    font-size: 13px;
+    margin: 0;
+    opacity: 0.9;
+}
+
+.info-item code {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
 }
 
 .alert {
-    padding: 1rem;
-    border-radius: 4px;
-    margin-bottom: 1.5rem;
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideDown 0.3s ease;
+    grid-column: 1 / -1;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .alert-success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+    background: #d1fae5;
+    color: #065f46;
+    border: 2px solid #10b981;
 }
 
 .alert-error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+    background: #fee2e2;
+    color: #991b1b;
+    border: 2px solid #ef4444;
 }
 
 .alert-info {
-    background: #d1ecf1;
-    color: #0c5460;
-    border: 1px solid #bee5eb;
+    background: #dbeafe;
+    color: #1e40af;
+    border: 2px solid #3b82f6;
 }
 
-/* Dark mode support */
-[data-theme="dark"] .alert-success {
-    background: #1e4620;
-    color: #d4edda;
-    border-color: #2d5a2f;
-}
+@media (max-width: 1024px) {
+    .settings-container {
+        grid-template-columns: 1fr;
+    }
 
-[data-theme="dark"] .alert-error {
-    background: #4a1f1f;
-    color: #f8d7da;
-    border-color: #5f2626;
-}
-
-[data-theme="dark"] .alert-info {
-    background: #1a3d44;
-    color: #d1ecf1;
-    border-color: #244d56;
+    .form-row {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 
@@ -164,10 +486,25 @@ async function loadSettings() {
                 hasConfiguredPassword = true;
                 document.getElementById('password-status').textContent = '✓ Password configured';
                 document.getElementById('zabbix_password').placeholder = 'Enter new password to change';
+
+                // Update connection status
+                updateConnectionStatus(true);
             }
         }
     } catch (error) {
         console.error('Error loading settings:', error);
+    }
+}
+
+// Update connection status indicator
+function updateConnectionStatus(connected) {
+    const statusEl = document.getElementById('connection-status');
+    if (connected) {
+        statusEl.classList.add('connected');
+        statusEl.innerHTML = '<i class="fas fa-circle"></i><span>Connected</span>';
+    } else {
+        statusEl.classList.remove('connected');
+        statusEl.innerHTML = '<i class="fas fa-circle"></i><span>Not Connected</span>';
     }
 }
 
@@ -199,7 +536,7 @@ async function testConnection() {
             body: JSON.stringify({
                 url,
                 user,
-                password: password || 'CURRENT_PASSWORD' // Will use env password if empty
+                password: password || 'CURRENT_PASSWORD'
             })
         });
 
@@ -207,11 +544,14 @@ async function testConnection() {
 
         if (response.ok && data.success) {
             showMessage(`✅ Connection successful! Zabbix version: ${data.version}`, 'success');
+            updateConnectionStatus(true);
         } else {
             showMessage(`❌ Connection failed: ${data.error || 'Unknown error'}`, 'error');
+            updateConnectionStatus(false);
         }
     } catch (error) {
         showMessage(`❌ Connection failed: ${error.message}`, 'error');
+        updateConnectionStatus(false);
     }
 }
 
@@ -244,6 +584,7 @@ document.getElementById('zabbixForm').addEventListener('submit', async (e) => {
 
         if (response.ok) {
             showMessage('✅ Settings saved successfully! Redirecting...', 'success');
+            updateConnectionStatus(true);
             setTimeout(() => {
                 window.location.href = '/';
             }, 1500);
