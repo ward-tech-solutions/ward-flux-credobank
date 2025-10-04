@@ -1,269 +1,272 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - WARD OPS</title>
-    <link rel="stylesheet" href="/static/css/ward-theme.css">
-    <style>
-        .settings-container {
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 20px;
-        }
+{% extends "base.html" %}
 
-        .settings-section {
-            background: white;
-            border-radius: 8px;
-            padding: 30px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
+{% block title %}Zabbix Settings - WARD OPS{% endblock %}
 
-        .settings-section h2 {
-            color: #5EBBA8;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #5EBBA8;
-            padding-bottom: 10px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #5EBBA8;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 30px;
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background: #5EBBA8;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #4da896;
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-
-        .alert {
-            padding: 12px 20px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .alert-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        .back-link {
-            display: inline-block;
-            color: #5EBBA8;
-            text-decoration: none;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-
-        .back-link:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
-    <div class="settings-container">
-        <a href="/" class="back-link">← Back to Dashboard</a>
-
-        <div class="settings-section">
-            <h2>Zabbix Configuration</h2>
-
-            <div id="message"></div>
-
-            <form id="zabbixForm">
-                <div class="form-group">
-                    <label for="zabbix_url">Zabbix API URL</label>
-                    <input type="text" id="zabbix_url" name="zabbix_url"
-                           placeholder="http://192.168.200.178:8080/api_jsonrpc.php" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="zabbix_user">Zabbix Username</label>
-                    <input type="text" id="zabbix_user" name="zabbix_user"
-                           placeholder="ops" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="zabbix_password">Zabbix Password</label>
-                    <input type="password" id="zabbix_password" name="zabbix_password" required>
-                </div>
-
-                <div class="btn-group">
-                    <button type="button" class="btn btn-secondary" onclick="testConnection()">
-                        Test Connection
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        Save Configuration
-                    </button>
-                </div>
-            </form>
+{% block content %}
+<div class="main-content">
+    <div class="page-header">
+        <div>
+            <h1>Zabbix Configuration</h1>
+            <p class="page-description">Configure connection to your Zabbix monitoring server</p>
         </div>
     </div>
 
-    <script>
-        // Load current settings
-        async function loadSettings() {
-            try {
-                const response = await fetch('/api/v1/settings/zabbix', {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                    }
-                });
+    <div class="card" style="max-width: 800px; margin: 0 auto;">
+        <div id="message"></div>
 
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('zabbix_url').value = data.zabbix_url || '';
-                    document.getElementById('zabbix_user').value = data.zabbix_user || '';
-                }
-            } catch (error) {
-                console.error('Error loading settings:', error);
-            }
-        }
+        <form id="zabbixForm">
+            <div class="form-group">
+                <label for="zabbix_url">Zabbix API URL</label>
+                <input type="text"
+                       id="zabbix_url"
+                       name="zabbix_url"
+                       class="form-control"
+                       placeholder="http://192.168.200.178:8080/api_jsonrpc.php"
+                       required>
+                <small class="form-text">Full URL to Zabbix API endpoint</small>
+            </div>
 
-        // Test Zabbix connection
-        async function testConnection() {
-            const url = document.getElementById('zabbix_url').value;
-            const user = document.getElementById('zabbix_user').value;
-            const password = document.getElementById('zabbix_password').value;
+            <div class="form-group">
+                <label for="zabbix_user">Zabbix Username</label>
+                <input type="text"
+                       id="zabbix_user"
+                       name="zabbix_user"
+                       class="form-control"
+                       placeholder="ops"
+                       required>
+            </div>
 
-            if (!url || !user || !password) {
-                showMessage('Please fill in all fields', 'error');
-                return;
-            }
+            <div class="form-group">
+                <label for="zabbix_password">Zabbix Password</label>
+                <input type="password"
+                       id="zabbix_password"
+                       name="zabbix_password"
+                       class="form-control"
+                       placeholder="Enter new password or leave blank to keep current">
+                <small class="form-text" id="password-status" style="color: #28a745;"></small>
+            </div>
 
-            showMessage('Testing connection...', 'info');
+            <div class="btn-group" style="display: flex; gap: 10px; margin-top: 30px;">
+                <button type="button" class="btn btn-secondary" onclick="testConnection()">
+                    <i class="fas fa-plug"></i> Test Connection
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Configuration
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
-            try {
-                const response = await fetch('/api/v1/settings/test-zabbix', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                    },
-                    body: JSON.stringify({ url, user, password })
-                });
+<style>
+.form-group {
+    margin-bottom: 1.5rem;
+}
 
-                const data = await response.json();
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
 
-                if (response.ok && data.success) {
-                    showMessage('✅ Connection successful! Zabbix version: ' + data.version, 'success');
-                } else {
-                    showMessage('❌ Connection failed: ' + (data.error || 'Unknown error'), 'error');
-                }
-            } catch (error) {
-                showMessage('❌ Connection failed: ' + error.message, 'error');
-            }
-        }
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.3s;
+}
 
-        // Save settings
-        document.getElementById('zabbixForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+.form-control:focus {
+    outline: none;
+    border-color: var(--ward-green);
+}
 
-            const formData = {
-                zabbix_url: document.getElementById('zabbix_url').value,
-                zabbix_user: document.getElementById('zabbix_user').value,
-                zabbix_password: document.getElementById('zabbix_password').value
-            };
+.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
 
-            try {
-                const response = await fetch('/api/v1/settings/zabbix', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                    },
-                    body: JSON.stringify(formData)
-                });
+.btn-group {
+    display: flex;
+    gap: 10px;
+}
 
-                const data = await response.json();
+.alert {
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1.5rem;
+}
 
-                if (response.ok) {
-                    showMessage('✅ Settings saved successfully! Refreshing...', 'success');
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                } else {
-                    showMessage('❌ Failed to save: ' + (data.detail || 'Unknown error'), 'error');
-                }
-            } catch (error) {
-                showMessage('❌ Error: ' + error.message, 'error');
+.alert-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.alert-info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+/* Dark mode support */
+[data-theme="dark"] .alert-success {
+    background: #1e4620;
+    color: #d4edda;
+    border-color: #2d5a2f;
+}
+
+[data-theme="dark"] .alert-error {
+    background: #4a1f1f;
+    color: #f8d7da;
+    border-color: #5f2626;
+}
+
+[data-theme="dark"] .alert-info {
+    background: #1a3d44;
+    color: #d1ecf1;
+    border-color: #244d56;
+}
+</style>
+
+<script>
+let hasConfiguredPassword = false;
+
+// Load current settings
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/v1/settings/zabbix', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
             }
         });
 
-        function showMessage(message, type) {
-            const messageDiv = document.getElementById('message');
-            messageDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('zabbix_url').value = data.zabbix_url || '';
+            document.getElementById('zabbix_user').value = data.zabbix_user || '';
 
-            if (type === 'success') {
-                setTimeout(() => {
-                    messageDiv.innerHTML = '';
-                }, 3000);
+            // Check if password is configured
+            if (data.zabbix_url && data.zabbix_user) {
+                hasConfiguredPassword = true;
+                document.getElementById('password-status').textContent = '✓ Password configured';
+                document.getElementById('zabbix_password').placeholder = 'Enter new password to change';
             }
         }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+}
 
-        // Load settings on page load
-        loadSettings();
-    </script>
-</body>
-</html>
+// Test Zabbix connection
+async function testConnection() {
+    const url = document.getElementById('zabbix_url').value;
+    const user = document.getElementById('zabbix_user').value;
+    const password = document.getElementById('zabbix_password').value;
+
+    if (!url || !user) {
+        showMessage('Please fill in URL and username', 'error');
+        return;
+    }
+
+    if (!password && !hasConfiguredPassword) {
+        showMessage('Please enter password for first connection', 'error');
+        return;
+    }
+
+    showMessage('Testing connection...', 'info');
+
+    try {
+        const response = await fetch('/api/v1/settings/test-zabbix', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: JSON.stringify({
+                url,
+                user,
+                password: password || 'CURRENT_PASSWORD' // Will use env password if empty
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            showMessage(`✅ Connection successful! Zabbix version: ${data.version}`, 'success');
+        } else {
+            showMessage(`❌ Connection failed: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        showMessage(`❌ Connection failed: ${error.message}`, 'error');
+    }
+}
+
+// Save settings
+document.getElementById('zabbixForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = {
+        zabbix_url: document.getElementById('zabbix_url').value,
+        zabbix_user: document.getElementById('zabbix_user').value,
+        zabbix_password: document.getElementById('zabbix_password').value
+    };
+
+    // If password is empty and we have configured password, don't send it
+    if (!formData.zabbix_password && hasConfiguredPassword) {
+        delete formData.zabbix_password;
+    }
+
+    try {
+        const response = await fetch('/api/v1/settings/zabbix', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage('✅ Settings saved successfully! Redirecting...', 'success');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1500);
+        } else {
+            showMessage(`❌ Failed to save: ${data.detail || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        showMessage(`❌ Error: ${error.message}`, 'error');
+    }
+});
+
+function showMessage(message, type) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+
+    if (type === 'success') {
+        setTimeout(() => {
+            messageDiv.innerHTML = '';
+        }, 3000);
+    }
+}
+
+// Load settings on page load
+loadSettings();
+</script>
+{% endblock %}
