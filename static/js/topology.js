@@ -519,6 +519,10 @@ function createNetworkVisualization() {
             setTimeout(() => {
                 drawMiniMap();
             }, 500);
+
+            // Dispatch topologyLoaded event for core device selector
+            window.dispatchEvent(new Event('topologyLoaded'));
+            console.log('[Topology] topologyLoaded event dispatched');
         });
 
     } catch (error) {
