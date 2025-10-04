@@ -231,6 +231,13 @@ async def complete_setup(setup_data: SetupData, db: Session = Depends(get_db)):
 
         db.commit()
 
+        # 6. Reconfigure Zabbix client with new credentials
+        request.app.state.zabbix.reconfigure(
+            url=setup_data.zabbix.url,
+            user=setup_data.zabbix.user,
+            password=setup_data.zabbix.password
+        )
+
         return {
             "success": True,
             "message": "Setup completed successfully",

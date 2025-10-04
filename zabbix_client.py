@@ -125,24 +125,34 @@ BRANCH_COORDINATES = {
 
 
 class ZabbixClient:
-    def __init__(self):
-        # Load from environment variables (SECURITY FIX)
-        self.url = os.getenv("ZABBIX_URL")
-        self.user = os.getenv("ZABBIX_USER")
-        self.password = os.getenv("ZABBIX_PASSWORD")
-
-        # Validate credentials
-        if not all([self.url, self.user, self.password]):
-            raise ValueError(
-                "Zabbix credentials not found in environment variables. "
-                "Please create .env file with ZABBIX_URL, ZABBIX_USER, and ZABBIX_PASSWORD"
-            )
+    def __init__(self, url: str = None, user: str = None, password: str = None):
+        # Load from environment variables (SECURITY FIX) or parameters
+        self.url = url or os.getenv("ZABBIX_URL")
+        self.user = user or os.getenv("ZABBIX_USER")
+        self.password = password or os.getenv("ZABBIX_PASSWORD")
 
         self.zapi = None
         self._cache = {}
         self._cache_timeout = 30  # seconds
         self._load_coordinates_from_db()
+
+        # Only connect if credentials are available (for SaaS setup wizard mode)
+        if all([self.url, self.user, self.password]):
+            self.connect()
+        else:
+            logger.info("Zabbix client initialized without credentials (setup wizard mode)")
+
+    def is_configured(self) -> bool:
+        """Check if Zabbix credentials are configured"""
+        return all([self.url, self.user, self.password]) and self.zapi is not None
+
+    def reconfigure(self, url: str, user: str, password: str):
+        """Reconfigure Zabbix connection with new credentials (after setup wizard)"""
+        self.url = url
+        self.user = user
+        self.password = password
         self.connect()
+        logger.info(f"Zabbix client reconfigured for {url}")
 
     def _load_coordinates_from_db(self):
         """Load city coordinates from database and update BRANCH_COORDINATES"""
