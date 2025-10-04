@@ -36,7 +36,14 @@ class User(Base):
     last_login = Column(DateTime, nullable=True)
 
 def init_db():
-    """Initialize database and create default admin user"""
+    """Initialize database and create all tables"""
+    # Import all models to ensure they're registered with Base
+    try:
+        from models import Organization, SystemConfig, SetupWizardState
+    except ImportError:
+        pass  # Models might not exist in older versions
+
+    # Create all tables
     Base.metadata.create_all(bind=engine)
 
 def get_db():
