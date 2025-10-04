@@ -21,7 +21,7 @@ load_dotenv()
 
 router = APIRouter(prefix="/setup", tags=["setup"])
 templates = Jinja2Templates(directory="templates")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 # ============================================
