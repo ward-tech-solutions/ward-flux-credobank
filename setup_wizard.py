@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import List, Optional
 import os
 from dotenv import load_dotenv, set_key
@@ -43,6 +43,15 @@ class AdminAccount(BaseModel):
     username: str
     email: EmailStr
     password: str
+
+    @validator('password')
+    def validate_password_length(cls, v):
+        """Validate password length for bcrypt compatibility"""
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Password cannot be longer than 72 bytes')
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        return v
 
 
 class SetupData(BaseModel):

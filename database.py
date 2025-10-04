@@ -8,7 +8,11 @@ from datetime import datetime
 import enum
 
 # SQLite database (change to PostgreSQL for production)
-DATABASE_URL = "sqlite:///./network_monitor.db"
+# Use data directory for Docker volume persistence
+import os
+data_dir = os.path.join(os.path.dirname(__file__), 'data')
+os.makedirs(data_dir, exist_ok=True)
+DATABASE_URL = f"sqlite:///{data_dir}/ward_ops.db"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
