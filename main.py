@@ -92,6 +92,33 @@ async def lifespan(app: FastAPI):
     # Initialize database
     init_db()
 
+    # Create default admin user if it doesn't exist
+    from database import SessionLocal, User
+    from passlib.context import CryptContext
+
+    pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+    db = SessionLocal()
+    try:
+        admin_user = db.query(User).filter(User.username == "admin").first()
+        if not admin_user:
+            admin_user = User(
+                username="admin",
+                email="admin@wardops.tech",
+                full_name="Administrator",
+                hashed_password=pwd_context.hash("admin123"),
+                is_active=True,
+                is_superuser=True
+            )
+            db.add(admin_user)
+            db.commit()
+            print("✓ Default admin user created (username: admin, password: admin123)")
+        else:
+            print("✓ Admin user already exists")
+    except Exception as e:
+        print(f"Warning: Could not create default admin user: {e}")
+    finally:
+        db.close()
+
     # Startup - use the working synchronous client
     app.state.zabbix = ZabbixClient()
     app.state.websocket_connections: List[WebSocket] = []
@@ -179,7 +206,8 @@ from setup_wizard import router as setup_router
 from middleware_setup import setup_check_middleware
 
 # Add setup middleware (redirects to wizard if not configured)
-app.middleware("http")(setup_check_middleware)
+# DISABLED: Setup wizard not needed - use Settings page for Zabbix config
+# app.middleware("http")(setup_check_middleware)
 
 # Include setup wizard routes
 app.include_router(setup_router)
