@@ -717,7 +717,7 @@
             statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing connection...';
 
             try {
-                const response = await fetch('/api/v1/setup/test-zabbix', {
+                const response = await fetch('/setup/test-zabbix', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({url, user, password})
@@ -748,7 +748,7 @@
             errorDiv.style.display = 'none';
 
             try {
-                const response = await fetch('/api/v1/setup/get-groups', {
+                const response = await fetch('/setup/get-groups', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(setupData.zabbix)
@@ -793,7 +793,7 @@
             btnNext.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving configuration...';
 
             try {
-                const response = await fetch('/api/v1/setup/complete', {
+                const response = await fetch('/setup/complete', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(setupData)
