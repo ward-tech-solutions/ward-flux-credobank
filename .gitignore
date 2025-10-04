@@ -112,3 +112,18 @@ QUICK_START.md
 CLEANUP_SENSITIVE.md
 PUSH_TO_GITHUB.md
 *.old
+
+# Unused/development files
+frontend/
+auth_endpoints.txt
+test_zabbix.py
+tests.py
+requirements_new.txt
+setup.sh
+IMPLEMENTATION_VERIFIED.md
+GITHUB_ACTIONS_STATUS.md
+FINAL_STATUS.md
+GITHUB_SUCCESS.md
+*.backup
+*.backup2
+migrations/
