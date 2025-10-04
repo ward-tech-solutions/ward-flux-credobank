@@ -41,6 +41,36 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
 
+class PingResult(Base):
+    """Independent ping check results"""
+    __tablename__ = "ping_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    device_ip = Column(String(50), index=True, nullable=False)
+    device_name = Column(String(255))
+    packets_sent = Column(Integer, default=5)
+    packets_received = Column(Integer, default=0)
+    packet_loss_percent = Column(Integer, default=100)
+    min_rtt_ms = Column(Integer, nullable=True)
+    avg_rtt_ms = Column(Integer, nullable=True)
+    max_rtt_ms = Column(Integer, nullable=True)
+    is_reachable = Column(Boolean, default=False)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+class TracerouteResult(Base):
+    """Network path traceroute results"""
+    __tablename__ = "traceroute_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    device_ip = Column(String(50), index=True, nullable=False)
+    device_name = Column(String(255))
+    hop_number = Column(Integer, nullable=False)
+    hop_ip = Column(String(50))
+    hop_hostname = Column(String(255))
+    latency_ms = Column(Integer, nullable=True)
+    packet_loss = Column(Integer, default=0)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
 def init_db():
     """Initialize database and create all tables"""
     # Import all models to ensure they're registered with Base

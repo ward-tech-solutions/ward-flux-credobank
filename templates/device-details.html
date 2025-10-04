@@ -2,6 +2,10 @@
 
 {% block title %}Device Details - Network Monitoring{% endblock %}
 
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/network-diagnostics.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="device-details-page">
     <div class="page-header">
@@ -57,13 +61,57 @@
             </table>
         </div>
     </div>
+
+    <!-- Network Diagnostics -->
+    <div class="diagnostics-section">
+        <div class="diagnostics-header">
+            <i class="fas fa-network-wired"></i>
+            <h3>Network Diagnostics</h3>
+        </div>
+
+        <div class="diagnostics-grid">
+            <!-- Ping Tool -->
+            <div class="diagnostic-tool">
+                <div class="tool-header">
+                    <div class="tool-title">
+                        <i class="fas fa-satellite-dish"></i>
+                        <span>Ping Check</span>
+                    </div>
+                    <button class="diagnostic-btn" id="ping-button" onclick="runPingCheck()">
+                        <i class="fas fa-satellite-dish"></i>
+                        Run Ping Check
+                    </button>
+                </div>
+                <div id="ping-results"></div>
+            </div>
+
+            <!-- Traceroute Tool -->
+            <div class="diagnostic-tool">
+                <div class="tool-header">
+                    <div class="tool-title">
+                        <i class="fas fa-route"></i>
+                        <span>Network Path Trace</span>
+                    </div>
+                    <button class="diagnostic-btn" id="traceroute-button" onclick="runTraceroute()">
+                        <i class="fas fa-route"></i>
+                        Trace Network Path
+                    </button>
+                </div>
+                <div id="traceroute-results"></div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/network-diagnostics.js') }}"></script>
 <script>
     const hostid = '{{ hostid }}';
-    
+    let deviceIP = '';
+    let deviceName = '';
+    let diagnostics = null;
+
     function loadDeviceDetails() {
         fetch(`/api/device/${hostid}`)
             .then(response => response.json())
@@ -75,7 +123,16 @@
                 
                 // Update title
                 document.getElementById('device-title').textContent = data.display_name;
-                
+
+                // Store device info for diagnostics
+                deviceIP = data.ip;
+                deviceName = data.display_name;
+
+                // Initialize diagnostics
+                if (!diagnostics) {
+                    diagnostics = new NetworkDiagnostics(deviceIP, deviceName);
+                }
+
                 // Device info
                 const statusClass = data.available === 'Available' ? 'status-online' : 
                                   data.available === 'Unavailable' ? 'status-offline' : 'status-unknown';
@@ -171,7 +228,24 @@
     function refreshData() {
         loadDeviceDetails();
     }
-    
+
+    // Network Diagnostics Functions
+    function runPingCheck() {
+        if (!diagnostics) {
+            alert('Device information not loaded yet. Please wait...');
+            return;
+        }
+        diagnostics.performPing(5);
+    }
+
+    function runTraceroute() {
+        if (!diagnostics) {
+            alert('Device information not loaded yet. Please wait...');
+            return;
+        }
+        diagnostics.performTraceroute(30);
+    }
+
     // Initial load
     loadDeviceDetails();
     startAutoRefresh(30000);

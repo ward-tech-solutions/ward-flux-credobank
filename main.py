@@ -480,6 +480,175 @@ async def get_device_details(request: Request, hostid: str):
         return details
     return JSONResponse(status_code=404, content={'error': 'Device not found'})
 
+# ============================================
+# NETWORK DIAGNOSTICS - Independent Ping & Traceroute
+# ============================================
+
+@app.post("/api/v1/diagnostics/ping")
+async def ping_device(
+    request: Request,
+    ip: str,
+    count: int = 5,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Perform independent ICMP ping check
+
+    Returns real-time ping results with packet loss and RTT
+    """
+    from network_diagnostics import NetworkDiagnostics
+    from database import PingResult
+
+    diag = NetworkDiagnostics()
+
+    # Perform ping
+    result = await run_in_executor(diag.ping, ip, count)
+
+    # Get device name from Zabbix
+    zabbix = request.app.state.zabbix
+    try:
+        devices = await run_in_executor(zabbix.get_all_hosts)
+        device = next((d for d in devices if d.get('ip') == ip), None)
+        device_name = device.get('display_name') if device else ip
+    except:
+        device_name = ip
+
+    # Store in database
+    ping_record = PingResult(
+        device_ip=ip,
+        device_name=device_name,
+        packets_sent=result['packets_sent'],
+        packets_received=result['packets_received'],
+        packet_loss_percent=result['packet_loss_percent'],
+        min_rtt_ms=result.get('min_rtt_ms'),
+        avg_rtt_ms=result.get('avg_rtt_ms'),
+        max_rtt_ms=result.get('max_rtt_ms'),
+        is_reachable=result['is_reachable']
+    )
+    db.add(ping_record)
+    db.commit()
+
+    return {
+        **result,
+        'device_name': device_name,
+        'stored': True
+    }
+
+@app.post("/api/v1/diagnostics/traceroute")
+async def traceroute_device(
+    request: Request,
+    ip: str,
+    max_hops: int = 30,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Perform traceroute to device
+
+    Returns network path with all hops and latencies
+    """
+    from network_diagnostics import NetworkDiagnostics
+    from database import TracerouteResult
+
+    diag = NetworkDiagnostics()
+
+    # Perform traceroute
+    result = await run_in_executor(diag.traceroute, ip, max_hops)
+
+    # Get device name from Zabbix
+    zabbix = request.app.state.zabbix
+    try:
+        devices = await run_in_executor(zabbix.get_all_hosts)
+        device = next((d for d in devices if d.get('ip') == ip), None)
+        device_name = device.get('display_name') if device else ip
+    except:
+        device_name = ip
+
+    # Store each hop in database
+    for hop in result.get('hops', []):
+        hop_record = TracerouteResult(
+            device_ip=ip,
+            device_name=device_name,
+            hop_number=hop['hop_number'],
+            hop_ip=hop.get('ip'),
+            hop_hostname=hop.get('hostname'),
+            latency_ms=hop.get('latency_ms')
+        )
+        db.add(hop_record)
+
+    db.commit()
+
+    return {
+        **result,
+        'device_name': device_name,
+        'stored': True
+    }
+
+@app.get("/api/v1/diagnostics/ping/history/{ip}")
+async def get_ping_history(
+    ip: str,
+    limit: int = 10,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get ping history for a device"""
+    from database import PingResult
+
+    results = db.query(PingResult)\
+        .filter(PingResult.device_ip == ip)\
+        .order_by(PingResult.timestamp.desc())\
+        .limit(limit)\
+        .all()
+
+    return [{
+        'device_ip': r.device_ip,
+        'device_name': r.device_name,
+        'packet_loss_percent': r.packet_loss_percent,
+        'avg_rtt_ms': r.avg_rtt_ms,
+        'is_reachable': r.is_reachable,
+        'timestamp': r.timestamp.isoformat()
+    } for r in results]
+
+@app.get("/api/v1/diagnostics/traceroute/history/{ip}")
+async def get_traceroute_history(
+    ip: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get last traceroute result for a device"""
+    from database import TracerouteResult
+    from sqlalchemy import func
+
+    # Get the most recent timestamp for this IP
+    latest = db.query(func.max(TracerouteResult.timestamp))\
+        .filter(TracerouteResult.device_ip == ip)\
+        .scalar()
+
+    if not latest:
+        return {'hops': [], 'message': 'No traceroute history found'}
+
+    # Get all hops from that traceroute
+    hops = db.query(TracerouteResult)\
+        .filter(
+            TracerouteResult.device_ip == ip,
+            TracerouteResult.timestamp == latest
+        )\
+        .order_by(TracerouteResult.hop_number)\
+        .all()
+
+    return {
+        'device_ip': ip,
+        'device_name': hops[0].device_name if hops else ip,
+        'timestamp': latest.isoformat(),
+        'hops': [{
+            'hop_number': h.hop_number,
+            'ip': h.hop_ip,
+            'hostname': h.hop_hostname,
+            'latency_ms': h.latency_ms
+        } for h in hops]
+    }
+
 @app.get("/api/v1/alerts")
 async def get_alerts(request: Request):
     """Get all active alerts"""
