@@ -1483,15 +1483,15 @@ async def login(
     Login endpoint - returns JWT token
     Rate limited to 5 attempts per minute to prevent brute force attacks
     """
-    # Apply rate limiting if enabled
-    if RATE_LIMITING_ENABLED and limiter:
-        try:
-            await limiter.check_request_limit(request, "5/minute")
-        except:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many login attempts. Please try again later."
-            )
+    # Rate limiting disabled for easier deployment
+    # if RATE_LIMITING_ENABLED and limiter:
+    #     try:
+    #         await limiter.check_request_limit(request, "5/minute")
+    #     except:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+    #             detail="Too many login attempts. Please try again later."
+    #         )
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
