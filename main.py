@@ -1981,7 +1981,7 @@ async def websocket_endpoint(websocket: WebSocket):
 # ============================================
 
 @app.get("/settings")
-async def settings_page(request: Request, current_user: User = Depends(get_current_active_user)):
+async def settings_page(request: Request):
     """Settings page"""
     return templates.TemplateResponse("settings.html", {"request": request})
 

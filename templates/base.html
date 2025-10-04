@@ -174,10 +174,16 @@
                 <span>Users</span>
             </a>
 
-            <!-- Admin Only: Settings -->
-            <a href="/settings" class="nav-item {% if request.path == '/settings' %}active{% endif %}" id="config-link" data-role="admin">
+            <!-- Admin Only: Configuration -->
+            <a href="/config" class="nav-item {% if request.path == '/config' %}active{% endif %}" id="config-link" data-role="admin">
                 <i class="fas fa-cog"></i>
-                <span>Settings</span>
+                <span>Config</span>
+            </a>
+
+            <!-- Admin Only: Zabbix Settings -->
+            <a href="/settings" class="nav-item {% if request.path == '/settings' %}active{% endif %}" id="settings-link" data-role="admin">
+                <i class="fas fa-database"></i>
+                <span>Zabbix</span>
             </a>
 
             <!-- Dark Mode Toggle -->
