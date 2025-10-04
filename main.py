@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
     init_db()
 
     # Create default admin user if it doesn't exist
-    from database import SessionLocal, User
+    from database import SessionLocal, User, UserRole
     from passlib.context import CryptContext
 
     pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
@@ -106,6 +106,7 @@ async def lifespan(app: FastAPI):
                 email="admin@wardops.tech",
                 full_name="Administrator",
                 hashed_password=pwd_context.hash("admin123"),
+                role=UserRole.ADMIN,
                 is_active=True,
                 is_superuser=True
             )
@@ -113,7 +114,14 @@ async def lifespan(app: FastAPI):
             db.commit()
             print("✓ Default admin user created (username: admin, password: admin123)")
         else:
-            print("✓ Admin user already exists")
+            # Update existing admin user to ensure ADMIN role
+            if admin_user.role != UserRole.ADMIN:
+                admin_user.role = UserRole.ADMIN
+                admin_user.is_superuser = True
+                db.commit()
+                print("✓ Admin user role updated to ADMIN")
+            else:
+                print("✓ Admin user already exists")
     except Exception as e:
         print(f"Warning: Could not create default admin user: {e}")
     finally:
