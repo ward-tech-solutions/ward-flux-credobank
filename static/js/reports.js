@@ -30,10 +30,10 @@ function loadDowntimeReport() {
     const period = document.getElementById('downtime-period')?.value || 'weekly';
     const region = document.getElementById('downtime-region')?.value || '';
 
-    let url = `/api/reports/downtime?period=${period}`;
+    let url = `/api/v1/reports/downtime?period=${period}`;
     if (region) url += `&region=${region}`;
 
-    fetch(url)
+    auth.fetch(url)
         .then(r => r.json())
         .then(data => {
             // Update summary cards
