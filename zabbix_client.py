@@ -4,10 +4,14 @@ from functools import lru_cache
 import hashlib
 import time
 import os
+import logging
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 REGION_COORDINATES = {
     'Tbilisi': {'lat': 41.7151, 'lng': 44.8271},
