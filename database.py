@@ -71,6 +71,54 @@ class TracerouteResult(Base):
     packet_loss = Column(Integer, default=0)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
+class MTRResult(Base):
+    """MTR (My TraceRoute) monitoring results - stores continuous monitoring data"""
+    __tablename__ = "mtr_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    device_ip = Column(String(50), index=True, nullable=False)
+    device_name = Column(String(255))
+    hop_number = Column(Integer, nullable=False)
+    hop_ip = Column(String(50))
+    hop_hostname = Column(String(255))
+
+    # MTR-specific metrics
+    packets_sent = Column(Integer, default=0)
+    packets_received = Column(Integer, default=0)
+    packet_loss_percent = Column(Integer, default=0)
+
+    # Latency statistics
+    latency_avg = Column(Integer, nullable=True)  # Average latency in ms
+    latency_min = Column(Integer, nullable=True)  # Best latency
+    latency_max = Column(Integer, nullable=True)  # Worst latency
+    latency_stddev = Column(Integer, nullable=True)  # Standard deviation (jitter)
+
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+class PerformanceBaseline(Base):
+    """Performance baselines for devices - used for anomaly detection"""
+    __tablename__ = "performance_baselines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    device_ip = Column(String(50), index=True, nullable=False, unique=True)
+    device_name = Column(String(255))
+
+    # Baseline metrics (calculated from historical data)
+    baseline_latency_avg = Column(Integer, nullable=True)  # Normal average latency
+    baseline_latency_stddev = Column(Integer, nullable=True)  # Normal variation
+    baseline_packet_loss = Column(Integer, default=0)  # Normal packet loss %
+
+    # Thresholds for anomaly detection
+    latency_warning_threshold = Column(Integer, nullable=True)  # Warning if exceeded
+    latency_critical_threshold = Column(Integer, nullable=True)  # Critical if exceeded
+    packet_loss_threshold = Column(Integer, default=5)  # Alert if loss > this %
+
+    # Metadata
+    samples_count = Column(Integer, default=0)  # Number of samples used for baseline
+    last_calculated = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 def init_db():
     """Initialize database and create all tables"""
     # Import all models to ensure they're registered with Base

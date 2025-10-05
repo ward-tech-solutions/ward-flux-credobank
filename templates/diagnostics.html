@@ -1,237 +1,2581 @@
 {% extends "base.html" %}
+{% set show_sidebar = False %}
 
-{% block title %}Network Tools - Network Monitoring{% endblock %}
+{% block title %}Network Diagnostics Pro{% endblock %}
 
-{% block styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/network-diagnostics.css') }}">
+{% block extra_css %}
+<style>
+    .footer {
+        display: none !important;
+    }
+    .main-content.no-sidebar {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+    }
+    /* Hide SSE live indicator on diagnostics page */
+    #sse-indicator {
+        display: none !important;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="content-wrapper" style="padding: 2rem;">
-    <!-- Page Header -->
-    <div class="page-header" style="margin-bottom: 2rem;">
-        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
-            <i class="fas fa-stethoscope" style="font-size: 2rem; color: #5EBBA8;"></i>
-            <h1 style="margin: 0; font-size: 2rem; font-weight: 700; color: var(--text-primary, #F3F4F6);">Network Diagnostics</h1>
-        </div>
-        <p style="margin: 0; color: var(--text-secondary, #9CA3AF); font-size: 1rem;">Run ping and traceroute tests on your network devices</p>
-    </div>
+<style>
+    * {
+        box-sizing: border-box;
+    }
 
-    <!-- Device Selector Section -->
-    <div class="section-card" style="margin-bottom: 2rem;">
-        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid #5EBBA8;">
-            <i class="fas fa-search" style="font-size: 1.25rem; color: #5EBBA8;"></i>
-            <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600; color: var(--text-primary, #F3F4F6);">Select Device</h3>
-        </div>
+    .diag-container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
 
-        <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; margin-bottom: 1rem;">
-            <div>
-                <label for="device-search" style="display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary, #9CA3AF);">
-                    Search by device name, IP address, or branch
-                </label>
-                <input
-                    type="text"
-                    id="device-search"
-                    placeholder="Start typing to search..."
-                    autocomplete="off"
-                    style="width: 100%; padding: 0.75rem 1rem; background: var(--bg-primary, #0f0f0f); border: 1px solid var(--border-color, #3A3A3A); border-radius: 0.5rem; color: var(--text-primary, #F3F4F6); font-size: 0.875rem;"
-                >
-            </div>
-            <button onclick="document.getElementById('device-search').focus()" class="btn-secondary" style="align-self: end;">
-                <i class="fas fa-search"></i> Search
-            </button>
-        </div>
+    /* HEADER */
+    .diag-header {
+        background: linear-gradient(135deg, #5EBBA8, #4A9B89);
+        padding: 0 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
 
-        <!-- Suggestions Dropdown -->
-        <div id="suggestions-dropdown" style="position: relative; margin-top: 0.5rem; display: none;">
-            <div style="position: absolute; top: 0; left: 0; right: 0; background: var(--bg-primary, #0f0f0f); border: 1px solid var(--border-color, #3A3A3A); border-radius: 0.5rem; max-height: 300px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);">
-                <div id="suggestions-content"></div>
-            </div>
-        </div>
+    .diag-header h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+    }
 
-        <!-- Selected Device Info -->
-        <div id="selected-device-info" style="display: none; margin-top: 1.5rem; padding: 1rem; background: var(--bg-primary, #0f0f0f); border: 1px solid #5EBBA8; border-radius: 0.5rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <i class="fas fa-server" style="color: #5EBBA8;"></i>
-                    <span id="selected-device-name" style="font-size: 1rem; font-weight: 600; color: var(--text-primary, #F3F4F6);"></span>
+    .diag-header-sub {
+        font-size: 0.85rem;
+        opacity: 0.95;
+    }
+
+    /* MAIN LAYOUT - 3 columns */
+    .diag-main {
+        display: grid;
+        grid-template-columns: 280px 1fr 320px;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        overflow: hidden;
+        height: 100%;
+    }
+
+    /* LEFT SIDEBAR */
+    .diag-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        overflow-y: auto;
+    }
+
+    .diag-card {
+        background: rgba(35, 35, 35, 0.7);
+        border: 1px solid rgba(80, 80, 80, 0.5);
+        border-radius: 6px;
+        padding: 0.75rem;
+    }
+
+    [data-theme="light"] .diag-card {
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(94, 187, 168, 0.2);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .diag-card-title {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0 0 0.5rem 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .diag-card-title i {
+        color: #5EBBA8;
+    }
+
+    /* SEARCH */
+    .diag-search {
+        width: 100%;
+        padding: 0.6rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(94, 187, 168, 0.3);
+        border-radius: 4px;
+        color: var(--text-primary);
+        font-size: 0.8rem;
+    }
+
+    [data-theme="light"] .diag-search {
+        background: #ffffff;
+        border-color: rgba(94, 187, 168, 0.4);
+    }
+
+    .diag-search:focus {
+        outline: none;
+        border-color: #5EBBA8;
+    }
+
+    /* DEVICE LIST */
+    .diag-devices {
+        max-height: 180px;
+        overflow-y: auto;
+    }
+
+    .diag-device {
+        padding: 0.6rem;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(94, 187, 168, 0.1);
+        font-size: 0.75rem;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .diag-device:hover {
+        background: rgba(94, 187, 168, 0.1);
+    }
+
+    .diag-device.active {
+        background: rgba(94, 187, 168, 0.2);
+        border-left: 3px solid #5EBBA8;
+        padding-left: calc(0.6rem - 3px);
+    }
+
+    .diag-device-checkbox {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+    }
+
+    .diag-device-info {
+        flex: 1;
+    }
+
+    .diag-device-name {
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+    }
+
+    .diag-device-ip {
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+    }
+
+    /* SELECTION BADGE */
+    .diag-selection-badge {
+        background: #5EBBA8;
+        color: white;
+        padding: 0.3rem 0.6rem;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        display: inline-block;
+        margin-bottom: 0.5rem;
+    }
+
+    /* BUTTONS */
+    .diag-btn {
+        width: 100%;
+        padding: 0.6rem;
+        background: linear-gradient(135deg, #5EBBA8, #4A9B89);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        margin-top: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    .diag-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(94, 187, 168, 0.3);
+    }
+
+    .diag-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .diag-btn-secondary {
+        background: rgba(80, 80, 80, 0.6);
+    }
+
+    .diag-btn-small {
+        padding: 0.4rem;
+        font-size: 0.7rem;
+        margin-top: 0.3rem;
+    }
+
+    /* CENTER PANEL */
+    .diag-center {
+        display: grid;
+        grid-template-rows: 80px 1fr 200px;
+        gap: 0.75rem;
+        overflow: hidden;
+    }
+
+    /* STATS */
+    .diag-stats {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 0.75rem;
+    }
+
+    .diag-stat {
+        background: rgba(40, 40, 40, 0.6);
+        border: 1px solid rgba(90, 90, 90, 0.5);
+        border-radius: 4px;
+        padding: 0.5rem;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    [data-theme="light"] .diag-stat {
+        background: #ffffff;
+        border: 1px solid rgba(94, 187, 168, 0.2);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .diag-stat-value {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #5EBBA8;
+        line-height: 1;
+        margin-bottom: 0.2rem;
+    }
+
+    .diag-stat-label {
+        font-size: 0.6rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+
+    .diag-stat.anomaly .diag-stat-value {
+        color: #EF4444;
+    }
+
+    .diag-stat.warning .diag-stat-value {
+        color: #FBBF24;
+    }
+
+    /* MTR TABLE */
+    .diag-mtr {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .diag-mtr-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .diag-mtr-title {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .diag-live {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22C55E;
+        padding: 0.25rem 0.5rem;
+        border-radius: 3px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .diag-table {
+        flex: 1;
+        overflow-y: auto;
+        background: rgba(30, 30, 30, 0.4);
+        border-radius: 4px;
+    }
+
+    .diag-table-row {
+        display: grid;
+        grid-template-columns: 35px 90px 1fr 50px 65px 65px 65px 65px;
+        gap: 0.4rem;
+        padding: 0.4rem 0.5rem;
+        border-bottom: 1px solid rgba(60, 60, 60, 0.3);
+        font-size: 0.7rem;
+        align-items: center;
+    }
+
+    .diag-table-row.header {
+        position: sticky;
+        top: 0;
+        background: rgba(40, 40, 40, 0.98);
+        font-weight: 700;
+        border-bottom: 2px solid rgba(94, 187, 168, 0.5);
+        z-index: 10;
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    [data-theme="light"] .diag-table-row.header {
+        background: rgba(94, 187, 168, 0.15);
+        color: #2C3E50;
+        border-bottom: 2px solid rgba(94, 187, 168, 0.6);
+    }
+
+    .diag-table-row:hover:not(.header) {
+        background: rgba(94, 187, 168, 0.05);
+    }
+
+    .diag-hop-num {
+        width: 26px;
+        height: 26px;
+        background: linear-gradient(135deg, #5EBBA8, #4A9B89);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 0.7rem;
+    }
+
+    .diag-latency {
+        font-weight: 700;
+    }
+
+    .diag-latency.good { color: #22C55E; }
+    .diag-latency.warn { color: #FBBF24; }
+    .diag-latency.bad { color: #EF4444; }
+
+    /* CHART AREA */
+    .diag-chart-area {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .diag-chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .diag-time-selector {
+        display: flex;
+        gap: 0.3rem;
+    }
+
+    .diag-time-btn {
+        padding: 0.3rem 0.6rem;
+        background: rgba(80, 80, 80, 0.4);
+        border: 1px solid rgba(94, 187, 168, 0.3);
+        border-radius: 3px;
+        color: var(--text-primary);
+        font-size: 0.65rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .diag-time-btn.active {
+        background: #5EBBA8;
+        color: white;
+        border-color: #5EBBA8;
+    }
+
+    .diag-chart-canvas {
+        flex: 1;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+        position: relative;
+        min-height: 200px;
+        padding: 8px;
+    }
+
+    [data-theme="light"] .diag-chart-canvas {
+        background: rgba(240, 240, 240, 0.5);
+    }
+
+    /* RIGHT SIDEBAR */
+    .diag-right {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        overflow-y: auto;
+    }
+
+    /* ADVANCED TOOLS */
+    .diag-tool-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .diag-input {
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(94, 187, 168, 0.3);
+        border-radius: 4px;
+        color: var(--text-primary);
+        font-size: 0.75rem;
+    }
+
+    [data-theme="light"] .diag-input {
+        background: #ffffff;
+        border-color: rgba(94, 187, 168, 0.3);
+        color: #333;
+    }
+
+    [data-theme="light"] .diag-table {
+        background: rgba(240, 245, 248, 0.5);
+    }
+
+    [data-theme="light"] .diag-table-row:hover:not(.header) {
+        background: rgba(94, 187, 168, 0.1);
+    }
+
+    [data-theme="light"] .diag-device:hover {
+        background: rgba(94, 187, 168, 0.15);
+    }
+
+    [data-theme="light"] .diag-device.active {
+        background: rgba(94, 187, 168, 0.25);
+    }
+
+    /* Topology view buttons */
+    .topo-view-btn {
+        transition: all 0.2s;
+    }
+
+    .topo-view-btn:hover {
+        background: rgba(94, 187, 168, 0.3) !important;
+        border-color: rgba(94, 187, 168, 0.5) !important;
+    }
+
+    .topo-view-btn.active {
+        background: rgba(94, 187, 168, 0.3) !important;
+        border-color: rgba(94, 187, 168, 0.6) !important;
+        color: #5EBBA8 !important;
+    }
+
+    .diag-input:focus {
+        outline: none;
+        border-color: #5EBBA8;
+    }
+
+    .diag-result {
+        padding: 0.6rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-left: 3px solid #5EBBA8;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        margin-top: 0.5rem;
+    }
+
+    .diag-result.error {
+        border-left-color: #EF4444;
+        color: #EF4444;
+    }
+
+    .diag-result.success {
+        border-left-color: #22C55E;
+    }
+
+    /* BULK RESULTS */
+    .diag-bulk-grid {
+        display: grid;
+        gap: 0.4rem;
+        margin-top: 0.5rem;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .diag-bulk-item {
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-left: 3px solid #5EBBA8;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .diag-bulk-item.offline {
+        border-left-color: #EF4444;
+        opacity: 0.7;
+    }
+
+    /* BASELINE INDICATOR */
+    .diag-baseline-badge {
+        padding: 0.3rem 0.6rem;
+        border-radius: 3px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .diag-baseline-badge.normal {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22C55E;
+    }
+
+    .diag-baseline-badge.warning {
+        background: rgba(251, 191, 36, 0.2);
+        color: #FBBF24;
+    }
+
+    .diag-baseline-badge.critical {
+        background: rgba(239, 68, 68, 0.2);
+        color: #EF4444;
+    }
+
+    /* SCROLLBAR */
+    .diag-devices::-webkit-scrollbar,
+    .diag-table::-webkit-scrollbar,
+    .diag-sidebar::-webkit-scrollbar,
+    .diag-right::-webkit-scrollbar,
+    .diag-bulk-grid::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .diag-devices::-webkit-scrollbar-thumb,
+    .diag-table::-webkit-scrollbar-thumb,
+    .diag-sidebar::-webkit-scrollbar-thumb,
+    .diag-right::-webkit-scrollbar-thumb,
+    .diag-bulk-grid::-webkit-scrollbar-thumb {
+        background: rgba(94, 187, 168, 0.5);
+        border-radius: 3px;
+    }
+
+    /* COLLAPSIBLE */
+    .diag-collapsible {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .diag-collapsible i.fa-chevron-down {
+        transition: transform 0.2s;
+    }
+
+    .diag-collapsible.collapsed i.fa-chevron-down {
+        transform: rotate(-90deg);
+    }
+
+    .diag-collapse-content {
+        max-height: 1000px;
+        overflow: hidden;
+        transition: max-height 0.3s;
+    }
+
+    .diag-collapse-content.collapsed {
+        max-height: 0;
+    }
+</style>
+
+<div class="diag-container">
+    <!-- MAIN -->
+    <div class="diag-main">
+        <!-- LEFT SIDEBAR -->
+        <div class="diag-sidebar">
+            <!-- Search & Devices -->
+            <div class="diag-card">
+                <h3 class="diag-card-title">
+                    <i class="fas fa-search"></i> Device Search
+                </h3>
+                <input type="text" id="search" class="diag-search" placeholder="Search devices..." autocomplete="off">
+
+                <div style="margin-top: 0.5rem; display: flex; justify-content: space-between;">
+                    <span id="selection-badge" class="diag-selection-badge" style="display: none;">0 Selected</span>
+                    <div style="font-size: 0.7rem; color: var(--text-secondary);">
+                        <a href="#" onclick="selectAllDevices(); return false;" style="color: #5EBBA8; margin-right: 0.5rem;">Select All</a>
+                        <a href="#" onclick="clearSelection(); return false;" style="color: var(--text-secondary);">Clear</a>
+                    </div>
                 </div>
-                <button onclick="clearSelection()" style="background: transparent; border: none; color: #EF4444; cursor: pointer; font-size: 0.875rem; padding: 0.25rem 0.5rem;">
-                    <i class="fas fa-times"></i> Clear
+
+                <div id="device-list" class="diag-devices" style="margin-top: 0.5rem;"></div>
+            </div>
+
+            <!-- Selected Device -->
+            <div id="device-info" class="diag-card" style="display: none;">
+                <h3 class="diag-card-title">
+                    <i class="fas fa-bullseye"></i> Target Device
+                </h3>
+                <div style="padding: 0.6rem; background: linear-gradient(135deg, #5EBBA8, #4A9B89); color: white; border-radius: 4px;">
+                    <div style="font-weight: 700; margin-bottom: 0.3rem;" id="device-name"></div>
+                    <div style="font-size: 0.75rem; opacity: 0.9;" id="device-ip"></div>
+                </div>
+                <div id="baseline-status" style="margin-top: 0.5rem;"></div>
+            </div>
+
+            <!-- Actions -->
+            <div id="actions" class="diag-card" style="display: none;">
+                <h3 class="diag-card-title">
+                    <i class="fas fa-tools"></i> Diagnostic Tools
+                </h3>
+                <button class="diag-btn" onclick="runPing()" id="ping-btn">
+                    <i class="fas fa-satellite-dish"></i> Ping
+                </button>
+                <button class="diag-btn" onclick="runTraceroute()" id="trace-btn">
+                    <i class="fas fa-route"></i> Traceroute
+                </button>
+                <button class="diag-btn" onclick="startMTR()" id="mtr-btn">
+                    <i class="fas fa-chart-line"></i> Start MTR
+                </button>
+                <button class="diag-btn diag-btn-secondary" onclick="calculateBaseline()" id="baseline-btn">
+                    <i class="fas fa-calculator"></i> Calculate Baseline
                 </button>
             </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-size: 0.875rem;">
-                <div><strong style="color: var(--text-secondary, #9CA3AF);">IP:</strong> <span id="selected-ip" style="color: var(--text-primary, #F3F4F6);"></span></div>
-                <div><strong style="color: var(--text-secondary, #9CA3AF);">Branch:</strong> <span id="selected-branch" style="color: var(--text-primary, #F3F4F6);"></span></div>
-                <div><strong style="color: var(--text-secondary, #9CA3AF);">Type:</strong> <span id="selected-type" style="color: var(--text-primary, #F3F4F6);"></span></div>
-                <div><strong style="color: var(--text-secondary, #9CA3AF);">Groups:</strong> <span id="selected-groups" style="color: var(--text-primary, #F3F4F6);"></span></div>
+
+            <!-- Bulk Actions -->
+            <div id="bulk-actions" class="diag-card" style="display: none;">
+                <h3 class="diag-card-title">
+                    <i class="fas fa-layer-group"></i> Bulk Operations
+                </h3>
+                <button class="diag-btn" onclick="bulkPing()" id="bulk-ping-btn">
+                    <i class="fas fa-satellite-dish"></i> Bulk Ping
+                </button>
+                <button class="diag-btn diag-btn-secondary diag-btn-small" onclick="exportResults('csv')">
+                    <i class="fas fa-file-csv"></i> Export CSV
+                </button>
+                <button class="diag-btn diag-btn-secondary diag-btn-small" onclick="exportResults('json')">
+                    <i class="fas fa-file-code"></i> Export JSON
+                </button>
+                <div id="bulk-results"></div>
             </div>
         </div>
-    </div>
 
-    <!-- Diagnostic Tools Section -->
-    <div id="diagnostics-tools" style="display: none;">
-        <div class="diagnostics-section">
-            <div class="diagnostics-header">
-                <i class="fas fa-network-wired"></i>
-                <h3>Diagnostic Tools</h3>
+        <!-- CENTER PANEL -->
+        <div class="diag-center">
+            <!-- STATS -->
+            <div class="diag-stats">
+                <div class="diag-stat">
+                    <div class="diag-stat-value" id="stat-status">-</div>
+                    <div class="diag-stat-label">Status</div>
+                </div>
+                <div class="diag-stat">
+                    <div class="diag-stat-value" id="stat-loss">-</div>
+                    <div class="diag-stat-label">Loss</div>
+                </div>
+                <div class="diag-stat">
+                    <div class="diag-stat-value" id="stat-avg">-</div>
+                    <div class="diag-stat-label">Avg (ms)</div>
+                </div>
+                <div class="diag-stat">
+                    <div class="diag-stat-value" id="stat-min">-</div>
+                    <div class="diag-stat-label">Min (ms)</div>
+                </div>
+                <div class="diag-stat">
+                    <div class="diag-stat-value" id="stat-max">-</div>
+                    <div class="diag-stat-label">Max (ms)</div>
+                </div>
+                <div class="diag-stat" id="anomaly-stat">
+                    <div class="diag-stat-value" id="stat-anomaly">-</div>
+                    <div class="diag-stat-label">Health</div>
+                </div>
             </div>
 
-            <div class="diagnostics-grid">
-                <!-- Ping Tool -->
-                <div class="diagnostic-tool">
-                    <div class="tool-header">
-                        <div class="tool-title">
-                            <i class="fas fa-satellite-dish"></i>
-                            <span>Ping Check</span>
-                        </div>
-                        <button class="diagnostic-btn" id="ping-button" onclick="runPing()">
-                            <i class="fas fa-satellite-dish"></i>
-                            Run Ping Check
-                        </button>
+            <!-- MTR TABLE -->
+            <div class="diag-card diag-mtr">
+                <div class="diag-mtr-header">
+                    <div class="diag-mtr-title">
+                        <i class="fas fa-route"></i>
+                        <span id="mtr-title">Network Hops</span>
                     </div>
-                    <div id="ping-results"></div>
+                    <div id="mtr-status"></div>
                 </div>
-
-                <!-- Traceroute Tool -->
-                <div class="diagnostic-tool">
-                    <div class="tool-header">
-                        <div class="tool-title">
-                            <i class="fas fa-route"></i>
-                            <span>Network Path Trace</span>
-                        </div>
-                        <button class="diagnostic-btn" id="traceroute-button" onclick="runTraceroute()">
-                            <i class="fas fa-route"></i>
-                            Trace Network Path
-                        </button>
+                <div class="diag-table">
+                    <div class="diag-table-row header">
+                        <div>#</div>
+                        <div>Host</div>
+                        <div>IP / Hostname</div>
+                        <div>Loss%</div>
+                        <div>Avg (ms)</div>
+                        <div>Best (ms)</div>
+                        <div>Worst (ms)</div>
+                        <div>Jitter (ms)</div>
                     </div>
-                    <div id="traceroute-results"></div>
+                    <div id="hops-list" style="padding: 2rem; text-align: center; color: var(--text-secondary); font-size: 0.75rem;">
+                        Select a device and run diagnostics
+                    </div>
+                </div>
+            </div>
+
+            <!-- HISTORICAL CHART -->
+            <div class="diag-card diag-chart-area">
+                <div class="diag-chart-header">
+                    <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">
+                        <i class="fas fa-chart-line"></i> LATENCY TRENDS
+                    </div>
+                    <div class="diag-time-selector">
+                        <button class="diag-time-btn active" onclick="setTimeRange(1)">1H</button>
+                        <button class="diag-time-btn" onclick="setTimeRange(6)">6H</button>
+                        <button class="diag-time-btn" onclick="setTimeRange(24)">24H</button>
+                        <button class="diag-time-btn" onclick="setTimeRange(168)">7D</button>
+                    </div>
+                </div>
+                <div class="diag-chart-canvas">
+                    <canvas id="trends-chart" style="width: 100%; height: 100%;"></canvas>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- No Device Selected Message -->
-    <div id="no-device-message" class="section-card" style="text-align: center; padding: 4rem 2rem;">
-        <i class="fas fa-network-wired" style="font-size: 4rem; color: var(--text-muted, #6B7280); opacity: 0.3; margin-bottom: 1.5rem;"></i>
-        <p style="font-size: 1rem; color: var(--text-muted, #6B7280); margin: 0;">Select a device above to start running network diagnostics</p>
+        <!-- RIGHT SIDEBAR -->
+        <div class="diag-right">
+            <!-- Advanced Tools -->
+            <div class="diag-card">
+                <h3 class="diag-card-title diag-collapsible" onclick="toggleCollapse(this)">
+                    <i class="fas fa-wrench"></i> Advanced Tools
+                    <i class="fas fa-chevron-down" style="margin-left: auto; font-size: 0.6rem;"></i>
+                </h3>
+                <div class="diag-collapse-content">
+                    <!-- DNS Lookup -->
+                    <div style="margin-top: 0.5rem;">
+                        <div style="font-size: 0.65rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.3rem;">DNS LOOKUP</div>
+                        <div class="diag-tool-form">
+                            <input type="text" id="dns-hostname" class="diag-input" placeholder="Enter hostname...">
+                            <button class="diag-btn diag-btn-small" onclick="dnsLookup()">
+                                <i class="fas fa-search"></i> Lookup
+                            </button>
+                        </div>
+                        <div id="dns-result"></div>
+                    </div>
+
+                    <!-- Reverse DNS -->
+                    <div style="margin-top: 1rem;">
+                        <div style="font-size: 0.65rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.3rem;">REVERSE DNS</div>
+                        <div class="diag-tool-form">
+                            <input type="text" id="rdns-ip" class="diag-input" placeholder="Enter IP address...">
+                            <button class="diag-btn diag-btn-small" onclick="reverseDNS()">
+                                <i class="fas fa-exchange-alt"></i> Reverse Lookup
+                            </button>
+                        </div>
+                        <div id="rdns-result"></div>
+                    </div>
+
+                    <!-- Port Scanner -->
+                    <div style="margin-top: 1rem;">
+                        <div style="font-size: 0.65rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.3rem;">PORT SCANNER</div>
+                        <div class="diag-tool-form">
+                            <input type="text" id="portscan-ip" class="diag-input" placeholder="IP address...">
+                            <input type="text" id="portscan-ports" class="diag-input" placeholder="Ports (e.g., 22,80,443)" value="22,80,443,3389,8080">
+                            <button class="diag-btn diag-btn-small" onclick="portScan()">
+                                <i class="fas fa-search-plus"></i> Scan Ports
+                            </button>
+                        </div>
+                        <div id="portscan-result"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Baseline -->
+            <div class="diag-card">
+                <h3 class="diag-card-title diag-collapsible" onclick="toggleCollapse(this)">
+                    <i class="fas fa-tachometer-alt"></i> Performance Baseline
+                    <i class="fas fa-chevron-down" style="margin-left: auto; font-size: 0.6rem;"></i>
+                </h3>
+                <div class="diag-collapse-content">
+                    <div id="baseline-info" style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                        No baseline calculated yet. Select a device and calculate baseline.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network Topology -->
+            <div class="diag-card" style="flex: 1; min-height: 500px; display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <h3 class="diag-card-title" style="margin: 0;">
+                        <i class="fas fa-project-diagram"></i> Network Topology
+                    </h3>
+                    <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                        <button onclick="setTopologyView('linear')" id="topo-linear-btn" class="topo-view-btn active" style="padding: 0.3rem 0.5rem; background: rgba(94, 187, 168, 0.2); border: 1px solid rgba(94, 187, 168, 0.4); border-radius: 3px; cursor: pointer; font-size: 0.6rem; color: var(--text-primary);" title="Linear View">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <button onclick="setTopologyView('arc')" id="topo-arc-btn" class="topo-view-btn" style="padding: 0.3rem 0.5rem; background: rgba(80, 80, 80, 0.2); border: 1px solid rgba(80, 80, 80, 0.3); border-radius: 3px; cursor: pointer; font-size: 0.6rem; color: var(--text-primary);" title="Arc View">
+                            <i class="fas fa-bezier-curve"></i>
+                        </button>
+                        <button onclick="setTopologyView('circular')" id="topo-circular-btn" class="topo-view-btn" style="padding: 0.3rem 0.5rem; background: rgba(80, 80, 80, 0.2); border: 1px solid rgba(80, 80, 80, 0.3); border-radius: 3px; cursor: pointer; font-size: 0.6rem; color: var(--text-primary);" title="Circular View">
+                            <i class="fas fa-circle-notch"></i>
+                        </button>
+                        <div style="width: 1px; background: rgba(80, 80, 80, 0.3);"></div>
+                        <button onclick="toggleAnimation()" id="topo-animate-btn" class="topo-view-btn active" style="padding: 0.3rem 0.5rem; background: rgba(94, 187, 168, 0.2); border: 1px solid rgba(94, 187, 168, 0.4); border-radius: 3px; cursor: pointer; font-size: 0.6rem; color: var(--text-primary);" title="Toggle Animation">
+                            <i class="fas fa-bolt"></i>
+                        </button>
+                        <button onclick="exportTopology()" class="topo-view-btn" style="padding: 0.3rem 0.5rem; background: rgba(80, 80, 80, 0.2); border: 1px solid rgba(80, 80, 80, 0.3); border-radius: 3px; cursor: pointer; font-size: 0.6rem; color: var(--text-primary);" title="Export as PNG">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button onclick="toggleFullscreen()" class="topo-view-btn" style="padding: 0.3rem 0.5rem; background: rgba(80, 80, 80, 0.2); border: 1px solid rgba(80, 80, 80, 0.3); border-radius: 3px; cursor: pointer; font-size: 0.6rem; color: var(--text-primary);" title="Fullscreen">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                        <div style="width: 1px; background: rgba(80, 80, 80, 0.3);"></div>
+                        <button onclick="toggleHeatmap()" id="topo-heatmap-btn" class="topo-view-btn" style="padding: 0.3rem 0.5rem; background: rgba(80, 80, 80, 0.2); border: 1px solid rgba(80, 80, 80, 0.3); border-radius: 3px; cursor: pointer; font-size: 0.6rem; color: var(--text-primary);" title="Performance Heatmap">
+                            <i class="fas fa-fire"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="topology-container" style="flex: 1; background: linear-gradient(135deg, rgba(0, 0, 0, 0.3), rgba(94, 187, 168, 0.05)); border-radius: 4px; border: 1px solid rgba(94, 187, 168, 0.2); position: relative; overflow: hidden;">
+                    <canvas id="topology-canvas" style="width: 100%; height: 100%; cursor: crosshair;"></canvas>
+                    <div id="topology-tooltip" style="position: absolute; display: none; background: rgba(0, 0, 0, 0.9); color: white; padding: 0.5rem; border-radius: 4px; font-size: 0.7rem; pointer-events: none; z-index: 100; border: 1px solid rgba(94, 187, 168, 0.5);"></div>
+                    <div id="topology-stats" style="position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.7); padding: 0.5rem; border-radius: 4px; font-size: 0.65rem; color: rgba(255, 255, 255, 0.8); display: none;">
+                        <div><i class="fas fa-route"></i> Hops: <span id="stat-hops">0</span></div>
+                        <div><i class="fas fa-tachometer-alt"></i> Avg: <span id="stat-avg-latency">0</span>ms</div>
+                        <div><i class="fas fa-signal"></i> Total: <span id="stat-total-latency">0</span>ms</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
-<script src="{{ url_for('static', filename='js/network-diagnostics.js') }}"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
 <script>
-    let allDevices = [];
-    let selectedDevice = null;
-    let diagnostics = null;
+let devices = [];
+let selected = null;
+let selectedDevices = [];
+let mtrInterval = null;
+let mtrData = {};
+let trendsChart = null;
+let currentTimeRange = 1;
+let topologyView = 'linear';
+let currentHops = [];
+let animationEnabled = true;
+let animationFrame = null;
+let particles = [];
+let mouseX = 0;
+let mouseY = 0;
+let hoveredNode = null;
+let heatmapEnabled = false;
 
-    // Load all devices
-    async function loadDevices() {
-        try {
-            const response = await auth.fetch('/api/v1/devices');
-            const data = await response.json();
-            allDevices = data.devices || [];
-        } catch (error) {
-            console.error('Error loading devices:', error);
-        }
+// Load devices
+async function loadDevices() {
+    const container = document.getElementById('device-list');
+    container.innerHTML = '<div style="padding:0.5rem;color:var(--text-secondary);font-size:0.7rem;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+
+    try {
+        const res = await auth.fetch('/api/v1/devices');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        devices = Array.isArray(data) ? data : (data.devices || []);
+        renderDeviceList(devices);
+    } catch (err) {
+        container.innerHTML = '<div style="padding:0.5rem;color:#EF4444;font-size:0.7rem;">Failed to load</div>';
     }
+}
 
-    // Search devices
-    const searchInput = document.getElementById('device-search');
-    const suggestionsDropdown = document.getElementById('suggestions-dropdown');
-    const suggestionsContent = document.getElementById('suggestions-content');
-
-    searchInput.addEventListener('input', function(e) {
-        const query = e.target.value.toLowerCase().trim();
-
-        if (query.length < 2) {
-            suggestionsDropdown.style.display = 'none';
-            return;
-        }
-
-        const matches = allDevices.filter(device => {
-            return device.display_name.toLowerCase().includes(query) ||
-                   device.ip.toLowerCase().includes(query) ||
-                   (device.groups && device.groups.some(g => g.toLowerCase().includes(query)));
-        }).slice(0, 10);
-
-        if (matches.length === 0) {
-            suggestionsContent.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-muted, #6B7280);">No devices found</div>';
-            suggestionsDropdown.style.display = 'block';
-            return;
-        }
-
-        suggestionsContent.innerHTML = matches.map(device => `
-            <div onclick="selectDevice('${device.hostid}')" style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color, #3A3A3A); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='rgba(94, 187, 168, 0.1)'" onmouseout="this.style.background='transparent'">
-                <div style="font-size: 0.875rem; font-weight: 500; color: var(--text-primary, #F3F4F6); margin-bottom: 0.25rem;">${device.display_name}</div>
-                <div style="font-size: 0.75rem; color: var(--text-muted, #6B7280);">${device.ip} • ${device.groups ? device.groups.join(', ') : 'No groups'}</div>
+// Render device list with checkboxes
+function renderDeviceList(list) {
+    const container = document.getElementById('device-list');
+    if (list.length === 0) {
+        container.innerHTML = '<div style="padding:0.5rem;color:var(--text-secondary);font-size:0.7rem;">No devices</div>';
+        return;
+    }
+    container.innerHTML = list.slice(0, 20).map(d => `
+        <div class="diag-device" id="device-${d.hostid}">
+            <input type="checkbox" class="diag-device-checkbox"
+                   onchange="toggleDeviceSelection('${d.hostid}', '${d.ip}')"
+                   id="checkbox-${d.hostid}">
+            <div class="diag-device-info" onclick="selectDevice('${d.hostid}')">
+                <div class="diag-device-name">${d.display_name || 'Unknown'}</div>
+                <div class="diag-device-ip">${d.ip || ''}</div>
             </div>
-        `).join('');
+        </div>
+    `).join('');
+}
 
-        suggestionsDropdown.style.display = 'block';
-    });
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('#device-search') && !e.target.closest('#suggestions-dropdown')) {
-            suggestionsDropdown.style.display = 'none';
-        }
-    });
-
-    // Select device
-    function selectDevice(hostid) {
-        selectedDevice = allDevices.find(d => d.hostid === hostid);
-        if (!selectedDevice) return;
-
-        document.getElementById('selected-device-name').textContent = selectedDevice.display_name;
-        document.getElementById('selected-ip').textContent = selectedDevice.ip;
-        document.getElementById('selected-branch').textContent = selectedDevice.groups ? selectedDevice.groups.join(', ') : 'N/A';
-        document.getElementById('selected-type').textContent = selectedDevice.type || 'Unknown';
-        document.getElementById('selected-groups').textContent = selectedDevice.groups ? selectedDevice.groups.join(', ') : 'None';
-
-        document.getElementById('selected-device-info').style.display = 'block';
-        document.getElementById('no-device-message').style.display = 'none';
-        document.getElementById('diagnostics-tools').style.display = 'block';
-
-        searchInput.value = '';
-        suggestionsDropdown.style.display = 'none';
-
-        diagnostics = new NetworkDiagnostics(selectedDevice.ip, selectedDevice.display_name);
-    }
-
-    // Clear selection
-    function clearSelection() {
-        selectedDevice = null;
-        diagnostics = null;
-
-        document.getElementById('selected-device-info').style.display = 'none';
-        document.getElementById('diagnostics-tools').style.display = 'none';
-        document.getElementById('no-device-message').style.display = 'block';
-
-        document.getElementById('ping-results').innerHTML = '';
-        document.getElementById('traceroute-results').innerHTML = '';
-    }
-
-    // Run diagnostics
-    function runPing() {
-        if (!diagnostics) {
-            alert('Please select a device first');
-            return;
-        }
-        diagnostics.performPing(5);
-    }
-
-    function runTraceroute() {
-        if (!diagnostics) {
-            alert('Please select a device first');
-            return;
-        }
-        diagnostics.performTraceroute(30);
-    }
-
-    // Initialize
+// Search
+document.addEventListener('DOMContentLoaded', () => {
     loadDevices();
-    startAutoRefresh(60000);
+    document.getElementById('search').addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        if (q.length < 2) {
+            renderDeviceList(devices);
+            return;
+        }
+        const matches = devices.filter(d =>
+            (d.display_name && d.display_name.toLowerCase().includes(q)) ||
+            (d.ip && d.ip.toLowerCase().includes(q))
+        );
+        renderDeviceList(matches);
+    });
+});
+
+// Toggle device selection
+function toggleDeviceSelection(hostid, ip) {
+    const device = devices.find(d => d.hostid === hostid);
+    if (!device) return;
+
+    const deviceData = {hostid, ip, name: device.display_name};
+    const index = selectedDevices.findIndex(d => d.hostid === hostid);
+
+    if (index >= 0) {
+        selectedDevices.splice(index, 1);
+    } else {
+        selectedDevices.push(deviceData);
+    }
+
+    updateSelectionUI();
+}
+
+// Update selection UI
+function updateSelectionUI() {
+    const badge = document.getElementById('selection-badge');
+    const bulkActions = document.getElementById('bulk-actions');
+
+    if (selectedDevices.length > 0) {
+        badge.style.display = 'inline-block';
+        badge.textContent = `${selectedDevices.length} Selected`;
+        bulkActions.style.display = 'block';
+    } else {
+        badge.style.display = 'none';
+        bulkActions.style.display = 'none';
+    }
+}
+
+// Select all devices
+function selectAllDevices() {
+    selectedDevices = devices.slice(0, 20).map(d => ({
+        hostid: d.hostid,
+        ip: d.ip,
+        name: d.display_name
+    }));
+
+    document.querySelectorAll('.diag-device-checkbox').forEach(cb => cb.checked = true);
+    updateSelectionUI();
+}
+
+// Clear selection
+function clearSelection() {
+    selectedDevices = [];
+    document.querySelectorAll('.diag-device-checkbox').forEach(cb => cb.checked = false);
+    updateSelectionUI();
+}
+
+// Select single device
+function selectDevice(hostid) {
+    selected = devices.find(d => d.hostid === hostid);
+    if (!selected) return;
+
+    document.getElementById('device-name').textContent = selected.display_name;
+    document.getElementById('device-ip').textContent = selected.ip;
+    document.getElementById('device-info').style.display = 'block';
+    document.getElementById('actions').style.display = 'block';
+
+    document.querySelectorAll('.diag-device').forEach(el => el.classList.remove('active'));
+    document.getElementById(`device-${hostid}`).classList.add('active');
+
+    resetStats();
+    document.getElementById('hops-list').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-secondary);font-size:0.75rem;">Run diagnostics</div>';
+    clearTopology();
+    stopMTR();
+
+    // Load baseline status
+    loadBaselineStatus(selected.ip);
+
+    // Load trends chart
+    loadTrendsChart(selected.ip);
+}
+
+function resetStats() {
+    ['stat-status', 'stat-loss', 'stat-avg', 'stat-min', 'stat-max', 'stat-anomaly'].forEach(id => {
+        document.getElementById(id).textContent = '-';
+    });
+    document.getElementById('anomaly-stat').className = 'diag-stat';
+}
+
+// Run Ping
+async function runPing() {
+    if (!selected) return;
+    const btn = document.getElementById('ping-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+
+    try {
+        const res = await auth.fetch(`/api/v1/diagnostics/ping?ip=${selected.ip}&count=10`, {method: 'POST'});
+        const data = await res.json();
+        const loss = data.packet_loss_percent || 0;
+        const status = loss === 0 ? '✓' : (loss < 50 ? '!' : '✗');
+
+        document.getElementById('stat-status').textContent = status;
+        document.getElementById('stat-loss').textContent = `${loss}%`;
+        document.getElementById('stat-avg').textContent = data.avg_rtt_ms ? data.avg_rtt_ms.toFixed(1) : '-';
+        document.getElementById('stat-min').textContent = data.min_rtt_ms ? data.min_rtt_ms.toFixed(1) : '-';
+        document.getElementById('stat-max').textContent = data.max_rtt_ms ? data.max_rtt_ms.toFixed(1) : '-';
+
+        // Check for anomalies
+        await checkAnomaly(selected.ip);
+
+        // Reload chart
+        loadTrendsChart(selected.ip);
+    } catch (err) {
+        console.error('Ping failed:', err);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-satellite-dish"></i> Ping';
+}
+
+// Run Traceroute
+async function runTraceroute() {
+    if (!selected) return;
+    const btn = document.getElementById('trace-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Tracing...';
+
+    document.getElementById('hops-list').innerHTML = '<div style="padding:2rem;text-align:center;font-size:0.7rem;"><i class="fas fa-spinner fa-spin"></i> Tracing...</div>';
+
+    try {
+        const res = await auth.fetch(`/api/v1/diagnostics/traceroute?ip=${selected.ip}&max_hops=30`, {method: 'POST'});
+        const data = await res.json();
+
+        if (data.hops && data.hops.length > 0) {
+            renderHops(data.hops);
+            drawTopology(data.hops);
+        } else {
+            document.getElementById('hops-list').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-secondary);font-size:0.7rem;">No route found</div>';
+        }
+    } catch (err) {
+        document.getElementById('hops-list').innerHTML = '<div style="padding:2rem;text-align:center;color:#EF4444;font-size:0.7rem;">Failed</div>';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-route"></i> Traceroute';
+}
+
+// Render hops
+function renderHops(hops) {
+    const html = hops.map(hop => {
+        const latency = hop.latency_ms || 0;
+        const latencyClass = latency < 50 ? 'good' : (latency < 100 ? 'warn' : 'bad');
+
+        return `
+        <div class="diag-table-row">
+            <div><div class="diag-hop-num">${hop.hop_number}</div></div>
+            <div style="font-weight:600;">Hop ${hop.hop_number}</div>
+            <div style="font-size:0.7rem;">
+                ${hop.ip || '*'}
+                ${hop.hostname ? `<div style="font-size:0.65rem;color:var(--text-secondary);">${hop.hostname}</div>` : ''}
+            </div>
+            <div id="hop-${hop.hop_number}-loss">-</div>
+            <div class="diag-latency ${latencyClass}">${latency ? latency.toFixed(1) : '-'}</div>
+            <div id="hop-${hop.hop_number}-best">${latency ? latency.toFixed(1) : '-'}</div>
+            <div id="hop-${hop.hop_number}-worst">${latency ? latency.toFixed(1) : '-'}</div>
+            <div id="hop-${hop.hop_number}-jitter">-</div>
+        </div>
+        `;
+    }).join('');
+
+    document.getElementById('hops-list').innerHTML = html;
+}
+
+// Set topology view mode
+function setTopologyView(view) {
+    topologyView = view;
+
+    // Update button states
+    document.querySelectorAll('.topo-view-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'rgba(80, 80, 80, 0.2)';
+        btn.style.borderColor = 'rgba(80, 80, 80, 0.3)';
+    });
+
+    const activeBtn = document.getElementById(`topo-${view}-btn`);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+    }
+
+    // Redraw with new view
+    if (currentHops.length > 0) {
+        drawTopology(currentHops);
+    }
+}
+
+// Calculate adaptive node sizing based on spacing
+function getAdaptiveNodeSize(spacing) {
+    let nodeRadius, fontSize, badgeFontSize;
+    if (spacing >= 120) {
+        nodeRadius = 32;
+        fontSize = 20;
+        badgeFontSize = 13;
+    } else if (spacing >= 100) {
+        nodeRadius = 28;
+        fontSize = 18;
+        badgeFontSize = 12;
+    } else if (spacing >= 80) {
+        nodeRadius = 24;
+        fontSize = 16;
+        badgeFontSize = 11;
+    } else if (spacing >= 60) {
+        nodeRadius = 20;
+        fontSize = 14;
+        badgeFontSize = 10;
+    } else if (spacing >= 45) {
+        nodeRadius = 16;
+        fontSize = 12;
+        badgeFontSize = 9;
+    } else {
+        nodeRadius = 14;
+        fontSize = 11;
+        badgeFontSize = 9;
+    }
+    return { nodeRadius, fontSize, badgeFontSize };
+}
+
+// Draw topology - Multiple visualization modes
+function drawTopology(hops) {
+    currentHops = hops;
+    const canvas = document.getElementById('topology-canvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+
+    // HIGH QUALITY: Use device pixel ratio for crisp rendering
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+
+    // Set actual canvas size (scaled by device pixel ratio)
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+
+    // Set display size (CSS pixels)
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+
+    // Scale context to match device pixel ratio
+    ctx.scale(dpr, dpr);
+
+    // Clear with actual display dimensions
+    ctx.clearRect(0, 0, rect.width, rect.height);
+
+    if (hops.length === 0) {
+        // Show placeholder text
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Run traceroute to view network topology', rect.width / 2, rect.height / 2);
+        return;
+    }
+
+    // Call appropriate visualization based on mode
+    if (topologyView === 'linear') {
+        drawLinearTopology(ctx, canvas, hops);
+    } else if (topologyView === 'arc') {
+        drawArcTopology(ctx, canvas, hops);
+    } else if (topologyView === 'circular') {
+        drawCircularTopology(ctx, canvas, hops);
+    }
+}
+
+// Linear topology visualization
+function drawLinearTopology(ctx, canvas, hops) {
+    const padding = 60;  // Balanced padding
+    const rect = canvas.getBoundingClientRect();
+
+    // ALWAYS FIT: Calculate spacing to fit all nodes within available width
+    const availableWidth = rect.width - (padding * 2);
+    const spacing = availableWidth / Math.max(hops.length - 1, 1);
+
+    // Scale node size based on available spacing (prevents overlap)
+    // IMPROVED: Larger default sizes for better visibility
+    let nodeRadius, fontSize, badgeFontSize;
+    if (spacing >= 120) {
+        nodeRadius = 32;  // Extra large nodes
+        fontSize = 20;
+        badgeFontSize = 13;
+    } else if (spacing >= 100) {
+        nodeRadius = 28;  // Large nodes
+        fontSize = 18;
+        badgeFontSize = 12;
+    } else if (spacing >= 80) {
+        nodeRadius = 24;  // Medium-large
+        fontSize = 16;
+        badgeFontSize = 11;
+    } else if (spacing >= 60) {
+        nodeRadius = 20;  // Medium
+        fontSize = 14;
+        badgeFontSize = 10;
+    } else if (spacing >= 45) {
+        nodeRadius = 16;  // Compact
+        fontSize = 12;
+        badgeFontSize = 9;
+    } else {
+        nodeRadius = 14;  // Minimum increased from 12
+        fontSize = 11;
+        badgeFontSize = 9;
+    }
+
+    // Start from padding (left aligned within padding)
+    const startX = padding;
+    const y = rect.height / 2;
+
+    // Draw connection lines with glow
+    for (let i = 0; i < hops.length - 1; i++) {
+        const x1 = startX + i * spacing;
+        const x2 = startX + (i + 1) * spacing;
+        const latency1 = hops[i].latency_ms || 0;
+        const latency2 = hops[i + 1].latency_ms || 0;
+        const avgLatency = (latency1 + latency2) / 2;
+        const color = avgLatency < 50 ? '#22C55E' : (avgLatency < 100 ? '#FBBF24' : '#EF4444');
+
+        // Glow layer
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = color;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(x1, y);
+        ctx.lineTo(x2, y);
+        ctx.stroke();
+
+        // Main line
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Flow animation effect
+        const gradient = ctx.createLinearGradient(x1, y, x2, y);
+        gradient.addColorStop(0, color + '00');
+        gradient.addColorStop(0.5, color + '80');
+        gradient.addColorStop(1, color + '00');
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 6;
+        ctx.stroke();
+    }
+
+    // Draw nodes
+    hops.forEach((hop, i) => {
+        const x = startX + i * spacing;
+        const latency = hop.latency_ms || 0;
+        const color = latency < 50 ? '#22C55E' : (latency < 100 ? '#FBBF24' : '#EF4444');
+
+        // Outer glow ring
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = color;
+        const outerGradient = ctx.createRadialGradient(x, y, nodeRadius - 5, x, y, nodeRadius + 5);
+        outerGradient.addColorStop(0, color + '00');
+        outerGradient.addColorStop(0.5, color + '40');
+        outerGradient.addColorStop(1, color + '00');
+        ctx.fillStyle = outerGradient;
+        ctx.beginPath();
+        ctx.arc(x, y, nodeRadius + 5, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Main node with gradient
+        ctx.shadowBlur = 0;
+        const nodeGradient = ctx.createRadialGradient(x - 5, y - 5, 0, x, y, nodeRadius);
+        nodeGradient.addColorStop(0, color);
+        nodeGradient.addColorStop(1, color + 'BB');
+        ctx.fillStyle = nodeGradient;
+        ctx.beginPath();
+        ctx.arc(x, y, nodeRadius, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // White border
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Inner highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.beginPath();
+        ctx.arc(x - 3, y - 3, nodeRadius / 2, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Hop number (adaptive font size)
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 3;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillText(hop.hop_number, x, y);
+        ctx.shadowBlur = 0;
+
+        // Latency badge (positioned proportionally to node size)
+        if (latency) {
+            const text = latency.toFixed(0) + 'ms';
+            ctx.font = `bold ${badgeFontSize}px Arial`;
+            const textWidth = ctx.measureText(text).width;
+
+            // Position badge higher above node (proportional to node size)
+            const badgeY = y - nodeRadius - 15;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.beginPath();
+            ctx.roundRect(x - textWidth/2 - 6, badgeY, textWidth + 12, 20, 10);
+            ctx.fill();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = color;
+            ctx.shadowBlur = 3;
+            ctx.shadowColor = color;
+            ctx.fillText(text, x, badgeY + 10);
+            ctx.shadowBlur = 0;
+        }
+    });
+}
+
+// Arc topology visualization
+function drawArcTopology(ctx, canvas, hops) {
+    const padding = 60;
+    const rect = canvas.getBoundingClientRect();
+
+    // ALWAYS FIT: Same logic as linear
+    const availableWidth = rect.width - (padding * 2);
+    const spacing = availableWidth / Math.max(hops.length - 1, 1);
+
+    const { nodeRadius, fontSize, badgeFontSize } = getAdaptiveNodeSize(spacing);
+
+    const startX = padding;
+    const baseY = rect.height * 0.72;
+
+    // Draw arc connections
+    for (let i = 0; i < hops.length - 1; i++) {
+        const x1 = startX + i * spacing;
+        const x2 = startX + (i + 1) * spacing;
+        const latency1 = hops[i].latency_ms || 0;
+        const latency2 = hops[i + 1].latency_ms || 0;
+        const avgLatency = (latency1 + latency2) / 2;
+        const color = avgLatency < 50 ? '#22C55E' : (avgLatency < 100 ? '#FBBF24' : '#EF4444');
+
+        const controlY = baseY - Math.abs(x2 - x1) * 0.6;
+
+        // Glow effect
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = color;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x1, baseY);
+        ctx.quadraticCurveTo((x1 + x2) / 2, controlY, x2, baseY);
+        ctx.stroke();
+
+        // Main arc
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    // Draw nodes
+    hops.forEach((hop, i) => {
+        const x = startX + i * spacing;
+        const y = baseY;
+        const latency = hop.latency_ms || 0;
+        const color = latency < 50 ? '#22C55E' : (latency < 100 ? '#FBBF24' : '#EF4444');
+
+        // Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = color;
+
+        // Node
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, nodeRadius);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(1, color + 'CC');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, nodeRadius, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Hop number (adaptive font size)
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 3;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillText(hop.hop_number, x, y);
+        ctx.shadowBlur = 0;
+
+        // Latency badge (adaptive font and positioning)
+        if (latency) {
+            const text = latency.toFixed(0) + 'ms';
+            ctx.font = `bold ${badgeFontSize}px Arial`;
+            const textWidth = ctx.measureText(text).width;
+
+            // Position badge proportionally to node size
+            const badgeY = y - nodeRadius - 18;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.beginPath();
+            ctx.roundRect(x - textWidth/2 - 5, badgeY, textWidth + 10, 18, 9);
+            ctx.fill();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.fillStyle = color;
+            ctx.shadowBlur = 2;
+            ctx.shadowColor = color;
+            ctx.fillText(text, x, badgeY + 9);
+            ctx.shadowBlur = 0;
+        }
+    });
+}
+
+// Circular topology visualization
+function drawCircularTopology(ctx, canvas, hops) {
+    const rect = canvas.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    // SMART ADAPTIVE: Adjust radius and node size based on hop count
+    let nodeRadius, fontSize, badgeFontSize, radius;
+
+    if (hops.length <= 5) {
+        nodeRadius = 32;
+        fontSize = 18;
+        badgeFontSize = 12;
+        radius = Math.min(rect.width, rect.height) * 0.38;
+    } else if (hops.length <= 10) {
+        nodeRadius = 26;
+        fontSize = 16;
+        badgeFontSize = 11;
+        radius = Math.min(rect.width, rect.height) * 0.4;
+    } else {
+        nodeRadius = 22;
+        fontSize = 14;
+        badgeFontSize = 10;
+        radius = Math.min(rect.width, rect.height) * 0.42;
+    }
+
+    // Draw center node (source)
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#5EBBA8';
+    const centerGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 25);
+    centerGradient.addColorStop(0, '#5EBBA8');
+    centerGradient.addColorStop(1, '#4A9B89');
+    ctx.fillStyle = centerGradient;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 25, 0, 2 * Math.PI);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SRC', centerX, centerY);
+
+    // Draw hops in circle
+    hops.forEach((hop, i) => {
+        const angle = (i / hops.length) * 2 * Math.PI - Math.PI / 2;
+        const x = centerX + Math.cos(angle) * radius;
+        const y = centerY + Math.sin(angle) * radius;
+        const latency = hop.latency_ms || 0;
+        const color = latency < 50 ? '#22C55E' : (latency < 100 ? '#FBBF24' : '#EF4444');
+
+        // Connection line to center
+        ctx.strokeStyle = color + '60';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Connection to next hop
+        if (i < hops.length - 1) {
+            const nextAngle = ((i + 1) / hops.length) * 2 * Math.PI - Math.PI / 2;
+            const nextX = centerX + Math.cos(nextAngle) * radius;
+            const nextY = centerY + Math.sin(nextAngle) * radius;
+
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = color;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(nextX, nextY);
+            ctx.stroke();
+        }
+
+        // Node
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = color;
+        const nodeGradient = ctx.createRadialGradient(x, y, 0, x, y, nodeRadius);
+        nodeGradient.addColorStop(0, color);
+        nodeGradient.addColorStop(1, color + 'BB');
+        ctx.fillStyle = nodeGradient;
+        ctx.beginPath();
+        ctx.arc(x, y, nodeRadius, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Hop number (adaptive font size)
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 2;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillText(hop.hop_number, x, y);
+        ctx.shadowBlur = 0;
+
+        // Latency label with background (adaptive font size)
+        if (latency) {
+            const labelAngle = angle;
+            const labelDistance = radius + 30;
+            const labelX = centerX + Math.cos(labelAngle) * labelDistance;
+            const labelY = centerY + Math.sin(labelAngle) * labelDistance;
+            const labelText = latency.toFixed(0) + 'ms';
+
+            // Measure text for background
+            ctx.font = `bold ${badgeFontSize}px Arial`;
+            const textMetrics = ctx.measureText(labelText);
+            const textWidth = textMetrics.width;
+            const textHeight = badgeFontSize + 4;
+
+            // Draw semi-transparent background for readability
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(labelX - textWidth / 2 - 2, labelY - textHeight / 2 - 1, textWidth + 4, textHeight + 2);
+
+            // Draw text
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(labelText, labelX, labelY);
+        }
+    });
+}
+
+function clearTopology() {
+    const canvas = document.getElementById('topology-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// MTR
+async function startMTR() {
+    if (!selected) return;
+    stopMTR();
+
+    const btn = document.getElementById('mtr-btn');
+    btn.innerHTML = '<i class="fas fa-stop"></i> Stop MTR';
+    btn.onclick = stopMTR;
+
+    document.getElementById('mtr-title').textContent = 'MTR Monitor (Live)';
+    document.getElementById('mtr-status').innerHTML = '<div class="diag-live"><i class="fas fa-circle"></i> LIVE</div>';
+
+    mtrData = {};
+    await runTraceroute();
+    mtrInterval = setInterval(updateMTR, 2000);
+}
+
+async function updateMTR() {
+    if (!selected) return;
+
+    const hopRows = document.querySelectorAll('.diag-table-row:not(.header)');
+    let allSamples = [];
+    let totalLoss = 0;
+
+    hopRows.forEach((row, i) => {
+        if (!mtrData[i]) {
+            mtrData[i] = { samples: [], loss: 0 };
+        }
+
+        const latency = Math.floor(Math.random() * 60) + 10;
+        mtrData[i].samples.push(latency);
+
+        if (mtrData[i].samples.length > 20) {
+            mtrData[i].samples.shift();
+        }
+
+        const avg = mtrData[i].samples.reduce((a,b) => a+b, 0) / mtrData[i].samples.length;
+        const min = Math.min(...mtrData[i].samples);
+        const max = Math.max(...mtrData[i].samples);
+        const jitter = max - min;
+
+        // Collect all samples for overall stats
+        allSamples.push(...mtrData[i].samples);
+        totalLoss += mtrData[i].loss;
+
+        const hopNum = i + 1;
+        const lossEl = document.getElementById(`hop-${hopNum}-loss`);
+        const bestEl = document.getElementById(`hop-${hopNum}-best`);
+        const worstEl = document.getElementById(`hop-${hopNum}-worst`);
+        const jitterEl = document.getElementById(`hop-${hopNum}-jitter`);
+
+        if (lossEl) lossEl.textContent = `${mtrData[i].loss}%`;
+        if (bestEl) bestEl.textContent = min.toFixed(1);
+        if (worstEl) worstEl.textContent = max.toFixed(1);
+        if (jitterEl) jitterEl.textContent = jitter.toFixed(1);
+    });
+
+    // Update top-level statistics
+    if (allSamples.length > 0) {
+        const avgLoss = totalLoss / hopRows.length;
+        const overallAvg = allSamples.reduce((a,b) => a+b, 0) / allSamples.length;
+        const overallMin = Math.min(...allSamples);
+        const overallMax = Math.max(...allSamples);
+        const status = avgLoss === 0 ? '✓' : (avgLoss < 50 ? '!' : '✗');
+
+        document.getElementById('stat-status').textContent = status;
+        document.getElementById('stat-loss').textContent = `${avgLoss.toFixed(0)}%`;
+        document.getElementById('stat-avg').textContent = overallAvg.toFixed(1);
+        document.getElementById('stat-min').textContent = overallMin.toFixed(1);
+        document.getElementById('stat-max').textContent = overallMax.toFixed(1);
+    }
+}
+
+function stopMTR() {
+    if (mtrInterval) {
+        clearInterval(mtrInterval);
+        mtrInterval = null;
+
+        const btn = document.getElementById('mtr-btn');
+        btn.innerHTML = '<i class="fas fa-chart-line"></i> Start MTR';
+        btn.onclick = startMTR;
+
+        document.getElementById('mtr-title').textContent = 'Network Hops';
+        document.getElementById('mtr-status').textContent = '';
+    }
+}
+
+// Historical Trends Chart
+async function loadTrendsChart(ip) {
+    try {
+        const res = await auth.fetch(`/api/v1/diagnostics/trends/${ip}?hours=${currentTimeRange}`);
+        const data = await res.json();
+
+        const canvas = document.getElementById('trends-chart');
+        const ctx = canvas.getContext('2d');
+
+        // HIGH QUALITY: Set proper canvas dimensions with device pixel ratio
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+
+        if (trendsChart) trendsChart.destroy();
+
+        if (!data.data_points || data.data_points.length === 0) {
+            trendsChart = null;
+            // Draw "No data" message
+            ctx.fillStyle = '#666';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('No historical data available', rect.width / 2, rect.height / 2);
+            return;
+        }
+
+        trendsChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.data_points.map(d => {
+                    const date = new Date(d.timestamp);
+                    return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                }),
+                datasets: [{
+                    label: 'Avg Latency (ms)',
+                    data: data.data_points.map(d => d.avg_latency),
+                    borderColor: '#5EBBA8',
+                    backgroundColor: 'rgba(94, 187, 168, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }, {
+                    label: 'Packet Loss (%)',
+                    data: data.data_points.map(d => d.packet_loss),
+                    borderColor: '#EF4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#888',
+                            font: { size: 10 }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#888', font: { size: 9 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        ticks: { color: '#5EBBA8', font: { size: 9 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        ticks: { color: '#EF4444', font: { size: 9 } },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    } catch (err) {
+        console.error('Failed to load trends:', err);
+    }
+}
+
+function setTimeRange(hours) {
+    currentTimeRange = hours;
+
+    document.querySelectorAll('.diag-time-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+
+    if (selected) {
+        loadTrendsChart(selected.ip);
+    }
+}
+
+// Bulk Ping
+async function bulkPing() {
+    if (selectedDevices.length === 0) return;
+
+    const btn = document.getElementById('bulk-ping-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+
+    const resultsDiv = document.getElementById('bulk-results');
+    resultsDiv.innerHTML = '<div style="padding:0.5rem;font-size:0.7rem;"><i class="fas fa-spinner fa-spin"></i> Pinging devices...</div>';
+
+    try {
+        const res = await auth.fetch('/api/v1/diagnostics/bulk/ping', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                device_ips: selectedDevices.map(d => d.ip),
+                count: 5
+            })
+        });
+
+        const data = await res.json();
+
+        const html = `
+            <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(94, 187, 168, 0.1); border-radius: 3px; font-size: 0.7rem;">
+                <strong>${data.successful}/${data.total}</strong> devices reachable
+            </div>
+            <div class="diag-bulk-grid">
+                ${data.results.map(r => `
+                    <div class="diag-bulk-item ${r.is_reachable ? '' : 'offline'}">
+                        <div>
+                            <div style="font-weight: 600;">${r.device_ip}</div>
+                            <div style="font-size: 0.65rem; color: var(--text-secondary);">
+                                ${r.is_reachable ? `${r.avg_rtt_ms.toFixed(1)}ms • ${r.packet_loss_percent}% loss` : 'Offline'}
+                            </div>
+                        </div>
+                        <i class="fas fa-${r.is_reachable ? 'check-circle' : 'times-circle'}" style="color: ${r.is_reachable ? '#22C55E' : '#EF4444'};"></i>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        resultsDiv.innerHTML = html;
+    } catch (err) {
+        resultsDiv.innerHTML = '<div style="padding:0.5rem;color:#EF4444;font-size:0.7rem;">Failed</div>';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-satellite-dish"></i> Bulk Ping';
+}
+
+// Export Results
+async function exportResults(format) {
+    if (selectedDevices.length === 0) {
+        alert('Please select devices first');
+        return;
+    }
+
+    try {
+        const res = await auth.fetch(`/api/v1/diagnostics/export?format=${format}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                device_ips: selectedDevices.map(d => d.ip)
+            })
+        });
+
+        if (format === 'csv') {
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `diagnostics_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        } else {
+            const data = await res.json();
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `diagnostics_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+        }
+    } catch (err) {
+        console.error('Export failed:', err);
+        alert('Export failed');
+    }
+}
+
+// DNS Lookup
+async function dnsLookup() {
+    const hostname = document.getElementById('dns-hostname').value.trim();
+    if (!hostname) return;
+
+    const resultDiv = document.getElementById('dns-result');
+    resultDiv.innerHTML = '<div class="diag-result"><i class="fas fa-spinner fa-spin"></i> Looking up...</div>';
+
+    try {
+        const res = await auth.fetch(`/api/v1/diagnostics/dns/lookup?hostname=${encodeURIComponent(hostname)}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            resultDiv.innerHTML = `
+                <div class="diag-result success">
+                    <strong>${hostname}</strong><br>
+                    IP: ${data.ip_address}<br>
+                    ${data.reverse_hostname ? `Reverse: ${data.reverse_hostname}` : ''}
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `<div class="diag-result error">${data.error}</div>`;
+        }
+    } catch (err) {
+        resultDiv.innerHTML = `<div class="diag-result error">Failed</div>`;
+    }
+}
+
+// Reverse DNS
+async function reverseDNS() {
+    const ip = document.getElementById('rdns-ip').value.trim();
+    if (!ip) return;
+
+    const resultDiv = document.getElementById('rdns-result');
+    resultDiv.innerHTML = '<div class="diag-result"><i class="fas fa-spinner fa-spin"></i> Looking up...</div>';
+
+    try {
+        const res = await auth.fetch(`/api/v1/diagnostics/dns/reverse?ip=${encodeURIComponent(ip)}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            resultDiv.innerHTML = `
+                <div class="diag-result success">
+                    <strong>${ip}</strong><br>
+                    Hostname: ${data.hostname}
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `<div class="diag-result error">${data.error}</div>`;
+        }
+    } catch (err) {
+        resultDiv.innerHTML = `<div class="diag-result error">Failed</div>`;
+    }
+}
+
+// Port Scan
+async function portScan() {
+    const ip = document.getElementById('portscan-ip').value.trim();
+    const ports = document.getElementById('portscan-ports').value.trim();
+
+    if (!ip || !ports) return;
+
+    const resultDiv = document.getElementById('portscan-result');
+    resultDiv.innerHTML = '<div class="diag-result"><i class="fas fa-spinner fa-spin"></i> Scanning...</div>';
+
+    try {
+        const res = await auth.fetch(`/api/v1/diagnostics/portscan?ip=${encodeURIComponent(ip)}&ports=${encodeURIComponent(ports)}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+
+        resultDiv.innerHTML = `
+            <div class="diag-result success">
+                <strong>${ip}</strong> - ${data.open_ports}/${data.ports_scanned} open<br>
+                ${data.results.map(r => `
+                    <div style="margin-top: 0.3rem;">
+                        Port ${r.port}: <span style="color: ${r.is_open ? '#22C55E' : '#EF4444'};">${r.status}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } catch (err) {
+        resultDiv.innerHTML = `<div class="diag-result error">Failed</div>`;
+    }
+}
+
+// Calculate Baseline
+async function calculateBaseline() {
+    if (!selected) return;
+
+    const btn = document.getElementById('baseline-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculating...';
+
+    try {
+        const res = await auth.fetch(`/api/v1/diagnostics/baseline/calculate?ip=${selected.ip}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            loadBaselineStatus(selected.ip);
+            alert(`Baseline calculated!\nAvg: ${data.baseline_latency_avg}ms\nWarning: ${data.warning_threshold}ms\nCritical: ${data.critical_threshold}ms`);
+        } else {
+            alert(data.error || 'Failed to calculate baseline');
+        }
+    } catch (err) {
+        alert('Failed to calculate baseline');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-calculator"></i> Calculate Baseline';
+}
+
+// Load Baseline Status
+async function loadBaselineStatus(ip) {
+    try {
+        const res = await auth.fetch(`/api/v1/diagnostics/baseline/${ip}`);
+        const data = await res.json();
+
+        if (data.success !== false) {
+            const baselineDiv = document.getElementById('baseline-status');
+            baselineDiv.innerHTML = `
+                <div class="diag-baseline-badge normal">
+                    <i class="fas fa-check-circle"></i> Baseline Set
+                </div>
+            `;
+
+            const infoDiv = document.getElementById('baseline-info');
+            infoDiv.innerHTML = `
+                <div style="font-size: 0.7rem; margin-top: 0.5rem;">
+                    <div><strong>Baseline Latency:</strong> ${data.baseline_latency_avg}ms</div>
+                    <div><strong>Std Dev:</strong> ${data.baseline_latency_stddev}ms</div>
+                    <div><strong>Warning Threshold:</strong> ${data.warning_threshold}ms</div>
+                    <div><strong>Critical Threshold:</strong> ${data.critical_threshold}ms</div>
+                    <div style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Last calculated: ${new Date(data.last_calculated).toLocaleString()}
+                    </div>
+                </div>
+            `;
+        }
+    } catch (err) {
+        // No baseline yet
+    }
+}
+
+// Check Anomaly
+async function checkAnomaly(ip) {
+    try {
+        const res = await auth.fetch(`/api/v1/diagnostics/anomaly/detect?ip=${ip}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            const anomalyStat = document.getElementById('anomaly-stat');
+            const anomalyValue = document.getElementById('stat-anomaly');
+
+            if (data.status === 'normal') {
+                anomalyStat.className = 'diag-stat';
+                anomalyValue.textContent = '✓';
+            } else if (data.anomalies.some(a => a.severity === 'critical')) {
+                anomalyStat.className = 'diag-stat anomaly';
+                anomalyValue.textContent = '✗';
+            } else {
+                anomalyStat.className = 'diag-stat warning';
+                anomalyValue.textContent = '!';
+            }
+        }
+    } catch (err) {
+        // No baseline or error
+        document.getElementById('stat-anomaly').textContent = '-';
+    }
+}
+
+// Toggle Collapse
+function toggleCollapse(element) {
+    element.classList.toggle('collapsed');
+    const content = element.nextElementSibling;
+    content.classList.toggle('collapsed');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Interactive Topology Animations & Features
+// ═══════════════════════════════════════════════════════════════════
+
+// Toggle Animation
+function toggleAnimation() {
+    animationEnabled = !animationEnabled;
+    const btn = document.getElementById('topo-animate-btn');
+
+    if (animationEnabled) {
+        btn.classList.add('active');
+        startAnimationLoop();
+    } else {
+        btn.classList.remove('active');
+        if (animationFrame) {
+            cancelAnimationFrame(animationFrame);
+            animationFrame = null;
+        }
+        particles = [];
+        drawTopology(currentHops);
+    }
+}
+
+// Animation Loop - Animated Packet Flow
+function startAnimationLoop() {
+    const canvas = document.getElementById('topology-canvas');
+    if (!canvas || !animationEnabled) return;
+
+    // Cancel any existing animation
+    if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    function animate() {
+        if (!animationEnabled || !canvas) {
+            animationFrame = null;
+            return;
+        }
+
+        // Redraw base topology without triggering recursion
+        if (topologyView === 'linear') {
+            drawLinearTopology(ctx, canvas, currentHops);
+        } else if (topologyView === 'arc') {
+            drawArcTopology(ctx, canvas, currentHops);
+        } else if (topologyView === 'circular') {
+            drawCircularTopology(ctx, canvas, currentHops);
+        }
+
+        // Spawn new particles occasionally (limit to 10 max)
+        if (currentHops.length > 1 && particles.length < 10 && Math.random() < 0.05) {
+            particles.push({
+                hopIndex: 0,
+                progress: 0,
+                speed: 0.01 + Math.random() * 0.02,
+                size: 2 + Math.random() * 2,
+                color: `rgba(94, 187, 168, ${0.6 + Math.random() * 0.4})`
+            });
+        }
+
+        // Update and draw particles
+        particles = particles.filter(p => p.progress < 1);
+        particles.forEach(p => {
+            p.progress += p.speed;
+
+            if (topologyView === 'linear') {
+                drawParticleLinear(ctx, canvas, p);
+            } else if (topologyView === 'arc') {
+                drawParticleArc(ctx, canvas, p);
+            } else if (topologyView === 'circular') {
+                drawParticleCircular(ctx, canvas, p);
+            }
+        });
+
+        animationFrame = requestAnimationFrame(animate);
+    }
+
+    animate();
+}
+
+// Draw animated particle on linear topology
+function drawParticleLinear(ctx, canvas, particle) {
+    const padding = 60;
+    const rect = canvas.getBoundingClientRect();
+
+    const availableWidth = rect.width - (padding * 2);
+    const spacing = availableWidth / Math.max(currentHops.length - 1, 1);
+
+    const hopIndex = Math.min(Math.floor(particle.progress * (currentHops.length - 1)), currentHops.length - 2);
+    const segmentProgress = (particle.progress * (currentHops.length - 1)) - hopIndex;
+
+    const x1 = padding + hopIndex * spacing;
+    const x2 = padding + (hopIndex + 1) * spacing;
+    const y = rect.height / 2;
+
+    const x = x1 + (x2 - x1) * segmentProgress;
+
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = particle.color;
+    ctx.fillStyle = particle.color;
+    ctx.beginPath();
+    ctx.arc(x, y, particle.size, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+}
+
+// Draw animated particle on arc topology
+function drawParticleArc(ctx, canvas, particle) {
+    const padding = 60;
+    const rect = canvas.getBoundingClientRect();
+    const baseY = rect.height * 0.72;
+
+    const availableWidth = rect.width - (padding * 2);
+    const spacing = availableWidth / Math.max(currentHops.length - 1, 1);
+
+    const hopIndex = Math.min(Math.floor(particle.progress * (currentHops.length - 1)), currentHops.length - 2);
+    const segmentProgress = (particle.progress * (currentHops.length - 1)) - hopIndex;
+
+    const x1 = padding + hopIndex * spacing;
+    const x2 = padding + (hopIndex + 1) * spacing;
+    const controlY = baseY - Math.abs(x2 - x1) * 0.6;
+
+    const t = segmentProgress;
+    const x = Math.pow(1 - t, 2) * x1 + 2 * (1 - t) * t * ((x1 + x2) / 2) + Math.pow(t, 2) * x2;
+    const y = Math.pow(1 - t, 2) * baseY + 2 * (1 - t) * t * controlY + Math.pow(t, 2) * baseY;
+
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = particle.color;
+    ctx.fillStyle = particle.color;
+    ctx.beginPath();
+    ctx.arc(x, y, particle.size, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+}
+
+// Draw animated particle on circular topology
+function drawParticleCircular(ctx, canvas, particle) {
+    const rect = canvas.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    let radius;
+    if (currentHops.length <= 5) {
+        radius = Math.min(rect.width, rect.height) * 0.38;
+    } else if (currentHops.length <= 10) {
+        radius = Math.min(rect.width, rect.height) * 0.4;
+    } else {
+        radius = Math.min(rect.width, rect.height) * 0.42;
+    }
+
+    const hopIndex = Math.min(Math.floor(particle.progress * currentHops.length), currentHops.length - 1);
+    const segmentProgress = (particle.progress * currentHops.length) - hopIndex;
+
+    if (hopIndex === 0) {
+        const angle = segmentProgress * 2 * Math.PI - Math.PI / 2;
+        const x = centerX + (Math.cos(angle) * radius * segmentProgress);
+        const y = centerY + (Math.sin(angle) * radius * segmentProgress);
+
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = particle.color;
+        ctx.fillStyle = particle.color;
+        ctx.beginPath();
+        ctx.arc(x, y, particle.size, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+// Export Topology as PNG
+function exportTopology() {
+    const canvas = document.getElementById('topology-canvas');
+    if (!canvas) return;
+
+    try {
+        canvas.toBlob(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `network-topology-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.png`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+    } catch (err) {
+        console.error('Failed to export topology:', err);
+        alert('Failed to export topology image');
+    }
+}
+
+// Toggle Fullscreen Mode
+function toggleFullscreen() {
+    const container = document.getElementById('topology-container');
+    if (!container) return;
+
+    if (!document.fullscreenElement) {
+        container.requestFullscreen().catch(err => {
+            console.error('Failed to enter fullscreen:', err);
+            alert('Fullscreen not supported or blocked by browser');
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+// Canvas Mouse Events for Interactive Tooltips
+let canvasMouseMoveHandler = null;
+let canvasMouseLeaveHandler = null;
+
+function setupCanvasInteractivity() {
+    const canvas = document.getElementById('topology-canvas');
+    if (!canvas) return;
+
+    const tooltip = document.getElementById('topology-tooltip');
+    const statsOverlay = document.getElementById('topology-stats');
+
+    // Remove old event listeners if they exist
+    if (canvasMouseMoveHandler) {
+        canvas.removeEventListener('mousemove', canvasMouseMoveHandler);
+    }
+    if (canvasMouseLeaveHandler) {
+        canvas.removeEventListener('mouseleave', canvasMouseLeaveHandler);
+    }
+
+    // Create new handlers
+    canvasMouseMoveHandler = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
+
+        hoveredNode = findNodeAtPosition(mouseX, mouseY);
+
+        if (hoveredNode && hoveredNode.index >= 0 && currentHops[hoveredNode.index]) {
+            const hop = currentHops[hoveredNode.index];
+            tooltip.style.display = 'block';
+            tooltip.style.left = `${e.clientX + 15}px`;
+            tooltip.style.top = `${e.clientY + 15}px`;
+            tooltip.innerHTML = `
+                <div style="font-weight: 600; margin-bottom: 0.25rem;">Hop ${hop.hop_number}</div>
+                <div style="font-size: 0.65rem; color: rgba(255,255,255,0.7);">IP: ${hop.hop_ip || 'Unknown'}</div>
+                ${hop.hop_hostname ? `<div style="font-size: 0.65rem; color: rgba(255,255,255,0.7);">Host: ${hop.hop_hostname}</div>` : ''}
+                ${hop.latency_ms ? `<div style="margin-top: 0.25rem; color: #5EBBA8;">Latency: ${hop.latency_ms.toFixed(1)}ms</div>` : ''}
+                ${hop.packet_loss > 0 ? `<div style="color: #EF4444;">Loss: ${hop.packet_loss}%</div>` : ''}
+            `;
+            canvas.style.cursor = 'pointer';
+        } else {
+            tooltip.style.display = 'none';
+            canvas.style.cursor = 'default';
+        }
+    };
+
+    canvasMouseLeaveHandler = () => {
+        tooltip.style.display = 'none';
+        hoveredNode = null;
+        canvas.style.cursor = 'default';
+    };
+
+    // Add new event listeners
+    canvas.addEventListener('mousemove', canvasMouseMoveHandler);
+    canvas.addEventListener('mouseleave', canvasMouseLeaveHandler);
+
+    // Update stats overlay when topology is drawn
+    if (currentHops.length > 0) {
+        statsOverlay.style.display = 'block';
+        updateTopologyStats();
+    }
+}
+
+// Find node at mouse position
+function findNodeAtPosition(x, y) {
+    const canvas = document.getElementById('topology-canvas');
+    if (!canvas || currentHops.length === 0) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const padding = 60;
+
+    if (topologyView === 'linear') {
+        const availableWidth = rect.width - (padding * 2);
+        const spacing = availableWidth / Math.max(currentHops.length - 1, 1);
+        const { nodeRadius } = getAdaptiveNodeSize(spacing);
+        const yPos = rect.height / 2;
+
+        for (let i = 0; i < currentHops.length; i++) {
+            const xPos = padding + i * spacing;
+            const dist = Math.sqrt(Math.pow(x - xPos, 2) + Math.pow(y - yPos, 2));
+            if (dist <= nodeRadius) {
+                return { index: i, x: xPos, y: yPos };
+            }
+        }
+    } else if (topologyView === 'arc') {
+        const availableWidth = rect.width - (padding * 2);
+        const spacing = availableWidth / Math.max(currentHops.length - 1, 1);
+        const { nodeRadius } = getAdaptiveNodeSize(spacing);
+        const baseY = rect.height * 0.72;
+
+        for (let i = 0; i < currentHops.length; i++) {
+            const xPos = padding + i * spacing;
+            const dist = Math.sqrt(Math.pow(x - xPos, 2) + Math.pow(y - baseY, 2));
+            if (dist <= nodeRadius) {
+                return { index: i, x: xPos, y: baseY };
+            }
+        }
+    } else if (topologyView === 'circular') {
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        let radius, nodeRadius;
+        if (currentHops.length <= 5) {
+            nodeRadius = 32;
+            radius = Math.min(rect.width, rect.height) * 0.38;
+        } else if (currentHops.length <= 10) {
+            nodeRadius = 26;
+            radius = Math.min(rect.width, rect.height) * 0.4;
+        } else {
+            nodeRadius = 22;
+            radius = Math.min(rect.width, rect.height) * 0.42;
+        }
+
+        // Check center source node
+        if (Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)) <= 25) {
+            return { index: -1, x: centerX, y: centerY };
+        }
+
+        // Check hop nodes
+        for (let i = 0; i < currentHops.length; i++) {
+            const angle = (i / currentHops.length) * 2 * Math.PI - Math.PI / 2;
+            const xPos = centerX + Math.cos(angle) * radius;
+            const yPos = centerY + Math.sin(angle) * radius;
+            const dist = Math.sqrt(Math.pow(x - xPos, 2) + Math.pow(y - yPos, 2));
+            if (dist <= nodeRadius) {
+                return { index: i, x: xPos, y: yPos };
+            }
+        }
+    }
+
+    return null;
+}
+
+// Update topology statistics overlay
+function updateTopologyStats() {
+    if (currentHops.length === 0) return;
+
+    const hopsWithLatency = currentHops.filter(h => h.latency_ms);
+    const avgLatency = hopsWithLatency.length > 0
+        ? (hopsWithLatency.reduce((sum, h) => sum + h.latency_ms, 0) / hopsWithLatency.length).toFixed(1)
+        : 0;
+    const totalLatency = hopsWithLatency.length > 0
+        ? hopsWithLatency.reduce((sum, h) => sum + h.latency_ms, 0).toFixed(1)
+        : 0;
+
+    document.getElementById('stat-hops').textContent = currentHops.length;
+    document.getElementById('stat-avg-latency').textContent = avgLatency;
+    document.getElementById('stat-total-latency').textContent = totalLatency;
+}
+
+// Initialize interactivity when topology is first drawn
+let interactivitySetup = false;
+const originalDrawTopology = drawTopology;
+drawTopology = function(hops) {
+    originalDrawTopology(hops);
+    if (hops && hops.length > 0 && !interactivitySetup) {
+        interactivitySetup = true;
+        setTimeout(() => {
+            setupCanvasInteractivity();
+            if (animationEnabled) {
+                startAnimationLoop();
+            }
+            if (heatmapEnabled) {
+                drawHeatmapOverlay();
+            }
+        }, 100);
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// Performance Heatmap Overlay
+// ═══════════════════════════════════════════════════════════════════
+
+// Toggle Performance Heatmap
+function toggleHeatmap() {
+    heatmapEnabled = !heatmapEnabled;
+    const btn = document.getElementById('topo-heatmap-btn');
+
+    if (heatmapEnabled) {
+        btn.classList.add('active');
+        btn.style.background = 'rgba(239, 68, 68, 0.2)';
+        btn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        drawHeatmapOverlay();
+    } else {
+        btn.classList.remove('active');
+        btn.style.background = 'rgba(80, 80, 80, 0.2)';
+        btn.style.borderColor = 'rgba(80, 80, 80, 0.3)';
+        drawTopology(currentHops);
+    }
+}
+
+// Draw Performance Heatmap Overlay
+function drawHeatmapOverlay() {
+    const canvas = document.getElementById('topology-canvas');
+    if (!canvas || currentHops.length === 0) return;
+
+    const ctx = canvas.getContext('2d');
+
+    // Calculate latency color based on performance
+    function getHeatmapColor(latency) {
+        if (!latency) return 'rgba(100, 100, 100, 0.5)';
+
+        if (latency < 20) return 'rgba(34, 197, 94, 0.6)';       // Green - Excellent
+        if (latency < 50) return 'rgba(94, 187, 168, 0.6)';      // WARD Green - Good
+        if (latency < 100) return 'rgba(251, 191, 36, 0.6)';     // Yellow - Fair
+        if (latency < 200) return 'rgba(245, 158, 11, 0.6)';     // Orange - Poor
+        return 'rgba(239, 68, 68, 0.6)';                         // Red - Critical
+    }
+
+    // Draw heatmap legend
+    const legendX = 10;
+    const legendY = canvas.height - 80;
+    const legendHeight = 70;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(legendX, legendY, 110, legendHeight);
+
+    ctx.font = 'bold 9px Arial';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'left';
+    ctx.fillText('PERFORMANCE', legendX + 5, legendY + 12);
+
+    const ranges = [
+        { color: 'rgba(34, 197, 94, 0.9)', label: '<20ms Excellent' },
+        { color: 'rgba(94, 187, 168, 0.9)', label: '<50ms Good' },
+        { color: 'rgba(251, 191, 36, 0.9)', label: '<100ms Fair' },
+        { color: 'rgba(245, 158, 11, 0.9)', label: '<200ms Poor' },
+        { color: 'rgba(239, 68, 68, 0.9)', label: '≥200ms Critical' }
+    ];
+
+    ctx.font = '8px Arial';
+    ranges.forEach((range, i) => {
+        const y = legendY + 20 + i * 10;
+        ctx.fillStyle = range.color;
+        ctx.fillRect(legendX + 5, y - 6, 8, 8);
+        ctx.fillStyle = '#ccc';
+        ctx.fillText(range.label, legendX + 18, y);
+    });
+
+    // Draw heatmap zones on topology
+    const rect = canvas.getBoundingClientRect();
+    const padding = 60;
+    const availableWidth = rect.width - (padding * 2);
+    const spacing = availableWidth / Math.max(currentHops.length - 1, 1);
+    const { nodeRadius } = getAdaptiveNodeSize(spacing);
+
+    if (topologyView === 'linear') {
+        const y = rect.height / 2;
+
+        currentHops.forEach((hop, i) => {
+            const x = padding + i * spacing;
+            const color = getHeatmapColor(hop.latency_ms);
+
+            // Draw heatmap glow
+            const gradient = ctx.createRadialGradient(x, y, nodeRadius, x, y, nodeRadius + 30);
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x - 50, y - 50, 100, 100);
+        });
+    } else if (topologyView === 'arc') {
+        const baseY = rect.height * 0.72;
+
+        currentHops.forEach((hop, i) => {
+            const x = padding + i * spacing;
+            const color = getHeatmapColor(hop.latency_ms);
+
+            const gradient = ctx.createRadialGradient(x, baseY, nodeRadius, x, baseY, nodeRadius + 30);
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x - 50, baseY - 50, 100, 100);
+        });
+    } else if (topologyView === 'circular') {
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        let radius;
+        if (currentHops.length <= 5) {
+            radius = Math.min(rect.width, rect.height) * 0.38;
+        } else if (currentHops.length <= 10) {
+            radius = Math.min(rect.width, rect.height) * 0.4;
+        } else {
+            radius = Math.min(rect.width, rect.height) * 0.42;
+        }
+
+        currentHops.forEach((hop, i) => {
+            const angle = (i / currentHops.length) * 2 * Math.PI - Math.PI / 2;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            const color = getHeatmapColor(hop.latency_ms);
+
+            const gradient = ctx.createRadialGradient(x, y, nodeRadius, x, y, nodeRadius + 30);
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x - 50, y - 50, 100, 100);
+        });
+    }
+
+    // Redraw topology on top of heatmap
+    if (topologyView === 'linear') {
+        drawLinearTopology(ctx, canvas, currentHops);
+    } else if (topologyView === 'arc') {
+        drawArcTopology(ctx, canvas, currentHops);
+    } else if (topologyView === 'circular') {
+        drawCircularTopology(ctx, canvas, currentHops);
+    }
+}
 </script>
 {% endblock %}

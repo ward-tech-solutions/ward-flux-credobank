@@ -249,6 +249,15 @@ class NetworkDiagnostics {
                     <small>${hops.length} hops</small>
                 </div>
 
+                <!-- Visual Network Map -->
+                <div style="background: var(--bg-secondary, #1a1a1a); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-light, #3A3A3A);">
+                        <i class="fas fa-project-diagram" style="color: #5EBBA8;"></i>
+                        <span style="font-weight: 600; color: var(--text-primary, #F3F4F6);">Visual Network Topology</span>
+                    </div>
+                    <canvas id="network-topology-canvas" width="800" height="300" style="width: 100%; height: 300px; background: var(--bg-tertiary, #0f0f0f); border-radius: 8px;"></canvas>
+                </div>
+
                 <div class="network-path">
                     <div class="path-start">
                         <i class="fas fa-server"></i>
@@ -279,6 +288,134 @@ class NetworkDiagnostics {
                 </div>
             </div>
         `;
+
+        // Draw visual topology map
+        setTimeout(() => this.drawNetworkTopology(hops), 100);
+    }
+
+    /**
+     * Draw visual network topology map on canvas
+     */
+    drawNetworkTopology(hops) {
+        const canvas = document.getElementById('network-topology-canvas');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width = 800;
+        const height = canvas.height = 300;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height);
+
+        if (hops.length === 0) {
+            // Empty state
+            ctx.fillStyle = '#6B7280';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('No network path data available', width / 2, height / 2);
+            return;
+        }
+
+        // Calculate positions
+        const padding = 60;
+        const nodeRadius = 20;
+        const horizontalSpacing = (width - (padding * 2)) / Math.max(hops.length - 1, 1);
+
+        // Draw connections first (so they appear behind nodes)
+        ctx.strokeStyle = '#5EBBA8';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+
+        for (let i = 0; i < hops.length - 1; i++) {
+            const x1 = padding + (i * horizontalSpacing);
+            const x2 = padding + ((i + 1) * horizontalSpacing);
+            const y = height / 2;
+
+            ctx.beginPath();
+            ctx.moveTo(x1, y);
+            ctx.lineTo(x2, y);
+            ctx.stroke();
+
+            // Draw arrow
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(x2 - 10, y - 5);
+            ctx.lineTo(x2, y);
+            ctx.lineTo(x2 - 10, y + 5);
+            ctx.fillStyle = '#5EBBA8';
+            ctx.fill();
+            ctx.setLineDash([5, 5]);
+        }
+
+        ctx.setLineDash([]);
+
+        // Draw nodes
+        hops.forEach((hop, index) => {
+            const x = padding + (index * horizontalSpacing);
+            const y = height / 2;
+
+            // Determine node color based on latency
+            let nodeColor = '#5EBBA8'; // Good (green)
+            if (hop.latency_ms > 50) nodeColor = '#F59E0B'; // Warning (yellow)
+            if (hop.latency_ms > 100) nodeColor = '#EF4444'; // Critical (red)
+
+            // Draw node circle
+            ctx.beginPath();
+            ctx.arc(x, y, nodeRadius, 0, 2 * Math.PI);
+            ctx.fillStyle = nodeColor;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Draw hop number inside circle
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(hop.hop_number.toString(), x, y);
+
+            // Draw hop IP/hostname below node
+            ctx.fillStyle = '#9CA3AF';
+            ctx.font = '11px Arial';
+            ctx.textBaseline = 'top';
+            const label = hop.hostname || hop.ip || '*';
+            const maxLabelWidth = 100;
+            const truncatedLabel = label.length > 15 ? label.substring(0, 15) + '...' : label;
+            ctx.fillText(truncatedLabel, x, y + nodeRadius + 10);
+
+            // Draw latency above node
+            if (hop.latency_ms) {
+                ctx.fillStyle = nodeColor;
+                ctx.font = 'bold 12px Arial';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(hop.latency_ms.toFixed(0) + ' ms', x, y - nodeRadius - 10);
+            }
+        });
+
+        // Draw legend
+        const legendY = height - 30;
+        const legendItems = [
+            { color: '#5EBBA8', label: 'Good (< 50ms)' },
+            { color: '#F59E0B', label: 'Warning (50-100ms)' },
+            { color: '#EF4444', label: 'Critical (> 100ms)' }
+        ];
+
+        let legendX = 20;
+        legendItems.forEach(item => {
+            ctx.fillStyle = item.color;
+            ctx.beginPath();
+            ctx.arc(legendX, legendY, 6, 0, 2 * Math.PI);
+            ctx.fill();
+
+            ctx.fillStyle = '#9CA3AF';
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(item.label, legendX + 12, legendY);
+
+            legendX += 140;
+        });
     }
 
     /**
