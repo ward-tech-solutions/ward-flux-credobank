@@ -162,7 +162,9 @@ async def lifespan(app: FastAPI):
 
     # Startup - use the working synchronous client
     app.state.zabbix = ZabbixClient()
-    app.state.websocket_connections: List[WebSocket] = []
+    # Initialize WebSocket connections list
+    websocket_connections: List[WebSocket] = []
+    app.state.websocket_connections = websocket_connections
 
     # Start background task for real-time updates
     app.state.monitor_task = asyncio.create_task(monitor_device_changes(app))
@@ -271,9 +273,9 @@ app.add_middleware(
 # Rate Limiting Setup
 # ============================================
 try:
-    from slowapi import Limiter, _rate_limit_exceeded_handler
-    from slowapi.util import get_remote_address
-    from slowapi.errors import RateLimitExceeded
+    from slowapi import Limiter, _rate_limit_exceeded_handler  # type: ignore
+    from slowapi.util import get_remote_address  # type: ignore
+    from slowapi.errors import RateLimitExceeded  # type: ignore
 
     limiter = Limiter(key_func=get_remote_address)
     app.state.limiter = limiter
