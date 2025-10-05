@@ -1,20 +1,51 @@
 """
 Database models and configuration for User Authentication
+Supports both SQLite (development) and PostgreSQL (production)
 """
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Enum as SQLEnum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import enum
-
-# SQLite database (change to PostgreSQL for production)
-# Use data directory for Docker volume persistence
 import os
-data_dir = os.path.join(os.path.dirname(__file__), 'data')
-os.makedirs(data_dir, exist_ok=True)
-DATABASE_URL = f"sqlite:///{data_dir}/ward_ops.db"
+from dotenv import load_dotenv
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+load_dotenv()
+
+# ============================================
+# Database Configuration
+# ============================================
+
+# Check if PostgreSQL should be used
+USE_POSTGRES = os.getenv("USE_POSTGRES", "false").lower() == "true"
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    # Default to SQLite for development
+    data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    DATABASE_URL = f"sqlite:///{data_dir}/ward_ops.db"
+    USE_POSTGRES = False
+
+# Create engine with appropriate configuration
+if USE_POSTGRES or DATABASE_URL.startswith("postgresql"):
+    # PostgreSQL configuration
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=20,  # Connection pool size
+        max_overflow=40,  # Max connections beyond pool_size
+        pool_pre_ping=True,  # Verify connections before using
+        pool_recycle=3600,  # Recycle connections after 1 hour
+        echo=False  # Set to True for SQL query logging
+    )
+else:
+    # SQLite configuration
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        echo=False
+    )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -40,6 +71,13 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
+
+    # User Preferences
+    theme_preference = Column(String(10), default='auto')  # 'light', 'dark', or 'auto'
+    language = Column(String(10), default='en')  # Language preference
+    timezone = Column(String(50), default='UTC')  # Timezone preference
+    notifications_enabled = Column(Boolean, default=True)  # Email notifications
+    dashboard_layout = Column(String(1000), nullable=True)  # JSON for custom dashboard
 
 class PingResult(Base):
     """Independent ping check results"""
@@ -131,27 +169,52 @@ def init_db():
     Base.metadata.create_all(bind=engine)
 
     # Run SQL migrations for georgian_cities and other custom tables
-    import sqlite3
-    import os
-
     migrations_dir = "migrations"
     if os.path.exists(migrations_dir):
-        db_path = str(engine.url).replace('sqlite:///', '')
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
-        sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith('.sql')])
-        for sql_file in sql_files:
-            sql_path = os.path.join(migrations_dir, sql_file)
-            with open(sql_path, 'r') as f:
-                sql_script = f.read()
+        if USE_POSTGRES or DATABASE_URL.startswith("postgresql"):
+            # PostgreSQL migrations using SQLAlchemy connection
+            from sqlalchemy import text
+            db = SessionLocal()
             try:
-                cursor.executescript(sql_script)
-                conn.commit()
-            except Exception:
-                pass  # Migration may already be applied
+                sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith('.sql')])
+                for sql_file in sql_files:
+                    sql_path = os.path.join(migrations_dir, sql_file)
+                    with open(sql_path, 'r') as f:
+                        sql_script = f.read()
 
-        conn.close()
+                    # Convert SQLite-specific syntax to PostgreSQL if needed
+                    sql_script = sql_script.replace('AUTOINCREMENT', 'SERIAL')
+
+                    try:
+                        # Execute each statement separately for PostgreSQL
+                        for statement in sql_script.split(';'):
+                            if statement.strip():
+                                db.execute(text(statement))
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+                        pass  # Migration may already be applied
+            finally:
+                db.close()
+        else:
+            # SQLite migrations
+            import sqlite3
+            db_path = str(engine.url).replace('sqlite:///', '')
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith('.sql')])
+            for sql_file in sql_files:
+                sql_path = os.path.join(migrations_dir, sql_file)
+                with open(sql_path, 'r') as f:
+                    sql_script = f.read()
+                try:
+                    cursor.executescript(sql_script)
+                    conn.commit()
+                except Exception:
+                    pass  # Migration may already be applied
+
+            conn.close()
 
 def get_db():
     """Dependency for FastAPI routes"""

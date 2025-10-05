@@ -167,3 +167,13 @@ archive/
 docs/guides/
 logs/
 PROJECT_STRUCTURE.md
+project_structure.md
+
+# Development/temporary files (don't commit)
+main.py.pre-refactor
+*.pre-refactor
+PHASE_*.md
+ORGANIZATION_SUMMARY.txt
+
+# App folder (if it's temporary/unused)
+# app/
