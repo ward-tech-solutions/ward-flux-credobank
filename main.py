@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, UploadFile, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -58,6 +61,12 @@ from bulk_operations import (
     export_devices_to_excel,
     BulkOperationResult,
 )
+
+# Import router functions for legacy routes
+from routers.devices import get_device_details
+from routers.zabbix import get_alerts, get_mttr_stats, get_groups, get_templates, create_host, update_host, delete_host
+from routers.reports import get_mttr_extended
+from routers.websockets import monitor_device_changes
 
 # Thread pool for running sync Zabbix client in async context
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
@@ -108,6 +117,11 @@ def extract_city_from_hostname(hostname):
 # Lifespan context manager for startup/shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Skip initialization in test mode
+    if os.getenv("TESTING") == "true":
+        yield
+        return
+
     # Initialize database
     init_db()
 

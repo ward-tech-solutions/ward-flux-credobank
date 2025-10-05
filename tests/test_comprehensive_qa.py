@@ -14,13 +14,16 @@ from datetime import datetime, timedelta
 import json
 import os
 
+# Set test mode before importing app
+os.environ["TESTING"] = "true"
+
 # Import main app
 from main import app
 from database import Base, User, UserRole, get_db
 from auth import create_access_token
 
-# Test database
-TEST_DATABASE_URL = "sqlite:///./test_ward.db"
+# Test database - Use in-memory database for tests
+TEST_DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -36,8 +39,8 @@ def override_get_db():
 
 app.dependency_overrides[get_db] = override_get_db
 
-# Test client
-client = TestClient(app)
+# Create test client with exception raising for debugging
+client = TestClient(app, raise_server_exceptions=True)
 
 
 # ═══════════════════════════════════════════════════════════════════
