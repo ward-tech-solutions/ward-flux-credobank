@@ -161,3 +161,9 @@ UI_FIXES_SUMMARY.md
 
 # Claude workspace
 .claude/
+
+# Organized folders (keep locally but don't commit)
+archive/
+docs/guides/
+logs/
+PROJECT_STRUCTURE.md
