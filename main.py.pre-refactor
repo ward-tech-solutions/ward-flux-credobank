@@ -179,14 +179,6 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
 # ============================================
-# Include Modular Routers
-# ============================================
-from routers import auth, pages
-
-app.include_router(auth.router)
-app.include_router(pages.router)
-
-# ============================================
 # Security Middleware
 # ============================================
 
@@ -2103,11 +2095,60 @@ async def stream_updates_legacy():
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 # Serve old frontend pages with templates
-# ============================================
-# Page Routes - MOVED TO routers/pages.py
-# ============================================
-# These routes have been extracted to routers/pages.py for better organization
-# Keeping here commented out for reference during migration
+@app.get("/", response_class=HTMLResponse)
+async def index_legacy(request: Request):
+    """Serve old dashboard"""
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/devices", response_class=HTMLResponse)
+async def devices_legacy(request: Request):
+    """Serve old devices page"""
+    return templates.TemplateResponse("devices.html", {"request": request})
+
+@app.get("/map", response_class=HTMLResponse)
+async def map_legacy(request: Request):
+    """Serve old map page"""
+    return templates.TemplateResponse("map.html", {"request": request})
+
+@app.get("/topology", response_class=HTMLResponse)
+async def topology_page_legacy(request: Request):
+    """Serve network topology visualization"""
+    return templates.TemplateResponse("topology.html", {"request": request})
+
+@app.get("/diagnostics", response_class=HTMLResponse)
+async def diagnostics_page(request: Request):
+    """Serve network diagnostics page"""
+    return templates.TemplateResponse("diagnostics.html", {"request": request})
+
+@app.get("/reports", response_class=HTMLResponse)
+async def reports_legacy(request: Request):
+    """Serve old reports page"""
+    return templates.TemplateResponse("reports.html", {"request": request})
+
+@app.get("/device/{hostid}", response_class=HTMLResponse)
+async def device_page_legacy(request: Request, hostid: str):
+    """Serve old device details page"""
+    return templates.TemplateResponse("device-details.html", {"request": request, "hostid": hostid})
+
+@app.get("/add-host", response_class=HTMLResponse)
+async def add_host_page(request: Request):
+    """Serve add host page"""
+    return templates.TemplateResponse("add-host.html", {"request": request})
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    """Serve login page"""
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.get("/users", response_class=HTMLResponse)
+async def users_management_page(request: Request):
+    """Serve user management page (admin only)"""
+    return templates.TemplateResponse("users.html", {"request": request})
+
+@app.get("/config", response_class=HTMLResponse)
+async def config_page(request: Request):
+    """Serve host group configuration page"""
+    return templates.TemplateResponse("config.html", {"request": request})
 
 # ============================================
 # Host Group Configuration Endpoints
@@ -2201,12 +2242,111 @@ async def get_georgian_cities(
 # Authentication Endpoints
 # ============================================
 
-# ============================================
-# Authentication Routes - MOVED TO routers/auth.py
-# ============================================
-# These routes have been extracted to routers/auth.py for better organization
-# Includes: /api/v1/auth/login, /api/v1/auth/register, /api/v1/auth/me
-# and all /api/v1/users/* endpoints
+@app.post("/api/v1/auth/login", response_model=Token)
+async def login(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    """
+    Login endpoint - returns JWT token
+    Rate limited to 5 attempts per minute to prevent brute force attacks
+    """
+    # Rate limiting disabled for easier deployment
+    # if RATE_LIMITING_ENABLED and limiter:
+    #     try:
+    #         await limiter.check_request_limit(request, "5/minute")
+    #     except:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+    #             detail="Too many login attempts. Please try again later."
+    #         )
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Update last login
+    user.last_login = datetime.now(timezone.utc)
+    db.commit()
+
+    # Create access token
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/api/v1/auth/register", response_model=UserResponse)
+async def register(
+    user_data: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Register new user (admin only)"""
+    from auth import get_user_by_username, get_user_by_email
+    if get_user_by_username(db, user_data.username):
+        raise HTTPException(status_code=400, detail="Username already registered")
+    if get_user_by_email(db, user_data.email):
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = create_user(db, user_data)
+    return user
+
+@app.get("/api/v1/auth/me", response_model=UserResponse)
+async def get_current_user_info(current_user: User = Depends(get_current_active_user)):
+    """Get current user info"""
+    return current_user
+
+@app.get("/api/v1/users", response_model=List[UserResponse])
+async def list_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """List all users (admin only)"""
+    users = db.query(User).all()
+    return users
+
+@app.put("/api/v1/users/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: int,
+    update_data: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Update user (admin only)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.full_name = update_data.full_name
+    user.email = update_data.email
+    user.role = update_data.role
+    user.region = update_data.region
+    if update_data.password:
+        from auth import get_password_hash
+        user.hashed_password = get_password_hash(update_data.password)
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+@app.delete("/api/v1/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Delete user (admin only)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+
+    db.delete(user)
+    db.commit()
+    return {"success": True, "message": "User deleted"}
 
 # ============================================
 # Bulk Operations Endpoints
@@ -2609,7 +2749,10 @@ async def websocket_endpoint(websocket: WebSocket):
 # Settings Routes
 # ============================================
 
-# Settings page route - MOVED TO routers/pages.py
+@app.get("/settings")
+async def settings_page(request: Request):
+    """Settings page"""
+    return templates.TemplateResponse("settings.html", {"request": request})
 
 
 @app.get("/api/v1/settings/zabbix")
