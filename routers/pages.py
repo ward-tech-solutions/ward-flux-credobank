@@ -9,8 +9,17 @@ from fastapi.templating import Jinja2Templates
 
 logger = logging.getLogger(__name__)
 
-# Templates
+# Flask-compatible url_for function for templates
+def url_for(endpoint: str, **values):
+    """Flask-compatible url_for function for Jinja2 templates"""
+    if endpoint == "static":
+        filename = values.get("filename", "")
+        return f"/static/{filename}"
+    return f"/{endpoint}"
+
+# Templates with custom url_for
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["url_for"] = url_for
 
 # Create router
 router = APIRouter(tags=["pages"])
