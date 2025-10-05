@@ -80,8 +80,9 @@ Thumbs.db
 *.pyd
 .Python
 
-# Documentation builds
+# Documentation builds (allow docs/internal/ for dev logs)
 docs/_build/
+!docs/internal/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -98,7 +99,8 @@ dmypy.json
 .pyre/
 
 # Internal/sensitive documentation
-docs/
+docs/*
+!docs/internal/
 TOPOLOGY_IMPLEMENTATION_GUIDE.md
 NEXT_STEPS.md
 IMPLEMENTATION_COMPLETE.md
@@ -172,8 +174,15 @@ project_structure.md
 # Development/temporary files (don't commit)
 main.py.pre-refactor
 *.pre-refactor
-PHASE_*.md
 ORGANIZATION_SUMMARY.txt
+
+# QA and bug tracking artifacts (internal use only)
+BUG_REPORT.md
+CRITICAL_BUGS_AND_FIXES.md
+QA_SUMMARY_REPORT.md
+qa_bug_finder.py
+fix_*.py
+*_COMPLETE.md
 
 # Old/unused folders
 app/
