@@ -302,12 +302,8 @@ app.include_router(setup_router)
 # ============================================
 # Static files and templates
 # ============================================
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-templates.env.auto_reload = True  # Force template reload for development
 
-
-# Add Flask-compatible url_for to templates
+# Add Flask-compatible url_for function BEFORE creating templates
 def url_for(endpoint: str, **values):
     """Flask-compatible url_for function for Jinja2 templates"""
     if endpoint == "static":
@@ -316,6 +312,10 @@ def url_for(endpoint: str, **values):
     return f"/{endpoint}"
 
 
+# Mount static files and create templates
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+templates.env.auto_reload = True  # Force template reload for development
 templates.env.globals["url_for"] = url_for
 
 
