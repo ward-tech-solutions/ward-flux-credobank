@@ -142,7 +142,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="WARD TECH SOLUTIONS - Network Monitoring Platform",
-    description="Enterprise-grade network monitoring and management system",
+    description="""
+## Enterprise-grade Network Monitoring & Management System
+
+### Features:
+* 🔐 **Secure Authentication** - JWT-based user authentication
+* 📊 **Zabbix Integration** - Real-time monitoring data from Zabbix
+* 🌐 **Network Diagnostics** - Ping, Traceroute, MTR tools
+* 📈 **Performance Baselines** - Automated performance tracking
+* 🗺️ **Network Topology** - Visual network mapping
+* 👥 **Multi-user Support** - Role-based access control
+
+### API Documentation:
+* Interactive Swagger UI: `/docs`
+* Alternative ReDoc: `/redoc`
+* OpenAPI Schema: `/openapi.json`
+    """,
     version="2.0.0",
     contact={
         "name": "WARD Tech Solutions",
@@ -153,6 +168,9 @@ app = FastAPI(
         "name": "Proprietary",
         "url": "https://wardops.tech/license"
     },
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
     lifespan=lifespan
 )
 
