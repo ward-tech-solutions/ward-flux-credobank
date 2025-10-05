@@ -175,5 +175,5 @@ main.py.pre-refactor
 PHASE_*.md
 ORGANIZATION_SUMMARY.txt
 
-# App folder (if it's temporary/unused)
-# app/
+# Old/unused folders
+app/
