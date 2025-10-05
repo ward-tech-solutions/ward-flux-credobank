@@ -127,7 +127,7 @@ docker run -d \
   -v ward-data:/app/data \
   -v ward-logs:/app/logs \
   --restart unless-stopped \
-  ghcr.io/ward-tech-solutions/ward-monitor:latest
+  ghcr.io/ward-tech-solutions/ward-tech-solutions:latest
 
 # Access the setup wizard
 open http://localhost:5001/setup
@@ -137,8 +137,8 @@ open http://localhost:5001/setup
 
 ```bash
 # Clone repository
-git clone https://github.com/ward-tech-solutions/ward-monitor.git
-cd ward-monitor
+git clone https://github.com/ward-tech-solutions/ward-tech-solutions.git
+cd ward-tech-solutions
 
 # Start services
 docker-compose up -d
@@ -151,7 +151,7 @@ docker-compose logs -f
 
 ```bash
 # Clone repository
-git clone https://github.com/ward-tech-solutions/ward-monitor.git
+git clone https://github.com/ward-tech-solutions/ward-tech-solutions.git
 cd ward-monitor
 
 # Create virtual environment
