@@ -26,6 +26,45 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # Redis - Message broker for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: ward-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ward-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # VictoriaMetrics - Time-series database for metrics
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: ward-victoriametrics
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm-data:/victoria-metrics-data
+    networks:
+      - ward-network
+    command:
+      - "-storageDataPath=/victoria-metrics-data"
+      - "-retentionPeriod=12"
+      - "-httpListenAddr=:8428"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8428/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
   # WARD Application
   ward-app:
     build: .
@@ -43,8 +82,16 @@ services:
       # Database configuration
       - DATABASE_URL=postgresql://${POSTGRES_USER:-ward_admin}:${POSTGRES_PASSWORD:-changeme_secure_password}@postgres:5432/${POSTGRES_DB:-ward_ops}
       - USE_POSTGRES=true
+      # Monitoring configuration
+      - REDIS_URL=redis://redis:6379/0
+      - VICTORIA_URL=http://victoriametrics:8428
+      - WARD_ENCRYPTION_KEY=${WARD_ENCRYPTION_KEY:-generate_a_secure_key_here}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      victoriametrics:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -53,6 +100,47 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - ward-network
+
+  # Celery Worker - Background task processor
+  celery-worker:
+    build: .
+    container_name: ward-celery-worker
+    command: celery -A monitoring.celery_app worker --loglevel=info --concurrency=4
+    volumes:
+      - ward-data:/app/data
+      - ward-logs:/app/logs
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ward_admin}:${POSTGRES_PASSWORD:-changeme_secure_password}@postgres:5432/${POSTGRES_DB:-ward_ops}
+      - REDIS_URL=redis://redis:6379/0
+      - VICTORIA_URL=http://victoriametrics:8428
+      - WARD_ENCRYPTION_KEY=${WARD_ENCRYPTION_KEY:-generate_a_secure_key_here}
+    depends_on:
+      - redis
+      - postgres
+      - victoriametrics
+    restart: unless-stopped
+    networks:
+      - ward-network
+
+  # Celery Beat - Task scheduler
+  celery-beat:
+    build: .
+    container_name: ward-celery-beat
+    command: celery -A monitoring.celery_app beat --loglevel=info
+    volumes:
+      - ward-data:/app/data
+      - ward-logs:/app/logs
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ward_admin}:${POSTGRES_PASSWORD:-changeme_secure_password}@postgres:5432/${POSTGRES_DB:-ward_ops}
+      - REDIS_URL=redis://redis:6379/0
+      - VICTORIA_URL=http://victoriametrics:8428
+      - WARD_ENCRYPTION_KEY=${WARD_ENCRYPTION_KEY:-generate_a_secure_key_here}
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
     networks:
       - ward-network
 
@@ -66,4 +154,8 @@ volumes:
   ward-data:
     driver: local
   ward-logs:
+    driver: local
+  redis-data:
+    driver: local
+  vm-data:
     driver: local
