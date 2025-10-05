@@ -2,6 +2,7 @@
 WARD TECH SOLUTIONS - Setup Wizard API
 Multi-tenant initial configuration
 """
+import logging
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -17,6 +18,8 @@ from database import get_db
 from database import User
 from models import Organization, SystemConfig, SetupWizardState
 
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 router = APIRouter(prefix="/setup", tags=["setup"])
@@ -27,6 +30,7 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 # ============================================
 # Pydantic Models
 # ============================================
+
 
 class ZabbixConfig(BaseModel):
     url: str
@@ -44,13 +48,13 @@ class AdminAccount(BaseModel):
     email: EmailStr
     password: str
 
-    @validator('password')
+    @validator("password")
     def validate_password_length(cls, v):
         """Validate password length for bcrypt compatibility"""
-        if len(v.encode('utf-8')) > 72:
-            raise ValueError('Password cannot be longer than 72 bytes')
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password cannot be longer than 72 bytes")
         if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters')
+            raise ValueError("Password must be at least 8 characters")
         return v
 
 
@@ -64,6 +68,7 @@ class SetupData(BaseModel):
 # ============================================
 # Helper Functions
 # ============================================
+
 
 def is_setup_complete(db: Session) -> bool:
     """Check if initial setup has been completed"""
@@ -85,15 +90,9 @@ def test_zabbix_connection(url: str, user: str, password: str) -> dict:
 
         zapi.user.logout()
 
-        return {
-            "success": True,
-            "hosts_count": hosts_count
-        }
+        return {"success": True, "hosts_count": hosts_count}
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 
 def get_zabbix_host_groups(url: str, user: str, password: str) -> dict:
@@ -102,22 +101,13 @@ def get_zabbix_host_groups(url: str, user: str, password: str) -> dict:
         zapi = ZabbixAPI(url, timeout=10)
         zapi.login(user, password)
 
-        groups = zapi.hostgroup.get(
-            output=["groupid", "name"],
-            sortfield="name"
-        )
+        groups = zapi.hostgroup.get(output=["groupid", "name"], sortfield="name")
 
         zapi.user.logout()
 
-        return {
-            "success": True,
-            "groups": groups
-        }
+        return {"success": True, "groups": groups}
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 
 def save_config_to_env(config: dict):
@@ -126,7 +116,7 @@ def save_config_to_env(config: dict):
 
     # Create .env if it doesn't exist
     if not os.path.exists(env_file):
-        with open(env_file, 'w') as f:
+        with open(env_file, "w") as f:
             f.write("# WARD TECH SOLUTIONS - Environment Configuration\n")
             f.write(f"# Generated: {__import__('datetime').datetime.now().strftime('%Y-%m-%d')}\n\n")
 
@@ -138,6 +128,7 @@ def save_config_to_env(config: dict):
 # ============================================
 # Routes
 # ============================================
+
 
 @router.get("/", response_class=HTMLResponse)
 async def setup_wizard_page(request: Request, db: Session = Depends(get_db)):
@@ -151,7 +142,7 @@ async def setup_wizard_page(request: Request, db: Session = Depends(get_db)):
                 <a href="/" style="color: #5EBBA8;">Go to Dashboard</a>
             </body></html>
             """,
-            status_code=200
+            status_code=200,
         )
 
     return templates.TemplateResponse("setup/wizard.html", {"request": request})
@@ -187,7 +178,7 @@ async def complete_setup(request: Request, setup_data: SetupData, db: Session = 
             zabbix_password=setup_data.zabbix.password,
             monitored_groups=[g.id for g in setup_data.groups],
             is_active=True,
-            is_setup_complete=True
+            is_setup_complete=True,
         )
         db.add(org)
         db.flush()
@@ -202,7 +193,7 @@ async def complete_setup(request: Request, setup_data: SetupData, db: Session = 
             organization_id=org.id,
             role="admin",
             is_active=True,
-            is_superuser=True
+            is_superuser=True,
         )
         db.add(admin_user)
 
@@ -212,7 +203,7 @@ async def complete_setup(request: Request, setup_data: SetupData, db: Session = 
             "ZABBIX_USER": setup_data.zabbix.user,
             "ZABBIX_PASSWORD": setup_data.zabbix.password,
             "ORGANIZATION_NAME": setup_data.organization["name"],
-            "MONITORED_GROUPS": ",".join([g.id for g in setup_data.groups])
+            "MONITORED_GROUPS": ",".join([g.id for g in setup_data.groups]),
         }
         save_config_to_env(env_config)
 
@@ -233,7 +224,9 @@ async def complete_setup(request: Request, setup_data: SetupData, db: Session = 
         configs = [
             SystemConfig(key="setup_complete", value="true", description="Initial setup completed"),
             SystemConfig(key="organization_id", value=str(org.id), description="Primary organization ID"),
-            SystemConfig(key="setup_date", value=str(__import__('datetime').datetime.now()), description="Setup completion date")
+            SystemConfig(
+                key="setup_date", value=str(__import__("datetime").datetime.now()), description="Setup completion date"
+            ),
         ]
         for config in configs:
             db.add(config)
@@ -242,16 +235,10 @@ async def complete_setup(request: Request, setup_data: SetupData, db: Session = 
 
         # 6. Reconfigure Zabbix client with new credentials
         request.app.state.zabbix.reconfigure(
-            url=setup_data.zabbix.url,
-            user=setup_data.zabbix.user,
-            password=setup_data.zabbix.password
+            url=setup_data.zabbix.url, user=setup_data.zabbix.user, password=setup_data.zabbix.password
         )
 
-        return {
-            "success": True,
-            "message": "Setup completed successfully",
-            "organization_id": org.id
-        }
+        return {"success": True, "message": "Setup completed successfully", "organization_id": org.id}
 
     except Exception as e:
         db.rollback()
@@ -266,11 +253,17 @@ async def setup_status(db: Session = Depends(get_db)):
 
     return {
         "is_complete": is_complete,
-        "current_step": None if is_complete else (
-            1 if not state or not state.step_1_welcome else
-            2 if not state.step_2_zabbix else
-            3 if not state.step_3_groups else
-            4 if not state.step_4_admin else
-            5
-        )
+        "current_step": None
+        if is_complete
+        else (
+            1
+            if not state or not state.step_1_welcome
+            else 2
+            if not state.step_2_zabbix
+            else 3
+            if not state.step_3_groups
+            else 4
+            if not state.step_4_admin
+            else 5
+        ),
     }

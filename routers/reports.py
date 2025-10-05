@@ -2,6 +2,7 @@
 WARD Tech Solutions - Reports Router
 Handles downtime reports and MTTR analysis
 """
+import logging
 import asyncio
 from datetime import datetime
 from typing import Optional
@@ -14,6 +15,8 @@ from routers.utils import get_monitored_groupids, run_in_executor
 
 # Create thread pool executor
 import concurrent.futures
+
+logger = logging.getLogger(__name__)
 
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 

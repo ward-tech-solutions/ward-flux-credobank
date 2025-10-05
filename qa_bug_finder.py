@@ -2,10 +2,13 @@
 WARD TECH SOLUTIONS - Automated Bug Finder
 Scans codebase for common issues and potential bugs
 """
+import logging
 import os
 import re
 from pathlib import Path
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 class BugFinder:
     def __init__(self):
@@ -144,23 +147,23 @@ class BugFinder:
 
     def generate_report(self):
         """Generate bug report"""
-        print("\n" + "="*80)
-        print("🔍 WARD TECH SOLUTIONS - AUTOMATED BUG FINDER REPORT")
-        print("="*80)
+        logger.info(f"{str("\n" + "="*80)}")
+        logger.info("🔍 WARD TECH SOLUTIONS - AUTOMATED BUG FINDER REPORT")
+        logger.info(f"{str("="*80)}")
 
-        print(f"\n📊 Scan Statistics:")
-        print(f"   Files Scanned: {self.file_count}")
-        print(f"   Lines Scanned: {self.line_count}")
-        print(f"   Issue Categories: {len(self.issues)}")
-        print(f"   Total Issues: {sum(len(v) for v in self.issues.values())}")
+        logger.info(f"\n📊 Scan Statistics:")
+        logger.info(f"   Files Scanned: {self.file_count}")
+        logger.info(f"   Lines Scanned: {self.line_count}")
+        logger.info(f"   Issue Categories: {len(self.issues)}")
+        logger.info(f"   Total Issues: {sum(len(v) for v in self.issues.values())}")
 
         if not self.issues:
-            print("\n✅ NO ISSUES FOUND! Code looks clean.")
+            logger.info("\n✅ NO ISSUES FOUND! Code looks clean.")
             return
 
-        print("\n" + "="*80)
-        print("🐛 ISSUES FOUND (sorted by severity):")
-        print("="*80)
+        logger.info(f"{str("\n" + "="*80)}")
+        logger.info("🐛 ISSUES FOUND (sorted by severity):")
+        logger.info(f"{str("="*80)}")
 
         # Sort by severity
         severity_order = [
@@ -183,24 +186,24 @@ class BugFinder:
         for category in severity_order:
             if category in self.issues:
                 issues = self.issues[category]
-                print(f"\n🔴 {category} ({len(issues)} issues):")
-                print("-" * 80)
+                logger.info(f"\n🔴 {category} ({len(issues)} issues):")
+                logger.info(f"{str("-" * 80)}")
 
                 for issue in issues[:10]:  # Show max 10 per category
-                    print(f"   • {issue}")
+                    logger.info(f"   • {issue}")
 
                 if len(issues) > 10:
-                    print(f"   ... and {len(issues) - 10} more")
+                    logger.info(f"   ... and {len(issues) - 10} more")
 
         # Show other categories
         for category, issues in self.issues.items():
             if category not in severity_order:
-                print(f"\n⚠️  {category} ({len(issues)} issues):")
-                print("-" * 80)
+                logger.info(f"\n⚠️  {category} ({len(issues)} issues):")
+                logger.info(f"{str("-" * 80)}")
                 for issue in issues[:5]:
-                    print(f"   • {issue}")
+                    logger.info(f"   • {issue}")
                 if len(issues) > 5:
-                    print(f"   ... and {len(issues) - 5} more")
+                    logger.info(f"   ... and {len(issues) - 5} more")
 
     def save_report(self, filename="BUG_REPORT.md"):
         """Save report to markdown file"""
@@ -226,18 +229,18 @@ class BugFinder:
                     f.write(f"- {issue}\n")
                 f.write("\n")
 
-        print(f"\n📄 Full report saved to: {filename}")
+        logger.info(f"\n📄 Full report saved to: {filename}")
 
 
 if __name__ == "__main__":
     scanner = BugFinder()
 
-    print("🔍 Scanning codebase for potential bugs...")
+    logger.info("🔍 Scanning codebase for potential bugs...")
     scanner.scan_directory(".")
 
     scanner.generate_report()
     scanner.save_report("BUG_REPORT.md")
 
-    print("\n" + "="*80)
-    print("✅ Scan complete!")
-    print("="*80)
+    logger.info(f"{str("\n" + "="*80)}")
+    logger.info("✅ Scan complete!")
+    logger.info(f"{str("="*80)}")

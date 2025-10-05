@@ -2,23 +2,18 @@
 WARD TECH SOLUTIONS - Setup Middleware
 Redirects to setup wizard if platform not configured
 """
+import logging
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import SetupWizardState
 
+logger = logging.getLogger(__name__)
+
 
 # Routes that should always be accessible (even during setup)
-ALLOWED_ROUTES = [
-    "/setup",
-    "/api/v1/setup",
-    "/api/v1/health",
-    "/static",
-    "/docs",
-    "/redoc",
-    "/openapi.json"
-]
+ALLOWED_ROUTES = ["/setup", "/api/v1/setup", "/api/v1/health", "/static", "/docs", "/redoc", "/openapi.json"]
 
 
 def is_setup_complete() -> bool:

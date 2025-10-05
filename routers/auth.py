@@ -2,6 +2,7 @@
 WARD Tech Solutions - Authentication Router
 Handles user authentication, registration, and user management
 """
+import logging
 from datetime import datetime, timezone
 from typing import List
 
@@ -24,14 +25,14 @@ from auth import (
 )
 from database import User, get_db
 
+logger = logging.getLogger(__name__)
+
 # Create router
 router = APIRouter(prefix="/api/v1", tags=["authentication"])
 
 
 @router.post("/auth/login", response_model=Token)
-async def login(
-    request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
-):
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
     Login endpoint - returns JWT token
     Rate limited to 5 attempts per minute to prevent brute force attacks
@@ -63,9 +64,7 @@ async def login(
 
 
 @router.post("/auth/register", response_model=UserResponse)
-async def register(
-    user_data: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)
-):
+async def register(user_data: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     """Register new user (admin only)"""
     if get_user_by_username(db, user_data.username):
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -114,9 +113,7 @@ async def update_user(
 
 
 @router.delete("/users/{user_id}")
-async def delete_user(
-    user_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)
-):
+async def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     """Delete user (admin only)"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:

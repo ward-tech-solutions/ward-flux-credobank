@@ -2,6 +2,7 @@
 WARD Tech Solutions - Bulk Operations Router
 Handles bulk import, update, delete, and export operations
 """
+import logging
 import io
 from typing import List
 
@@ -24,6 +25,8 @@ from bulk_operations import (
 from database import User, UserRole
 from routers.utils import run_in_executor
 
+logger = logging.getLogger(__name__)
+
 # Create router
 router = APIRouter(prefix="/api/v1/bulk", tags=["bulk-operations"])
 
@@ -40,9 +43,7 @@ async def download_bulk_import_template(current_user: User = Depends(require_tec
 
 
 @router.post("/import", response_model=BulkOperationResult)
-async def bulk_import_devices(
-    request: Request, file: UploadFile, current_user: User = Depends(require_tech_or_admin)
-):
+async def bulk_import_devices(request: Request, file: UploadFile, current_user: User = Depends(require_tech_or_admin)):
     """Bulk import devices from CSV/Excel"""
     zabbix = request.app.state.zabbix
 
@@ -103,7 +104,9 @@ async def export_csv(request: Request, current_user: User = Depends(get_current_
 
     csv_content = export_devices_to_csv(devices)
     return StreamingResponse(
-        iter([csv_content]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=devices_export.csv"}
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=devices_export.csv"},
     )
 
 

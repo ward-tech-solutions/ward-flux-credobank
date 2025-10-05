@@ -2,9 +2,12 @@
 WARD Tech Solutions - Pages Router
 Handles HTML page rendering
 """
+import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+
+logger = logging.getLogger(__name__)
 
 # Templates
 templates = Jinja2Templates(directory="templates")

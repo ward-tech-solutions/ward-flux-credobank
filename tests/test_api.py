@@ -41,18 +41,12 @@ class TestAuthentication:
 
     def test_login_invalid_credentials(self):
         """Test login with invalid credentials returns 401"""
-        response = client.post(
-            "/api/v1/auth/login",
-            data={"username": "invalid", "password": "wrong"}
-        )
+        response = client.post("/api/v1/auth/login", data={"username": "invalid", "password": "wrong"})
         assert response.status_code == 401
 
     def test_login_success(self):
         """Test login with valid credentials returns token"""
-        response = client.post(
-            "/api/v1/auth/login",
-            data={"username": "admin", "password": "Ward@2025!"}
-        )
+        response = client.post("/api/v1/auth/login", data={"username": "admin", "password": "Ward@2025!"})
         assert response.status_code == 200
         data = response.json()
         assert "access_token" in data
@@ -71,28 +65,19 @@ class TestDeviceEndpoints:
     @pytest.fixture
     def auth_token(self):
         """Get authentication token for tests"""
-        response = client.post(
-            "/api/v1/auth/login",
-            data={"username": "admin", "password": "Ward@2025!"}
-        )
+        response = client.post("/api/v1/auth/login", data={"username": "admin", "password": "Ward@2025!"})
         return response.json()["access_token"]
 
     def test_get_devices_with_auth(self, auth_token):
         """Test getting devices with valid token"""
-        response = client.get(
-            "/api/v1/devices",
-            headers={"Authorization": f"Bearer {auth_token}"}
-        )
+        response = client.get("/api/v1/devices", headers={"Authorization": f"Bearer {auth_token}"})
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
 
     def test_dashboard_stats_with_auth(self, auth_token):
         """Test getting dashboard stats with valid token"""
-        response = client.get(
-            "/api/v1/dashboard/stats",
-            headers={"Authorization": f"Bearer {auth_token}"}
-        )
+        response = client.get("/api/v1/dashboard/stats", headers={"Authorization": f"Bearer {auth_token}"})
         assert response.status_code == 200
         data = response.json()
         assert "total_devices" in data
@@ -133,10 +118,7 @@ class TestRateLimiting:
         """Test that login endpoint has rate limiting"""
         # Make 6 rapid login attempts (limit is 5/minute)
         for i in range(6):
-            response = client.post(
-                "/api/v1/auth/login",
-                data={"username": "test", "password": "test"}
-            )
+            response = client.post("/api/v1/auth/login", data={"username": "test", "password": "test"})
             if i < 5:
                 # First 5 should return 401 (invalid credentials)
                 assert response.status_code == 401
@@ -160,17 +142,11 @@ class TestAsyncEndpoints:
         """Test getting Zabbix templates"""
         async with AsyncClient(app=app, base_url="http://test") as ac:
             # Login first
-            login_response = await ac.post(
-                "/api/v1/auth/login",
-                data={"username": "admin", "password": "Ward@2025!"}
-            )
+            login_response = await ac.post("/api/v1/auth/login", data={"username": "admin", "password": "Ward@2025!"})
             token = login_response.json()["access_token"]
 
             # Get templates
-            response = await ac.get(
-                "/api/v1/templates",
-                headers={"Authorization": f"Bearer {token}"}
-            )
+            response = await ac.get("/api/v1/templates", headers={"Authorization": f"Bearer {token}"})
             assert response.status_code == 200
             data = response.json()
             assert isinstance(data, list)

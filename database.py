@@ -2,6 +2,7 @@
 Database models and configuration for User Authentication
 Supports both SQLite (development) and PostgreSQL (production)
 """
+import logging
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Enum as SQLEnum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -9,6 +10,8 @@ from datetime import datetime
 import enum
 import os
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -22,7 +25,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
     # Default to SQLite for development
-    data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
     os.makedirs(data_dir, exist_ok=True)
     DATABASE_URL = f"sqlite:///{data_dir}/ward_ops.db"
     USE_POSTGRES = False
@@ -36,24 +39,22 @@ if USE_POSTGRES or DATABASE_URL.startswith("postgresql"):
         max_overflow=40,  # Max connections beyond pool_size
         pool_pre_ping=True,  # Verify connections before using
         pool_recycle=3600,  # Recycle connections after 1 hour
-        echo=False  # Set to True for SQL query logging
+        echo=False,  # Set to True for SQL query logging
     )
 else:
     # SQLite configuration
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        echo=False
-    )
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}, echo=False)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
 
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
     REGIONAL_MANAGER = "regional_manager"
     TECHNICIAN = "technician"
     VIEWER = "viewer"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -73,14 +74,16 @@ class User(Base):
     last_login = Column(DateTime, nullable=True)
 
     # User Preferences
-    theme_preference = Column(String(10), default='auto')  # 'light', 'dark', or 'auto'
-    language = Column(String(10), default='en')  # Language preference
-    timezone = Column(String(50), default='UTC')  # Timezone preference
+    theme_preference = Column(String(10), default="auto")  # 'light', 'dark', or 'auto'
+    language = Column(String(10), default="en")  # Language preference
+    timezone = Column(String(50), default="UTC")  # Timezone preference
     notifications_enabled = Column(Boolean, default=True)  # Email notifications
     dashboard_layout = Column(String(1000), nullable=True)  # JSON for custom dashboard
 
+
 class PingResult(Base):
     """Independent ping check results"""
+
     __tablename__ = "ping_results"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -95,8 +98,10 @@ class PingResult(Base):
     is_reachable = Column(Boolean, default=False)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
+
 class TracerouteResult(Base):
     """Network path traceroute results"""
+
     __tablename__ = "traceroute_results"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -109,8 +114,10 @@ class TracerouteResult(Base):
     packet_loss = Column(Integer, default=0)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
+
 class MTRResult(Base):
     """MTR (My TraceRoute) monitoring results - stores continuous monitoring data"""
+
     __tablename__ = "mtr_results"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -133,8 +140,10 @@ class MTRResult(Base):
 
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
+
 class PerformanceBaseline(Base):
     """Performance baselines for devices - used for anomaly detection"""
+
     __tablename__ = "performance_baselines"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -157,6 +166,7 @@ class PerformanceBaseline(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
 def init_db():
     """Initialize database and create all tables"""
     # Import all models to ensure they're registered with Base
@@ -174,20 +184,21 @@ def init_db():
         if USE_POSTGRES or DATABASE_URL.startswith("postgresql"):
             # PostgreSQL migrations using SQLAlchemy connection
             from sqlalchemy import text
+
             db = SessionLocal()
             try:
-                sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith('.sql')])
+                sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith(".sql")])
                 for sql_file in sql_files:
                     sql_path = os.path.join(migrations_dir, sql_file)
-                    with open(sql_path, 'r') as f:
+                    with open(sql_path, "r") as f:
                         sql_script = f.read()
 
                     # Convert SQLite-specific syntax to PostgreSQL if needed
-                    sql_script = sql_script.replace('AUTOINCREMENT', 'SERIAL')
+                    sql_script = sql_script.replace("AUTOINCREMENT", "SERIAL")
 
                     try:
                         # Execute each statement separately for PostgreSQL
-                        for statement in sql_script.split(';'):
+                        for statement in sql_script.split(";"):
                             if statement.strip():
                                 db.execute(text(statement))
                         db.commit()
@@ -199,14 +210,15 @@ def init_db():
         else:
             # SQLite migrations
             import sqlite3
-            db_path = str(engine.url).replace('sqlite:///', '')
+
+            db_path = str(engine.url).replace("sqlite:///", "")
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
-            sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith('.sql')])
+            sql_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith(".sql")])
             for sql_file in sql_files:
                 sql_path = os.path.join(migrations_dir, sql_file)
-                with open(sql_path, 'r') as f:
+                with open(sql_path, "r") as f:
                     sql_script = f.read()
                 try:
                     cursor.executescript(sql_script)
@@ -215,6 +227,7 @@ def init_db():
                     pass  # Migration may already be applied
 
             conn.close()
+
 
 def get_db():
     """Dependency for FastAPI routes"""

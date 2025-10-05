@@ -3,7 +3,10 @@
 WARD OPS - Network Monitoring Dashboard
 Entry point for the application
 """
+import logging
 import uvicorn
+
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     uvicorn.run(
@@ -12,5 +15,5 @@ if __name__ == "__main__":
         port=5001,
         reload=True,
         log_level="info",
-        forwarded_allow_ips="*"  # Allow all IPs (for Docker/reverse proxy)
+        forwarded_allow_ips="*",  # Allow all IPs (for Docker/reverse proxy)
     )

@@ -2,6 +2,7 @@
 WARD Tech Solutions - Dashboard Router
 Handles health checks and dashboard statistics
 """
+import logging
 import asyncio
 import concurrent.futures
 import sqlite3
@@ -13,6 +14,8 @@ from fastapi import APIRouter, Depends, Request
 from auth import get_current_active_user
 from database import User, UserRole
 from routers.utils import extract_city_from_hostname, run_in_executor
+
+logger = logging.getLogger(__name__)
 
 # Thread pool executor
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
@@ -62,26 +65,28 @@ async def get_dashboard_stats(
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT groupid, display_name
         FROM monitored_hostgroups
         WHERE is_active = 1
-    """)
+    """
+    )
     monitored_groups = [dict(row) for row in cursor.fetchall()]
 
-    print(f"[DEBUG] Monitored groups from DB: {monitored_groups}")
+    logger.info(f"[DEBUG] Monitored groups from DB: {monitored_groups}")
 
     # If no groups configured, fall back to old behavior
     if not monitored_groups:
-        print("[DEBUG] No monitored groups, getting all hosts")
+        logger.info("[DEBUG] No monitored groups, getting all hosts")
         devices = await run_in_executor(zabbix.get_all_hosts)
     else:
         # Get devices from configured groups only using group IDs
         monitored_groupids = [g["groupid"] for g in monitored_groups]
-        print(f"[DEBUG] Fetching hosts for group IDs: {monitored_groupids}")
+        logger.info(f"[DEBUG] Fetching hosts for group IDs: {monitored_groupids}")
         loop = asyncio.get_event_loop()
         devices = await loop.run_in_executor(executor, lambda: zabbix.get_all_hosts(group_ids=monitored_groupids))
-        print(f"[DEBUG] Retrieved {len(devices)} devices from Zabbix")
+        logger.info(f"[DEBUG] Retrieved {len(devices)} devices from Zabbix")
 
     # Apply region filter if requested
     if region:

@@ -2,6 +2,7 @@
 WARD Tech Solutions - Devices Router
 Handles device listing and details
 """
+import logging
 import asyncio
 from typing import Optional
 
@@ -11,6 +12,8 @@ from fastapi.responses import JSONResponse
 from auth import get_current_active_user
 from database import User, UserRole
 from routers.utils import get_monitored_groupids, run_in_executor
+
+logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/v1/devices", tags=["devices"])

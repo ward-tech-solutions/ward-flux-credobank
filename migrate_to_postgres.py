@@ -2,13 +2,17 @@
 WARD TECH SOLUTIONS - Database Migration Tool
 Migrate data from SQLite to PostgreSQL
 """
+import logging
 import os
 import sys
 from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 
+logger = logging.getLogger(__name__)
+
 load_dotenv()
+
 
 def migrate_sqlite_to_postgres(sqlite_path: str, postgres_url: str):
     """
@@ -18,7 +22,7 @@ def migrate_sqlite_to_postgres(sqlite_path: str, postgres_url: str):
         sqlite_path: Path to SQLite database file
         postgres_url: PostgreSQL connection string
     """
-    print("🔄 Starting database migration from SQLite to PostgreSQL...")
+    logger.info("🔄 Starting database migration from SQLite to PostgreSQL...")
 
     # Create engines
     sqlite_engine = create_engine(f"sqlite:///{sqlite_path}")
@@ -36,22 +40,23 @@ def migrate_sqlite_to_postgres(sqlite_path: str, postgres_url: str):
     metadata.reflect(bind=sqlite_engine)
 
     # Create all tables in PostgreSQL
-    print("📊 Creating tables in PostgreSQL...")
+    logger.info("📊 Creating tables in PostgreSQL...")
     from database import Base
+
     try:
         from models import Organization, SystemConfig, SetupWizardState
     except ImportError:
         pass
 
     Base.metadata.create_all(bind=postgres_engine)
-    print("✅ Tables created")
+    logger.info("✅ Tables created")
 
     # Migrate data table by table
     tables_migrated = 0
     total_rows = 0
 
     for table_name in metadata.tables:
-        print(f"📦 Migrating table: {table_name}...")
+        logger.info(f"📦 Migrating table: {table_name}...")
 
         table = Table(table_name, metadata, autoload_with=sqlite_engine)
 
@@ -69,22 +74,23 @@ def migrate_sqlite_to_postgres(sqlite_path: str, postgres_url: str):
             try:
                 postgres_session.execute(table.insert(), rows_data)
                 postgres_session.commit()
-                print(f"   ✅ Migrated {len(rows_data)} rows")
+                logger.info(f"   ✅ Migrated {len(rows_data)} rows")
                 tables_migrated += 1
                 total_rows += len(rows_data)
             except Exception as e:
-                print(f"   ⚠️  Error migrating {table_name}: {e}")
+                logger.info(f"   ⚠️  Error migrating {table_name}: {e}")
                 postgres_session.rollback()
         else:
-            print(f"   ℹ️  No data to migrate")
+            logger.info(f"   ℹ️  No data to migrate")
 
     sqlite_session.close()
     postgres_session.close()
 
-    print(f"\n✅ Migration complete!")
-    print(f"   Tables migrated: {tables_migrated}")
-    print(f"   Total rows: {total_rows}")
-    print(f"   PostgreSQL is now ready to use!")
+    logger.info(f"\n✅ Migration complete!")
+    logger.info(f"   Tables migrated: {tables_migrated}")
+    logger.info(f"   Total rows: {total_rows}")
+    logger.info(f"   PostgreSQL is now ready to use!")
+
 
 if __name__ == "__main__":
     # Default paths
@@ -93,23 +99,23 @@ if __name__ == "__main__":
 
     # Check if PostgreSQL URL is provided
     if not postgres_url or not postgres_url.startswith("postgresql"):
-        print("❌ Error: DATABASE_URL must be set to a PostgreSQL connection string")
-        print("   Example: postgresql://user:password@localhost:5432/database")
+        logger.info("❌ Error: DATABASE_URL must be set to a PostgreSQL connection string")
+        logger.info("   Example: postgresql://user:password@localhost:5432/database")
         sys.exit(1)
 
     # Check if SQLite file exists
     if not os.path.exists(sqlite_path):
-        print(f"❌ Error: SQLite database not found at {sqlite_path}")
-        print("   If this is a fresh installation, no migration is needed.")
+        logger.info(f"❌ Error: SQLite database not found at {sqlite_path}")
+        logger.info("   If this is a fresh installation, no migration is needed.")
         sys.exit(1)
 
     # Confirm migration
-    print(f"📍 SQLite source: {sqlite_path}")
-    print(f"📍 PostgreSQL target: {postgres_url}")
+    logger.info(f"📍 SQLite source: {sqlite_path}")
+    logger.info(f"📍 PostgreSQL target: {postgres_url}")
     print()
     response = input("⚠️  This will migrate all data to PostgreSQL. Continue? (yes/no): ")
 
-    if response.lower() in ['yes', 'y']:
+    if response.lower() in ["yes", "y"]:
         migrate_sqlite_to_postgres(sqlite_path, postgres_url)
     else:
-        print("❌ Migration cancelled")
+        logger.info("❌ Migration cancelled")

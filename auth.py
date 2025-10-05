@@ -1,6 +1,7 @@
 """
 Authentication and authorization utilities
 """
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import Depends, HTTPException, status
@@ -12,6 +13,8 @@ from pydantic import BaseModel
 
 from database import get_db, User, UserRole
 
+logger = logging.getLogger(__name__)
+
 # Security configuration
 SECRET_KEY = "your-secret-key-change-this-in-production-use-openssl-rand-hex-32"
 ALGORITHM = "HS256"
@@ -20,13 +23,16 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 pwd_context = CryptContext(schemes=["argon2", "pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
+
 # Pydantic models
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+
 class TokenData(BaseModel):
     username: Optional[str] = None
+
 
 class UserCreate(BaseModel):
     username: str
@@ -36,6 +42,7 @@ class UserCreate(BaseModel):
     role: UserRole = UserRole.VIEWER
     region: Optional[str] = None
     branches: Optional[str] = None  # Comma-separated branch names
+
 
 class UserResponse(BaseModel):
     id: int
@@ -52,23 +59,28 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 # Password utilities
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password against hash"""
     return pwd_context.verify(plain_password, hashed_password)
 
+
 def get_password_hash(password: str) -> str:
     """Hash a password"""
     return pwd_context.hash(password)
+
 
 # User utilities
 def get_user_by_username(db: Session, username: str) -> Optional[User]:
     """Get user by username"""
     return db.query(User).filter(User.username == username).first()
 
+
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     """Get user by email"""
     return db.query(User).filter(User.email == email).first()
+
 
 def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
     """Authenticate user"""
@@ -78,6 +90,7 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
     if not verify_password(password, user.hashed_password):
         return None
     return user
+
 
 def create_user(db: Session, user_data: UserCreate) -> User:
     """Create new user"""
@@ -89,12 +102,13 @@ def create_user(db: Session, user_data: UserCreate) -> User:
         hashed_password=hashed_password,
         role=user_data.role,
         region=user_data.region,
-        branches=user_data.branches
+        branches=user_data.branches,
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
+
 
 # JWT token utilities
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -108,10 +122,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> User:
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     """Get current authenticated user from token"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -132,10 +144,8 @@ async def get_current_user(
         raise credentials_exception
     return user
 
-async def get_current_user_optional(
-    token: Optional[str] = None,
-    db: Session = Depends(get_db)
-) -> Optional[User]:
+
+async def get_current_user_optional(token: Optional[str] = None, db: Session = Depends(get_db)) -> Optional[User]:
     """Get current user if token is provided, otherwise return None (for optional auth)"""
     if not token:
         return None
@@ -149,6 +159,7 @@ async def get_current_user_optional(
     except JWTError:
         return None
 
+
 async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """Get current active user"""
     if current_user is None:
@@ -157,17 +168,21 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
+
 # Role-based access control
 def require_role(required_roles: list[UserRole]):
     """Dependency to require specific roles"""
+
     async def role_checker(current_user: User = Depends(get_current_active_user)):
         if current_user.role not in required_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Required roles: {[r.value for r in required_roles]}"
+                detail=f"Insufficient permissions. Required roles: {[r.value for r in required_roles]}",
             )
         return current_user
+
     return role_checker
+
 
 # Convenience dependencies
 require_admin = require_role([UserRole.ADMIN])

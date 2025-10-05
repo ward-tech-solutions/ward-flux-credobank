@@ -2,6 +2,7 @@
 WARD Tech Solutions - Zabbix Integration Router
 Handles Zabbix host management, alerts, groups, templates, and search
 """
+import logging
 import asyncio
 from typing import List, Optional
 
@@ -15,6 +16,8 @@ from routers.utils import get_monitored_groupids, run_in_executor
 
 # Thread pool executor
 import concurrent.futures
+
+logger = logging.getLogger(__name__)
 
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 

@@ -2,9 +2,12 @@
 WARD Tech Solutions - Router Utilities
 Shared helper functions for routers
 """
+import logging
 import asyncio
 import concurrent.futures
 import sqlite3
+
+logger = logging.getLogger(__name__)
 
 # Thread pool for running sync functions in async context
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
@@ -27,9 +30,11 @@ def get_monitored_groupids():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT groupid FROM monitored_hostgroups WHERE is_active = 1
-    """)
+    """
+    )
     groupids = [row["groupid"] for row in cursor.fetchall()]
     conn.close()
     return groupids if groupids else None

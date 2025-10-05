@@ -1,10 +1,13 @@
 """Initialize database and create default admin user"""
+import logging
 from database import init_db, SessionLocal, User
 from auth import get_password_hash
 from database import UserRole
 
+logger = logging.getLogger(__name__)
+
 # Create database tables
-print("Creating database tables...")
+logger.info("Creating database tables...")
 init_db()
 
 # Create default admin user
@@ -18,16 +21,16 @@ if not admin_exists:
         full_name="System Administrator",
         hashed_password=get_password_hash("admin123"),
         role=UserRole.ADMIN,
-        is_active=True
+        is_active=True,
     )
     db.add(admin)
     db.commit()
-    print("✅ Admin user created successfully!")
-    print("   Username: admin")
-    print("   Password: admin123")
-    print("   ⚠️  Please change this password after first login!")
+    logger.info("✅ Admin user created successfully!")
+    logger.info("   Username: admin")
+    logger.info("   Password: admin123")
+    logger.info("   ⚠️  Please change this password after first login!")
 else:
-    print("⚠️  Admin user already exists")
+    logger.info("⚠️  Admin user already exists")
 
 db.close()
-print("\n✅ Database initialization complete!")
+logger.info("\n✅ Database initialization complete!")

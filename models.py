@@ -2,13 +2,17 @@
 WARD TECH SOLUTIONS - Database Models
 Multi-tenant configuration support
 """
+import logging
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, JSON
 from sqlalchemy.sql import func
 from database import Base
 
+logger = logging.getLogger(__name__)
+
 
 class Organization(Base):
     """Organization/Company configuration"""
+
     __tablename__ = "organizations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -38,6 +42,7 @@ class Organization(Base):
 
 class SystemConfig(Base):
     """System-wide configuration settings"""
+
     __tablename__ = "system_config"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -52,6 +57,7 @@ class SystemConfig(Base):
 
 class SetupWizardState(Base):
     """Track setup wizard progress"""
+
     __tablename__ = "setup_wizard_state"
 
     id = Column(Integer, primary_key=True, index=True)

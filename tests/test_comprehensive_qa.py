@@ -24,6 +24,7 @@ TEST_DATABASE_URL = "sqlite:///./test_ward.db"
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 # Override get_db dependency
 def override_get_db():
     try:
@@ -31,6 +32,7 @@ def override_get_db():
         yield db
     finally:
         db.close()
+
 
 app.dependency_overrides[get_db] = override_get_db
 
@@ -41,6 +43,7 @@ client = TestClient(app)
 # ═══════════════════════════════════════════════════════════════════
 # SETUP & TEARDOWN
 # ═══════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture(scope="function", autouse=True)
 def setup_database():
@@ -57,6 +60,7 @@ def test_user():
     """Create a test user"""
     db = TestingSessionLocal()
     from passlib.context import CryptContext
+
     pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
     user = User(
@@ -66,7 +70,7 @@ def test_user():
         hashed_password=pwd_context.hash("TestPass123!"),
         role=UserRole.ADMIN,
         is_active=True,
-        is_superuser=True
+        is_superuser=True,
     )
     db.add(user)
     db.commit()
@@ -86,15 +90,13 @@ def auth_headers(test_user):
 # 1. AUTHENTICATION & SECURITY TESTS
 # ═══════════════════════════════════════════════════════════════════
 
+
 class TestAuthentication:
     """Test all authentication scenarios"""
 
     def test_login_success(self, test_user):
         """✓ Test successful login"""
-        response = client.post(
-            "/api/v1/auth/login",
-            data={"username": "testuser", "password": "TestPass123!"}
-        )
+        response = client.post("/api/v1/auth/login", data={"username": "testuser", "password": "TestPass123!"})
         assert response.status_code == 200
         data = response.json()
         assert "access_token" in data
@@ -102,19 +104,13 @@ class TestAuthentication:
 
     def test_login_wrong_password(self, test_user):
         """✓ Test login with wrong password fails"""
-        response = client.post(
-            "/api/v1/auth/login",
-            data={"username": "testuser", "password": "WrongPassword"}
-        )
+        response = client.post("/api/v1/auth/login", data={"username": "testuser", "password": "WrongPassword"})
         assert response.status_code == 401
         assert "Incorrect username or password" in response.json()["detail"]
 
     def test_login_nonexistent_user(self):
         """✓ Test login with non-existent user fails"""
-        response = client.post(
-            "/api/v1/auth/login",
-            data={"username": "ghost", "password": "anything"}
-        )
+        response = client.post("/api/v1/auth/login", data={"username": "ghost", "password": "anything"})
         assert response.status_code == 401
 
     def test_login_missing_credentials(self):
@@ -129,10 +125,7 @@ class TestAuthentication:
 
     def test_protected_route_with_invalid_token(self):
         """✓ Test protected endpoint rejects invalid token"""
-        response = client.get(
-            "/api/v1/devices",
-            headers={"Authorization": "Bearer invalid_token_here"}
-        )
+        response = client.get("/api/v1/devices", headers={"Authorization": "Bearer invalid_token_here"})
         assert response.status_code == 401
 
     def test_protected_route_with_valid_token(self, auth_headers):
@@ -162,8 +155,8 @@ class TestAuthentication:
                 "username": "newuser",
                 "email": "new@wardops.tech",
                 "password": "NewPass123!",
-                "full_name": "New User"
-            }
+                "full_name": "New User",
+            },
         )
         # Should work or return appropriate error
         assert response.status_code in [200, 201, 400, 401]
@@ -172,6 +165,7 @@ class TestAuthentication:
 # ═══════════════════════════════════════════════════════════════════
 # 2. DATABASE & DATA INTEGRITY TESTS
 # ═══════════════════════════════════════════════════════════════════
+
 
 class TestDatabase:
     """Test database operations and integrity"""
@@ -186,13 +180,11 @@ class TestDatabase:
         """✓ Test user can be created"""
         db = TestingSessionLocal()
         from passlib.context import CryptContext
+
         pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
         user = User(
-            username="dbtest",
-            email="db@wardops.tech",
-            hashed_password=pwd_context.hash("pass"),
-            role=UserRole.VIEWER
+            username="dbtest", email="db@wardops.tech", hashed_password=pwd_context.hash("pass"), role=UserRole.VIEWER
         )
         db.add(user)
         db.commit()
@@ -207,13 +199,14 @@ class TestDatabase:
         """✓ Test username must be unique"""
         db = TestingSessionLocal()
         from passlib.context import CryptContext
+
         pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
         duplicate_user = User(
             username="testuser",  # Same as test_user
             email="different@email.com",
             hashed_password=pwd_context.hash("pass"),
-            role=UserRole.VIEWER
+            role=UserRole.VIEWER,
         )
         db.add(duplicate_user)
 
@@ -225,13 +218,14 @@ class TestDatabase:
         """✓ Test email must be unique"""
         db = TestingSessionLocal()
         from passlib.context import CryptContext
+
         pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
         duplicate_email = User(
             username="different",
             email="test@wardops.tech",  # Same as test_user
             hashed_password=pwd_context.hash("pass"),
-            role=UserRole.VIEWER
+            role=UserRole.VIEWER,
         )
         db.add(duplicate_email)
 
@@ -241,10 +235,10 @@ class TestDatabase:
 
     def test_user_roles_enum(self):
         """✓ Test user roles are properly defined"""
-        assert hasattr(UserRole, 'ADMIN')
-        assert hasattr(UserRole, 'REGIONAL_MANAGER')
-        assert hasattr(UserRole, 'TECHNICIAN')
-        assert hasattr(UserRole, 'VIEWER')
+        assert hasattr(UserRole, "ADMIN")
+        assert hasattr(UserRole, "REGIONAL_MANAGER")
+        assert hasattr(UserRole, "TECHNICIAN")
+        assert hasattr(UserRole, "VIEWER")
 
     def test_cascade_delete(self):
         """✓ Test proper cascade deletion if configured"""
@@ -255,6 +249,7 @@ class TestDatabase:
 # ═══════════════════════════════════════════════════════════════════
 # 3. API ENDPOINT TESTS
 # ═══════════════════════════════════════════════════════════════════
+
 
 class TestAPIEndpoints:
     """Test all API endpoints"""
@@ -298,19 +293,14 @@ class TestAPIEndpoints:
 # 4. INPUT VALIDATION TESTS
 # ═══════════════════════════════════════════════════════════════════
 
+
 class TestInputValidation:
     """Test input validation and sanitization"""
 
     def test_sql_injection_prevention(self, auth_headers):
         """✓ Test SQL injection is prevented"""
         # Try SQL injection in login
-        response = client.post(
-            "/api/v1/auth/login",
-            data={
-                "username": "admin' OR '1'='1",
-                "password": "anything"
-            }
-        )
+        response = client.post("/api/v1/auth/login", data={"username": "admin' OR '1'='1", "password": "anything"})
         assert response.status_code == 401  # Should fail, not execute SQL
 
     def test_xss_prevention(self, auth_headers):
@@ -322,9 +312,9 @@ class TestInputValidation:
                 "username": "<script>alert('xss')</script>",
                 "email": "xss@test.com",
                 "password": "Pass123!",
-                "full_name": "XSS Test"
+                "full_name": "XSS Test",
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
         # Should either sanitize or reject
         assert response.status_code in [200, 400, 422]
@@ -337,24 +327,22 @@ class TestInputValidation:
                 "username": "emailtest",
                 "email": "not-an-email",  # Invalid email
                 "password": "Pass123!",
-                "full_name": "Email Test"
-            }
+                "full_name": "Email Test",
+            },
         )
         assert response.status_code == 422  # Validation error
 
     def test_long_input_handling(self):
         """✓ Test very long inputs are handled"""
         long_string = "A" * 10000
-        response = client.post(
-            "/api/v1/auth/login",
-            data={"username": long_string, "password": long_string}
-        )
+        response = client.post("/api/v1/auth/login", data={"username": long_string, "password": long_string})
         assert response.status_code in [400, 401, 422]  # Should reject or handle
 
 
 # ═══════════════════════════════════════════════════════════════════
 # 5. ERROR HANDLING TESTS
 # ═══════════════════════════════════════════════════════════════════
+
 
 class TestErrorHandling:
     """Test error scenarios are handled gracefully"""
@@ -378,9 +366,7 @@ class TestErrorHandling:
     def test_malformed_json(self):
         """✓ Test malformed JSON is rejected"""
         response = client.post(
-            "/api/v1/auth/register",
-            data="{ this is not valid json }",
-            headers={"Content-Type": "application/json"}
+            "/api/v1/auth/register", data="{ this is not valid json }", headers={"Content-Type": "application/json"}
         )
         assert response.status_code == 422
 
@@ -389,12 +375,14 @@ class TestErrorHandling:
 # 6. PERFORMANCE TESTS
 # ═══════════════════════════════════════════════════════════════════
 
+
 class TestPerformance:
     """Test performance and load handling"""
 
     def test_response_time(self):
         """✓ Test API response time is acceptable"""
         import time
+
         start = time.time()
         response = client.get("/api/v1/health")
         duration = time.time() - start
@@ -419,11 +407,7 @@ class TestPerformance:
     def test_large_payload_handling(self, auth_headers):
         """✓ Test large payload handling"""
         large_data = {"data": "X" * 1000000}  # 1MB of data
-        response = client.post(
-            "/api/v1/bulk/import",
-            json=large_data,
-            headers=auth_headers
-        )
+        response = client.post("/api/v1/bulk/import", json=large_data, headers=auth_headers)
         # Should either accept or reject gracefully
         assert response.status_code in [200, 413, 422]
 
@@ -431,6 +415,7 @@ class TestPerformance:
 # ═══════════════════════════════════════════════════════════════════
 # 7. ROLE-BASED ACCESS CONTROL TESTS
 # ═══════════════════════════════════════════════════════════════════
+
 
 class TestRBAC:
     """Test role-based access control"""
@@ -446,6 +431,7 @@ class TestRBAC:
         # Create viewer user
         db = TestingSessionLocal()
         from passlib.context import CryptContext
+
         pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
         viewer = User(
@@ -453,31 +439,26 @@ class TestRBAC:
             email="viewer@test.com",
             hashed_password=pwd_context.hash("ViewPass123!"),
             role=UserRole.VIEWER,
-            is_active=True
+            is_active=True,
         )
         db.add(viewer)
         db.commit()
         db.close()
 
         # Login as viewer
-        login_response = client.post(
-            "/api/v1/auth/login",
-            data={"username": "viewer", "password": "ViewPass123!"}
-        )
+        login_response = client.post("/api/v1/auth/login", data={"username": "viewer", "password": "ViewPass123!"})
         viewer_token = login_response.json()["access_token"]
         viewer_headers = {"Authorization": f"Bearer {viewer_token}"}
 
         # Try to delete (should fail)
-        response = client.delete(
-            "/api/v1/devices/123",
-            headers=viewer_headers
-        )
+        response = client.delete("/api/v1/devices/123", headers=viewer_headers)
         assert response.status_code in [403, 401]  # Forbidden or Unauthorized
 
 
 # ═══════════════════════════════════════════════════════════════════
 # 8. ZABBIX INTEGRATION TESTS
 # ═══════════════════════════════════════════════════════════════════
+
 
 class TestZabbixIntegration:
     """Test Zabbix integration (mocked)"""
@@ -497,6 +478,7 @@ class TestZabbixIntegration:
 # 9. FILE UPLOAD TESTS
 # ═══════════════════════════════════════════════════════════════════
 
+
 class TestFileUploads:
     """Test file upload functionality"""
 
@@ -505,11 +487,7 @@ class TestFileUploads:
         csv_content = "hostname,ip,group\ntest1,10.0.0.1,servers"
         files = {"file": ("test.csv", csv_content, "text/csv")}
 
-        response = client.post(
-            "/api/v1/bulk/import",
-            files=files,
-            headers=auth_headers
-        )
+        response = client.post("/api/v1/bulk/import", files=files, headers=auth_headers)
         assert response.status_code in [200, 400, 422]
 
     def test_malicious_file_rejection(self, auth_headers):
@@ -517,17 +495,14 @@ class TestFileUploads:
         exe_content = b"MZ\x90\x00"  # EXE file header
         files = {"file": ("virus.exe", exe_content, "application/x-msdownload")}
 
-        response = client.post(
-            "/api/v1/bulk/import",
-            files=files,
-            headers=auth_headers
-        )
+        response = client.post("/api/v1/bulk/import", files=files, headers=auth_headers)
         assert response.status_code in [400, 415, 422]  # Should reject
 
 
 # ═══════════════════════════════════════════════════════════════════
 # 10. EDGE CASES & BOUNDARY TESTS
 # ═══════════════════════════════════════════════════════════════════
+
 
 class TestEdgeCases:
     """Test edge cases and boundary conditions"""
@@ -543,14 +518,7 @@ class TestEdgeCases:
 
     def test_null_values_handling(self):
         """✓ Test null values are handled"""
-        response = client.post(
-            "/api/v1/auth/register",
-            json={
-                "username": None,
-                "email": None,
-                "password": None
-            }
-        )
+        response = client.post("/api/v1/auth/register", json={"username": None, "email": None, "password": None})
         assert response.status_code == 422  # Validation error
 
     def test_unicode_handling(self):
@@ -561,8 +529,8 @@ class TestEdgeCases:
                 "username": "გიორგი",  # Georgian text
                 "email": "test@თბილისი.ge",
                 "password": "Pass123!",
-                "full_name": "გიორგი ჯალაბაძე"
-            }
+                "full_name": "გიორგი ჯალაბაძე",
+            },
         )
         # Should handle Unicode properly
         assert response.status_code in [200, 400, 422]
