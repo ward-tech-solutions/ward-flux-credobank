@@ -1,7 +1,6 @@
 import { Search, Bell, Moon, Sun, LogOut, User } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { authAPI } from '@/services/api'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function Header() {

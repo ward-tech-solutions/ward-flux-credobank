@@ -9,7 +9,6 @@ import {
   Stethoscope,
   BarChart3,
   MapPin,
-  Users,
   Settings
 } from 'lucide-react'
 import { cn } from '@/lib/utils'

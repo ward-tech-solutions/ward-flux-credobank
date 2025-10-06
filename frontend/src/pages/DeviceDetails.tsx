@@ -136,7 +136,7 @@ export default function DeviceDetails() {
                 <div className="flex justify-between py-2">
                   <span className="text-gray-500 dark:text-gray-400">Created At</span>
                   <span className="font-medium text-gray-900 dark:text-gray-100">
-                    {new Date(deviceData.created_at).toLocaleString()}
+                    {deviceData.created_at ? new Date(deviceData.created_at).toLocaleString() : 'N/A'}
                   </span>
                 </div>
               </div>

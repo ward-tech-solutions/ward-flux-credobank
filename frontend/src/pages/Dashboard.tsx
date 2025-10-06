@@ -6,27 +6,12 @@ import Badge from '@/components/ui/Badge'
 import { devicesAPI } from '@/services/api'
 import {
   Activity,
-  Wifi,
   AlertTriangle,
   CheckCircle,
-  Clock,
   TrendingUp,
   Server,
-  WifiOff,
-  BarChart4,
   XCircle,
 } from 'lucide-react'
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
 import { Link } from 'react-router-dom'
 
 // Device type icons mapping

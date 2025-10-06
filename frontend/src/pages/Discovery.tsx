@@ -100,8 +100,8 @@ export default function Discovery() {
 
     createRuleMutation.mutate({
       ...ruleForm,
-      network_ranges: networkRanges,
-      excluded_ips: excludedIps,
+      network_ranges: networkRanges.join(','),
+      excluded_ips: excludedIps.join(','),
     })
   }
 

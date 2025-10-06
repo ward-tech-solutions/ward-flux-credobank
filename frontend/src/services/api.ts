@@ -36,11 +36,13 @@ export interface Device {
   hostid: string
   hostname: string
   display_name: string
+  name?: string
   branch: string  // City name
   region: string  // Region name
   ip: string
   device_type: string
   status: string  // "Enabled" or "Disabled"
+  enabled?: boolean
   available: string  // "Available" or "Unavailable"
   ping_status: string  // "Up" or "Down"
   ping_response_time: number | null
@@ -50,6 +52,9 @@ export interface Device {
   triggers?: Trigger[]
   latitude: number
   longitude: number
+  vendor?: string
+  model?: string
+  created_at?: string
 }
 
 export interface User {
@@ -79,6 +84,7 @@ export interface DiscoveryRule {
   name: string
   description: string
   network_ranges: string
+  excluded_ips?: string
   enabled: boolean
   created_at: string
 }
@@ -155,6 +161,9 @@ export const discoveryAPI = {
   deleteRule: (id: string) => api.delete(`/discovery/rules/${id}`),
   getResults: () => api.get<DiscoveryResult[]>('/discovery/results'),
   scanNow: (ruleId: string) => api.post(`/discovery/rules/${ruleId}/scan`),
+  quickScan: (params: { network_ranges: string[]; excluded_ips: string[]; use_ping: boolean; use_snmp: boolean }) =>
+    api.post('/discovery/scan', params),
+  importDevices: (deviceIds: string[]) => api.post('/discovery/import', { device_ids: deviceIds }),
 }
 
 // Reports

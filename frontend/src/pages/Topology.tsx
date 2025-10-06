@@ -12,9 +12,6 @@ import {
   ZoomOut,
   Maximize,
   Filter,
-  Server,
-  Radio,
-  Layers,
   CheckCircle,
   XCircle
 } from 'lucide-react'
@@ -84,7 +81,7 @@ export default function Topology() {
   const networkRef = useRef<any>(null)
   const nodesRef = useRef<any>(null)
   const edgesRef = useRef<any>(null)
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pollingIntervalRef = useRef<number | null>(null)
 
   // Fetch all devices
   const { data: allDevices } = useQuery({
@@ -116,7 +113,7 @@ export default function Topology() {
     return () => {
       // Cleanup
       if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
+        window.clearInterval(pollingIntervalRef.current)
       }
       if (networkRef.current) {
         networkRef.current.destroy()
@@ -180,16 +177,16 @@ export default function Topology() {
 
     // Setup polling every 30 seconds
     if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
+      window.clearInterval(pollingIntervalRef.current)
     }
 
-    pollingIntervalRef.current = setInterval(() => {
+    pollingIntervalRef.current = window.setInterval(() => {
       fetchRouterInterfaces(selectedDeviceId, selectedDeviceName)
     }, 30000) // 30 seconds
 
     return () => {
       if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
+        window.clearInterval(pollingIntervalRef.current)
       }
     }
   }, [selectedDeviceId, selectedDeviceName])
@@ -470,7 +467,7 @@ export default function Topology() {
       // Transform data to match expected format
       if (data.interfaces) {
         // Convert interfaces object to array and add Mbps conversions
-        const interfacesArray = Object.entries(data.interfaces).map(([key, iface]: [string, any]) => ({
+        const interfacesArray = Object.entries(data.interfaces).map(([, iface]: [string, any]) => ({
           name: iface.name,
           description: iface.description || '',
           status: iface.status,
@@ -611,13 +608,6 @@ export default function Topology() {
     if (networkRef.current) {
       networkRef.current.fit({ animation: { duration: 800 } })
     }
-  }
-
-  const getDeviceIcon = (type: string) => {
-    const deviceType = (type || '').toLowerCase()
-    if (deviceType.includes('router')) return Radio
-    if (deviceType.includes('switch')) return Layers
-    return Server
   }
 
   return (

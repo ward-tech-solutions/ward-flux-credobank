@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { devicesAPI } from '@/services/api'
 import { Card, CardContent } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
-import { MapPin, Globe, CheckCircle, XCircle } from 'lucide-react'
+import { Globe, CheckCircle, XCircle } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 
 // Fix for default marker icons in Leaflet
@@ -253,7 +253,7 @@ export default function Map() {
                   spiderfyOnMaxZoom={true}
                   showCoverageOnHover={false}
                   zoomToBoundsOnClick={true}
-                  iconCreateFunction={(cluster) => {
+                  iconCreateFunction={(cluster: any) => {
                     const markers = cluster.getAllChildMarkers()
                     const count = markers.length
                     const onlineCount = markers.filter((m: any) => {
@@ -306,7 +306,6 @@ export default function Map() {
                         key={index}
                         position={[firstDevice.latitude, firstDevice.longitude]}
                         icon={createMarkerIcon(allOnline, group.length)}
-                        device={firstDevice} // Pass device data for clustering
                       >
                         <Popup maxWidth={350} maxHeight={400}>
                           <div className="p-2 bg-white dark:bg-gray-800">
