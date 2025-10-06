@@ -169,6 +169,8 @@ docs/guides/
 logs/
 PROJECT_STRUCTURE.md
 project_structure.md
+KnowledgeBase/
+DisasterRecovery/
 
 # Development/temporary files (don't commit)
 main.py.pre-refactor
