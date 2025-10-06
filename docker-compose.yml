@@ -40,28 +40,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # VictoriaMetrics - Time-Series Database
-  victoriametrics:
-    image: victoriametrics/victoria-metrics:latest
-    container_name: ward-victoriametrics
-    command:
-      - '--storageDataPath=/victoria-metrics-data'
-      - '--httpListenAddr=:8428'
-      - '--retentionPeriod=12'
-      - '--search.maxQueryDuration=60s'
-    volumes:
-      - victoria-data:/victoria-metrics-data
-    ports:
-      - "8428:8428"
-    networks:
-      - ward-network
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8428/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
   # WARD FLUX API Server
   api:
     build:
@@ -71,12 +49,12 @@ services:
     environment:
       - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
-      - VICTORIA_URL=http://victoriametrics:8428
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - SECRET_KEY=${SECRET_KEY}
-      - ZABBIX_URL=${ZABBIX_URL}
-      - ZABBIX_USER=${ZABBIX_USER}
-      - ZABBIX_PASSWORD=${ZABBIX_PASSWORD}
+      - ZABBIX_URL=${ZABBIX_URL:-}
+      - ZABBIX_USER=${ZABBIX_USER:-}
+      - ZABBIX_PASSWORD=${ZABBIX_PASSWORD:-}
+      - MONITORING_MODE=${MONITORING_MODE:-snmp_only}
     volumes:
       - ./logs:/app/logs
       - api-data:/data
@@ -86,8 +64,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      victoriametrics:
         condition: service_healthy
     networks:
       - ward-network
@@ -109,8 +85,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
-      - VICTORIA_URL=http://victoriametrics:8428
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - MONITORING_MODE=${MONITORING_MODE:-snmp_only}
     volumes:
       - ./logs:/app/logs
       - celery-data:/data
@@ -118,8 +94,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      victoriametrics:
         condition: service_healthy
     networks:
       - ward-network
@@ -148,50 +122,9 @@ services:
       - ward-network
     restart: unless-stopped
 
-  # Grafana - Metrics Visualization
-  grafana:
-    image: grafana/grafana:latest
-    container_name: ward-grafana
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=http://localhost:3000
-      - GF_INSTALL_PLUGINS=
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-    ports:
-      - "3000:3000"
-    depends_on:
-      - victoriametrics
-    networks:
-      - ward-network
-    restart: unless-stopped
-
-  # Nginx - Reverse Proxy (Optional)
-  nginx:
-    image: nginx:alpine
-    container_name: ward-nginx
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      - api
-      - grafana
-    networks:
-      - ward-network
-    restart: unless-stopped
-    profiles:
-      - production
-
 volumes:
   postgres-data:
   redis-data:
-  victoria-data:
-  grafana-data:
   api-data:
   celery-data:
   beat-data:
@@ -199,6 +132,3 @@ volumes:
 networks:
   ward-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.25.0.0/16
