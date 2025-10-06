@@ -23,7 +23,7 @@ executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 router = APIRouter(prefix="/api/v1", tags=["infrastructure"])
 
 
-@router.get("/api/v1/router/{hostid}/interfaces")
+@router.get("/router/{hostid}/interfaces")
 async def get_router_interfaces(request: Request, hostid: str, current_user: User = Depends(get_current_active_user)):
     """Get router interface statistics"""
     zabbix = request.app.state.zabbix
@@ -32,7 +32,7 @@ async def get_router_interfaces(request: Request, hostid: str, current_user: Use
     return {"hostid": hostid, "interfaces": interfaces}
 
 
-@router.get("/api/v1/topology")
+@router.get("/topology")
 async def get_topology(
     request: Request,
     view: str = "hierarchical",

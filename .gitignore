@@ -115,7 +115,6 @@ PUSH_TO_GITHUB.md
 *.old
 
 # Unused/development files
-frontend/
 auth_endpoints.txt
 test_zabbix.py
 tests.py
@@ -186,3 +185,9 @@ fix_*.py
 
 # Old/unused folders
 app/
+
+# Frontend build artifacts (keep source, ignore builds)
+frontend/dist/
+frontend/node_modules/
+frontend/.vite/
+static_new/

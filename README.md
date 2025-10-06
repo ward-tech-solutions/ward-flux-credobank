@@ -1,521 +1,459 @@
-<div align="center">
+# WARD FLUX - Network Monitoring Platform
 
-# 🛡️ WARD Tech Solutions
-### Enterprise Network Monitoring & Management Platform
+A modern, enterprise-grade network monitoring platform built with FastAPI, React, and VictoriaMetrics. WARD FLUX provides comprehensive network device monitoring, SNMP polling, real-time alerts, and advanced analytics.
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://hub.docker.com)
-[![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)](LICENSE)
+## Features
 
-[![Code Quality](https://img.shields.io/badge/Code%20Quality-A+-success?style=flat-square)](https://github.com/psf/black)
-[![Security](https://img.shields.io/badge/Security-Hardened-green?style=flat-square)](docs/SECURITY.md)
-[![API Docs](https://img.shields.io/badge/API-OpenAPI%203.0-blue?style=flat-square)](http://localhost:5001/docs)
-[![Coverage](https://img.shields.io/badge/Coverage-85%25-brightgreen?style=flat-square)](https://github.com/pytest-dev/pytest)
+### Core Monitoring Capabilities
+- **Multi-Protocol Support**: Native SNMP polling and optional Zabbix integration
+- **Real-Time Monitoring**: Live device status updates via WebSockets
+- **Geographic Visualization**: Interactive network topology with map-based device locations
+- **Advanced Analytics**: Historical metrics storage and analysis with VictoriaMetrics
+- **Bulk Operations**: Import/export devices via CSV/Excel with validation
 
-<p align="center">
-  <strong>Transform your Zabbix infrastructure into a modern, enterprise-grade monitoring platform</strong>
-</p>
+### Network Management
+- **Device Discovery**: Automated network device discovery and classification
+- **SNMP Polling**: Asynchronous SNMP v2c/v3 polling with configurable intervals
+- **Alert Management**: Real-time alerting with customizable thresholds
+- **Performance Metrics**: CPU, memory, bandwidth, and interface statistics
+- **Topology Mapping**: Automated network topology discovery and visualization
 
-<p align="center">
-  <a href="#-key-features">Features</a> •
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-documentation">Documentation</a> •
-  <a href="#-architecture">Architecture</a> •
-  <a href="#-api-reference">API</a>
-</p>
+### Security & Administration
+- **Role-Based Access Control (RBAC)**: Admin, Manager, and Technician roles
+- **JWT Authentication**: Secure token-based authentication
+- **Encrypted Credentials**: AES-256 encryption for sensitive data
+- **Audit Logging**: Comprehensive activity tracking
+- **Multi-Tenancy**: Separate user workspaces and permissions
 
-![Dashboard Preview](docs/screenshots/dashboard.png)
+### Integration & Extensibility
+- **Zabbix Integration**: Optional hybrid monitoring mode with existing Zabbix servers
+- **REST API**: Complete API for automation and third-party integrations
+- **Grafana Support**: Pre-configured dashboards for metrics visualization
+- **Webhook Support**: Custom alert notifications and integrations
+- **CSV/Excel Import**: Bulk device management capabilities
 
-</div>
+## Technology Stack
 
----
+### Backend
+- **FastAPI**: Modern async Python web framework
+- **SQLAlchemy**: ORM with PostgreSQL/SQLite support
+- **Celery**: Distributed task queue for SNMP polling
+- **Redis**: Task queue backend and caching layer
+- **VictoriaMetrics**: High-performance time-series database
 
-## 🌟 Overview
+### Frontend
+- **React 18**: Modern UI with TypeScript
+- **Vite**: Fast development and optimized builds
+- **TailwindCSS**: Utility-first CSS framework
+- **Recharts**: Interactive data visualization
+- **React Leaflet**: Geographic mapping and topology
 
-WARD Tech Solutions is a **production-ready**, **enterprise-grade** network monitoring platform built on top of **Zabbix**. It provides a modern interface, advanced diagnostics, real-time monitoring, and comprehensive reporting capabilities for large-scale network infrastructure.
+### Infrastructure
+- **Docker**: Containerized deployment
+- **Docker Compose**: Multi-container orchestration
+- **Nginx**: Reverse proxy and SSL termination (optional)
+- **PostgreSQL**: Production database
+- **Grafana**: Advanced metrics visualization
 
-### Why WARD?
+## Prerequisites
 
-- ✅ **Zero Data Migration** - Uses your existing Zabbix infrastructure
-- ✅ **15-Minute Setup** - Automated setup wizard with no technical expertise required
-- ✅ **Enterprise Ready** - Built for scale with multi-tenancy, RBAC, and audit logging
-- ✅ **Modern Stack** - FastAPI + React with WebSocket real-time updates
-- ✅ **Advanced Diagnostics** - Ping, Traceroute, MTR, DNS, Port Scanning, Anomaly Detection
-- ✅ **Comprehensive API** - RESTful API with OpenAPI/Swagger documentation
+### For Docker Deployment (Recommended)
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- 4GB RAM minimum (8GB recommended)
+- 20GB disk space
 
----
+### For Manual Installation
+- Python 3.11+
+- Node.js 20+
+- PostgreSQL 15+ (or SQLite for development)
+- Redis 7+
+- VictoriaMetrics (optional, for production)
 
-## 🚀 Key Features
+## Quick Start with Docker
 
-### 📊 Real-Time Monitoring
-- **Live Dashboard** - WebSocket-powered real-time device status updates
-- **Geographic Maps** - Visualize your entire network infrastructure on interactive maps
-- **Network Topology** - Hierarchical topology view with router interface statistics
-- **Active Alerts** - Real-time problem notifications with severity levels
-
-### 🔧 Advanced Network Diagnostics
-- **ICMP Ping** - Packet loss, RTT statistics, historical trends
-- **Traceroute** - Network path analysis with hop-by-hop latency
-- **MTR (My Traceroute)** - Combined ping + traceroute with continuous monitoring
-- **DNS Tools** - Forward/reverse lookup, FQDN resolution
-- **Port Scanning** - TCP port availability checks
-- **Performance Baselines** - Automated baseline calculation with anomaly detection
-- **Bulk Diagnostics** - Run diagnostics on multiple devices simultaneously
-
-### 📈 Reporting & Analytics
-- **Downtime Reports** - Comprehensive availability analysis by region/device type
-- **MTTR Analytics** - Mean Time To Repair with trend analysis
-- **Device Inventory** - Complete asset tracking with bulk import/export
-- **Custom Reports** - Excel/CSV export with configurable templates
-- **Historical Data** - Trend analysis for capacity planning
-
-### 🔐 Enterprise Security
-- **JWT Authentication** - Secure token-based authentication
-- **Role-Based Access Control (RBAC)** - 4 permission levels (Admin, Manager, Technician, Viewer)
-- **Regional Restrictions** - Limit access by geographic region
-- **Branch-Level Permissions** - Multi-tenant access control
-- **Rate Limiting** - API abuse prevention
-- **Security Headers** - 6+ security headers (CSP, HSTS, X-Frame-Options, etc.)
-- **Audit Logging** - Complete activity tracking
-
-### 🎨 Modern User Experience
-- **Responsive Design** - Mobile, tablet, and desktop optimized
-- **Dark/Light Modes** - User preference support
-- **Interactive UI** - Real-time updates without page refresh
-- **Intuitive Navigation** - Clean, modern interface
-- **Accessibility** - WCAG 2.1 AA compliant
-
-### ⚡ Performance & Scalability
-- **Async Architecture** - Non-blocking I/O with FastAPI
-- **WebSocket Support** - Real-time bidirectional communication
-- **Caching Layer** - Redis-ready for horizontal scaling
-- **Database Optimization** - Indexed queries, connection pooling
-- **Docker Support** - Multi-arch (AMD64, ARM64) container images
-- **Horizontal Scaling** - Load balancer ready
-
----
-
-## 📋 Requirements
-
-### Minimum Requirements
-- **Zabbix Server**: 5.0 or higher
-- **Python**: 3.11+
-- **Docker**: 20.10+ (recommended) or Python environment
-- **RAM**: 4GB minimum, 8GB recommended
-- **Storage**: 10GB minimum, 50GB recommended for logs/database
-- **Network**: Zabbix API access (read-only minimum)
-
-### Recommended Setup
-- **OS**: Ubuntu 22.04 LTS, Rocky Linux 9, or Docker
-- **CPU**: 4+ cores
-- **RAM**: 16GB
-- **Storage**: SSD with 100GB+
-- **Database**: PostgreSQL 14+ (for production) or SQLite (development)
-
----
-
-## 🏃 Quick Start
-
-### Option 1: Docker (Recommended)
-
+### 1. Clone the Repository
 ```bash
-# Pull and run the latest image
-docker run -d \
-  --name ward-monitor \
-  -p 5001:5001 \
-  -v ward-data:/app/data \
-  -v ward-logs:/app/logs \
-  --restart unless-stopped \
-  ghcr.io/ward-tech-solutions/ward-tech-solutions:latest
-
-# Access the setup wizard
-open http://localhost:5001/setup
+git clone https://github.com/ward-tech-solutions/ward-flux.git
+cd ward-flux
 ```
 
-### Option 2: Docker Compose
-
+### 2. Configure Environment Variables
 ```bash
-# Clone repository
-git clone https://github.com/ward-tech-solutions/ward-tech-solutions.git
-cd ward-tech-solutions
+# Copy the example environment file
+cp .env.example .env
 
-# Start services
+# Edit .env with your configuration
+nano .env
+```
+
+**Required Environment Variables:**
+```bash
+# Database
+POSTGRES_PASSWORD=your_secure_password
+DATABASE_URL=postgresql://ward:your_secure_password@postgres:5432/ward_flux
+
+# Redis
+REDIS_PASSWORD=your_redis_password
+REDIS_URL=redis://:your_redis_password@redis:6379/0
+
+# Security (IMPORTANT: Generate these!)
+ENCRYPTION_KEY=<generate with: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
+SECRET_KEY=<generate with: openssl rand -base64 32>
+
+# Zabbix (Optional - only if using Zabbix integration)
+ZABBIX_URL=http://your-zabbix-server/api_jsonrpc.php
+ZABBIX_USER=your_zabbix_username
+ZABBIX_PASSWORD=your_zabbix_password
+
+# Grafana
+GRAFANA_PASSWORD=your_grafana_password
+```
+
+### 3. Launch the Stack
+```bash
+# Start all services
 docker-compose up -d
 
 # View logs
-docker-compose logs -f
+docker-compose logs -f api
+
+# Check service health
+docker-compose ps
 ```
 
-### Option 3: From Source
+### 4. Access the Platform
+- **Web Interface**: http://localhost:5001
+- **API Documentation**: http://localhost:5001/docs
+- **Grafana**: http://localhost:3000
+- **VictoriaMetrics**: http://localhost:8428
 
+**Default Credentials:**
+- Username: `admin`
+- Password: `admin` (change immediately after first login)
+
+## Manual Installation
+
+### 1. Install Python Dependencies
 ```bash
-# Clone repository
-git clone https://github.com/ward-tech-solutions/ward-tech-solutions.git
-cd ward-monitor
-
 # Create virtual environment
-python3.11 -m venv .venv
-source .venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Run development server
-uvicorn main:app --reload --host 0.0.0.0 --port 5001
 ```
 
----
-
-## 🎬 Setup Wizard (5 Minutes)
-
-WARD includes an **intelligent setup wizard** that guides you through initial configuration:
-
-1. **🏠 Welcome** - Review features and system requirements
-2. **🔌 Zabbix Connection** - Enter Zabbix URL and API credentials
-3. **📦 Host Groups** - Select which Zabbix host groups to monitor
-4. **👤 Admin Account** - Create your administrator account
-5. **✅ Complete** - Configuration saved, start monitoring!
-
-The wizard validates each step and provides helpful error messages if something goes wrong.
-
----
-
-## 📖 Documentation
-
-### For Users
-- **[User Guide](docs/USER_GUIDE.md)** - Complete user manual
-- **[Setup Guide](docs/SETUP.md)** - Detailed installation instructions
-- **[Configuration](docs/CONFIGURATION.md)** - Advanced configuration options
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
-
-### For Developers
-- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute
-- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and components
-- **[API Documentation](http://localhost:5001/docs)** - Interactive OpenAPI/Swagger UI
-- **[Development Setup](docs/DEVELOPMENT.md)** - Local development environment
-- **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community guidelines
-
-### For Administrators
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment
-- **[Security Hardening](docs/SECURITY.md)** - Security best practices
-- **[Monitoring & Maintenance](docs/OPERATIONS.md)** - Operations guide
-- **[Backup & Recovery](docs/BACKUP.md)** - Data protection strategies
-
----
-
-## 🏗️ Architecture
-
-### Technology Stack
-
-**Backend**
-- **Framework**: FastAPI 0.109+ (async Python web framework)
-- **API**: RESTful + WebSocket support
-- **Authentication**: JWT with Argon2 password hashing
-- **Database**: SQLAlchemy ORM (SQLite/PostgreSQL)
-- **Monitoring**: Zabbix API integration via pyzabbix
-- **Async**: asyncio + concurrent.futures for parallel operations
-
-**Frontend**
-- **UI**: Modern responsive design with Bootstrap 5
-- **Real-time**: WebSocket connections for live updates
-- **Maps**: Leaflet.js for geographic visualization
-- **Charts**: Chart.js for analytics and trends
-- **Icons**: Font Awesome Pro
-
-**Infrastructure**
-- **Containerization**: Docker + Docker Compose
-- **Web Server**: Uvicorn (ASGI) with Gunicorn (production)
-- **Reverse Proxy**: Nginx (recommended for production)
-- **CI/CD**: GitHub Actions
-- **Code Quality**: Black, isort, Ruff, Bandit, pre-commit hooks
-
-### System Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                      Client Browser                      │
-│            (React UI + WebSocket Client)                 │
-└────────────────┬────────────────────────────────────────┘
-                 │
-                 │ HTTPS (443)
-                 ▼
-┌─────────────────────────────────────────────────────────┐
-│               Nginx Reverse Proxy                        │
-│         (SSL/TLS, Load Balancing, Caching)              │
-└────────────────┬────────────────────────────────────────┘
-                 │
-                 │ HTTP (5001)
-                 ▼
-┌─────────────────────────────────────────────────────────┐
-│              WARD Application (FastAPI)                  │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │  Routers (11 modules)                           │   │
-│  │  • auth          • diagnostics                  │   │
-│  │  • devices       • infrastructure               │   │
-│  │  • reports       • websockets                   │   │
-│  │  • config        • bulk operations              │   │
-│  └─────────────────────────────────────────────────┘   │
-│                                                          │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │  Core Services                                  │   │
-│  │  • Authentication  • Network Diagnostics       │   │
-│  │  • Authorization   • WebSocket Manager         │   │
-│  └─────────────────────────────────────────────────┘   │
-└───────┬──────────────────────────────────┬──────────────┘
-        │                                  │
-        │ SQLAlchemy ORM                   │ Zabbix API
-        ▼                                  ▼
-┌──────────────────┐            ┌─────────────────────┐
-│  SQLite/PostgreSQL│            │  Zabbix Server      │
-│   (Application DB)│            │  (Monitoring Data)  │
-└──────────────────┘            └─────────────────────┘
+### 2. Build Frontend
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
 ```
 
-### Modular Router Architecture
+### 3. Initialize Database
+```bash
+# Set environment variables
+export DATABASE_URL="sqlite:///./data/ward_flux.db"
+export ENCRYPTION_KEY="<generate your key>"
 
-The application uses a **modular router architecture** for better maintainability:
+# Create database tables
+python3 -c "from database import init_db; init_db()"
+```
 
-- **11 Independent Routers** - Each handles a specific domain
-- **Shared Utilities** - Common functions in `routers/utils.py`
-- **Dependency Injection** - FastAPI's built-in DI for clean code
-- **Type Safety** - Pydantic models for request/response validation
+### 4. Start Services
+```bash
+# Terminal 1: Start Redis
+redis-server
 
----
+# Terminal 2: Start VictoriaMetrics (optional)
+victoria-metrics
 
-## 🔌 API Reference
+# Terminal 3: Start Celery Worker
+celery -A celery_app worker --loglevel=info
 
-### Interactive Documentation
+# Terminal 4: Start Celery Beat
+celery -A celery_app beat --loglevel=info
 
-Access the **interactive API documentation** at:
-- **Swagger UI**: `http://localhost:5001/docs`
-- **ReDoc**: `http://localhost:5001/redoc`
-- **OpenAPI JSON**: `http://localhost:5001/openapi.json`
+# Terminal 5: Start API Server
+uvicorn main:app --host 0.0.0.0 --port 5001
+```
 
-### API Overview
+## Configuration
 
-| Category | Endpoints | Description |
-|----------|-----------|-------------|
-| **Authentication** | 7 | User login, registration, JWT tokens, user management |
-| **Devices** | 4 | Device listing, search, details, filters |
-| **Diagnostics** | 15 | Ping, traceroute, MTR, DNS, port scan, baselines |
-| **Reports** | 5 | Downtime reports, MTTR analytics, exports |
-| **Monitoring** | 6 | Dashboard stats, health checks, alerts, topology |
-| **Configuration** | 5 | Host groups, settings, regional config |
-| **Bulk Operations** | 6 | Import/export CSV/Excel, bulk updates/deletes |
-| **WebSockets** | 3 | Real-time device updates, router interfaces, notifications |
+### Environment Variables Reference
 
-**Total**: **60+ REST endpoints** + **3 WebSocket channels**
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `DATABASE_URL` | PostgreSQL or SQLite connection string | Yes | - |
+| `POSTGRES_PASSWORD` | PostgreSQL password | Yes (Docker) | - |
+| `REDIS_URL` | Redis connection string | Yes | `redis://localhost:6379/0` |
+| `REDIS_PASSWORD` | Redis password | Yes (Docker) | - |
+| `VICTORIA_URL` | VictoriaMetrics endpoint | No | `http://victoriametrics:8428` |
+| `ENCRYPTION_KEY` | AES encryption key for credentials | Yes | - |
+| `SECRET_KEY` | JWT signing secret | Yes | - |
+| `ZABBIX_URL` | Zabbix API endpoint | No | - |
+| `ZABBIX_USER` | Zabbix username | No | - |
+| `ZABBIX_PASSWORD` | Zabbix password | No | - |
+| `GRAFANA_PASSWORD` | Grafana admin password | Yes (Docker) | - |
+| `LOG_LEVEL` | Application log level | No | `INFO` |
+| `CORS_ORIGINS` | Allowed CORS origins | No | `*` |
 
-### Example API Calls
+### Monitoring Modes
+
+WARD FLUX supports three monitoring modes:
+
+1. **SNMP Only** (Default): Native SNMP polling without Zabbix
+2. **Zabbix Only**: Use existing Zabbix infrastructure
+3. **Hybrid**: Combined SNMP + Zabbix monitoring
+
+Set the mode in the UI under Settings > Configuration.
+
+### SNMP Configuration
+
+For SNMP monitoring, configure the following in the UI:
+- **SNMP Version**: v2c or v3
+- **Community String**: For v2c (e.g., "public")
+- **Polling Interval**: 60-300 seconds recommended
+- **Timeout/Retries**: Adjust based on network conditions
+
+## Usage
+
+### Adding Devices
+
+**Single Device:**
+1. Navigate to Dashboard > Add Device
+2. Enter device details (hostname, IP, SNMP credentials)
+3. Click "Save" to add the device
+
+**Bulk Import:**
+1. Download CSV/Excel template from Dashboard > Bulk Operations
+2. Fill in device information
+3. Upload and validate the file
+4. Review and confirm the import
+
+### Viewing Metrics
+
+1. Click on any device to view detailed metrics
+2. Select time range and metric type
+3. Export data as needed
+
+### Setting Up Alerts
+
+1. Navigate to Settings > Alerts
+2. Configure alert thresholds for CPU, memory, bandwidth
+3. Set notification preferences (email, webhook)
+
+### Generating Reports
+
+1. Go to Reports section
+2. Select report type (MTTR, uptime, performance)
+3. Choose date range and devices
+4. Export to PDF/Excel
+
+## Development
+
+### Running in Development Mode
 
 ```bash
-# Authenticate
-curl -X POST "http://localhost:5001/api/v1/auth/login" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=your_password"
+# Backend with hot reload
+uvicorn main:app --reload --host 0.0.0.0 --port 5001
 
-# Get dashboard stats
-curl -X GET "http://localhost:5001/api/v1/dashboard/stats" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-
-# Run network diagnostic
-curl -X POST "http://localhost:5001/api/v1/diagnostics/ping" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"ip": "8.8.8.8", "count": 5}'
+# Frontend with hot reload
+cd frontend
+npm run dev
 ```
 
----
+### Running Tests
 
-## 🎯 Use Cases
+```bash
+# Backend tests
+pytest tests/ -v
 
-### Industry Applications
-
-- **🏪 Retail Chains** - Monitor POS systems, switches, and routers across hundreds of stores
-- **🏭 Manufacturing** - Track industrial equipment and plant infrastructure
-- **🏥 Healthcare** - Monitor critical medical equipment and hospital networks
-- **🎓 Education** - Manage university campus networks and IT infrastructure
-- **🌐 MSPs** - Multi-tenant monitoring for managed service providers
-- **🏢 Enterprises** - Corporate network monitoring with branch office support
-- **☁️ Cloud Providers** - Infrastructure monitoring across data centers
-
-### Common Scenarios
-
-✅ **Geographic Distribution** - Devices spread across multiple cities/countries
-✅ **Large Scale** - 1,000+ devices requiring centralized monitoring
-✅ **Multi-Tenant** - Different teams/departments with isolated access
-✅ **Compliance** - Audit logging and access control requirements
-✅ **Reporting** - Executive dashboards and SLA compliance reports
-✅ **Diagnostics** - Advanced troubleshooting and root cause analysis
-
----
-
-## 🔐 Security Features
-
-### Built-in Security
-
-- ✅ **JWT Authentication** - Secure, stateless authentication
-- ✅ **Argon2 Password Hashing** - Industry-leading password security
-- ✅ **RBAC** - Four permission levels with granular access control
-- ✅ **Rate Limiting** - Prevent API abuse (configurable limits)
-- ✅ **CORS Protection** - Configurable cross-origin policies
-- ✅ **SQL Injection Prevention** - Parameterized queries via SQLAlchemy
-- ✅ **XSS Protection** - Content Security Policy headers
-- ✅ **CSRF Protection** - Token-based CSRF prevention
-- ✅ **Secure Headers** - HSTS, X-Frame-Options, X-Content-Type-Options
-- ✅ **Input Validation** - Pydantic schema validation
-- ✅ **Audit Logging** - Complete activity tracking
-- ✅ **Session Management** - Secure token lifecycle
-
-### Security Best Practices
-
-See [docs/SECURITY.md](docs/SECURITY.md) for:
-- SSL/TLS configuration
-- Reverse proxy setup
-- Firewall rules
-- Database hardening
-- Secret management
-- Vulnerability scanning
-
----
-
-## 📊 Performance
-
-### Benchmarks
-
-- **API Response Time**: < 50ms (avg)
-- **WebSocket Latency**: < 10ms
-- **Dashboard Load**: < 2 seconds
-- **Concurrent Users**: 100+ (single instance)
-- **Device Capacity**: 10,000+ devices
-- **Database Queries**: Optimized with indexes
-- **Memory Footprint**: ~500MB (base)
-
-### Scaling
-
-- **Horizontal Scaling**: Load balancer ready
-- **Database**: PostgreSQL with read replicas
-- **Caching**: Redis integration available
-- **Queue System**: Celery for background tasks
-- **Monitoring**: Prometheus metrics endpoint
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Workflow
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/AmazingFeature`)
-3. **Commit** your changes (`git commit -m 'Add some AmazingFeature'`)
-4. **Push** to the branch (`git push origin feature/AmazingFeature`)
-5. **Open** a Pull Request
+# Frontend tests
+cd frontend
+npm run test
+```
 
 ### Code Quality
 
-This project uses:
-- **Black** - Code formatting (100 char line length)
-- **isort** - Import sorting
-- **Ruff** - Fast Python linter
-- **Bandit** - Security vulnerability scanner
-- **pre-commit** - Automated pre-commit hooks
-
 ```bash
-# Setup pre-commit hooks
-pre-commit install
-
-# Run linters manually
-black .
-isort .
+# Python linting
 ruff check .
-bandit -r . -c pyproject.toml
+black .
+
+# Frontend linting
+cd frontend
+npm run lint
 ```
 
+## API Documentation
+
+Interactive API documentation is available at:
+- **Swagger UI**: http://localhost:5001/docs
+- **ReDoc**: http://localhost:5001/redoc
+
+### Authentication
+
+All API endpoints require JWT authentication (except `/auth/token`).
+
+```bash
+# Get access token
+curl -X POST "http://localhost:5001/auth/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=admin"
+
+# Use token in requests
+curl -X GET "http://localhost:5001/api/v1/devices" \
+  -H "Authorization: Bearer <your_token>"
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Database Connection Errors:**
+```bash
+# Check PostgreSQL is running
+docker-compose ps postgres
+
+# View PostgreSQL logs
+docker-compose logs postgres
+```
+
+**SNMP Polling Failures:**
+- Verify SNMP is enabled on target devices
+- Check firewall rules (UDP port 161)
+- Validate SNMP community string/credentials
+
+**Frontend Build Errors:**
+```bash
+# Clear cache and rebuild
+cd frontend
+rm -rf node_modules dist
+npm install
+npm run build
+```
+
+**Redis Connection Issues:**
+```bash
+# Test Redis connectivity
+redis-cli -h localhost -p 6379 ping
+```
+
+### Logs
+
+View application logs:
+```bash
+# Docker deployment
+docker-compose logs -f api
+docker-compose logs -f celery-worker
+
+# Manual installation
+tail -f logs/ward_flux.log
+```
+
+## Performance Tuning
+
+### Recommended Settings
+
+**For 100-500 devices:**
+- Celery workers: 4
+- Polling interval: 120s
+- Redis memory: 512MB
+- PostgreSQL shared_buffers: 256MB
+
+**For 500-2000 devices:**
+- Celery workers: 8
+- Polling interval: 180s
+- Redis memory: 2GB
+- PostgreSQL shared_buffers: 1GB
+
+### Scaling
+
+For large deployments (2000+ devices):
+1. Use dedicated PostgreSQL server
+2. Scale Celery workers horizontally
+3. Implement Redis clustering
+4. Use external VictoriaMetrics cluster
+
+## Security Best Practices
+
+1. **Change Default Passwords**: Update admin password immediately
+2. **Use Strong Encryption Keys**: Generate random keys for production
+3. **Enable HTTPS**: Use Nginx with SSL certificates
+4. **Restrict Network Access**: Firewall rules for production deployments
+5. **Regular Updates**: Keep dependencies up to date
+6. **Backup Database**: Implement automated backup strategy
+7. **Monitor Logs**: Regular security audit log review
+
+## Backup and Recovery
+
+### Backup Database
+```bash
+# PostgreSQL backup
+docker-compose exec postgres pg_dump -U ward ward_flux > backup.sql
+
+# SQLite backup
+cp data/ward_flux.db data/ward_flux.db.backup
+```
+
+### Restore Database
+```bash
+# PostgreSQL restore
+docker-compose exec -T postgres psql -U ward ward_flux < backup.sql
+
+# SQLite restore
+cp data/ward_flux.db.backup data/ward_flux.db
+```
+
+## Contributing
+
+We welcome contributions! Please follow these guidelines:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Submit a pull request
+
+## Support
+
+For issues and questions:
+- GitHub Issues: https://github.com/ward-tech-solutions/ward-flux/issues
+- Documentation: https://github.com/ward-tech-solutions/ward-flux/wiki
+
+## License
+
+MIT License
+
+Copyright (c) 2025 WARD Tech Solutions
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Acknowledgments
+
+- Built with FastAPI, React, and VictoriaMetrics
+- Network monitoring powered by PySNMP
+- Geographic visualization with Leaflet
+- UI components styled with TailwindCSS
+
 ---
 
-## 📜 License
-
-**Proprietary License** - WARD Tech Solutions
-
-This software is proprietary and confidential. Unauthorized copying, distribution, or use is strictly prohibited.
-
-For licensing inquiries: **sales@wardops.tech**
-
----
-
-## 📞 Support
-
-### Community
-- **GitHub Issues**: [Report bugs or request features](https://github.com/ward-tech-solutions/ward-monitor/issues)
-- **Discussions**: [Ask questions and share ideas](https://github.com/ward-tech-solutions/ward-monitor/discussions)
-- **Documentation**: [Full documentation](docs/)
-
-### Commercial
-- **Email**: support@wardops.tech
-- **Sales**: sales@wardops.tech
-- **Website**: https://wardops.tech
-- **Enterprise Support**: Priority support with SLA
-
----
-
-## 🗺️ Roadmap
-
-### Q1 2025
-- [ ] Multi-language support (i18n)
-- [ ] Advanced alerting rules engine
-- [ ] Mobile app (iOS/Android)
-- [ ] Slack/Teams/Discord integrations
-
-### Q2 2025
-- [ ] Machine learning for anomaly prediction
-- [ ] Custom dashboard builder
-- [ ] GraphQL API
-- [ ] Kubernetes deployment charts
-
-### Q3 2025
-- [ ] Network automation workflows
-- [ ] Change management system
-- [ ] Capacity planning tools
-- [ ] Advanced reporting engine
-
-See [ROADMAP.md](docs/ROADMAP.md) for the complete roadmap.
-
----
-
-## 🙏 Acknowledgments
-
-Built with these amazing technologies:
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
-- [Zabbix](https://www.zabbix.com/) - Enterprise monitoring solution
-- [SQLAlchemy](https://www.sqlalchemy.org/) - Python SQL toolkit
-- [Uvicorn](https://www.uvicorn.org/) - Lightning-fast ASGI server
-- [Pydantic](https://pydantic-docs.helpmanual.io/) - Data validation
-- [Leaflet](https://leafletjs.com/) - Interactive maps
-
----
-
-## 📈 Statistics
-
-![GitHub stars](https://img.shields.io/github/stars/ward-tech-solutions/ward-monitor?style=social)
-![GitHub forks](https://img.shields.io/github/forks/ward-tech-solutions/ward-monitor?style=social)
-![GitHub watchers](https://img.shields.io/github/watchers/ward-tech-solutions/ward-monitor?style=social)
-
-![Lines of Code](https://img.shields.io/badge/Lines%20of%20Code-15K+-blue)
-![Modules](https://img.shields.io/badge/Modules-11%20Routers-green)
-![API Endpoints](https://img.shields.io/badge/API%20Endpoints-60%2B-brightgreen)
-![Test Coverage](https://img.shields.io/badge/Test%20Coverage-85%25-success)
-
----
-
-<div align="center">
-
-### Made with ❤️ by WARD Tech Solutions
-
-**[Website](https://wardops.tech)** • **[Documentation](docs/)** • **[API Docs](http://localhost:5001/docs)** • **[Support](mailto:support@wardops.tech)**
-
-Copyright © 2025 WARD Tech Solutions. All rights reserved.
-
-</div>
+**WARD FLUX v2.0** - Enterprise Network Monitoring Platform

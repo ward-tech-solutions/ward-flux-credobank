@@ -1,18 +1,14 @@
-# ═══════════════════════════════════════════════════════════════════
-# WARD TECH SOLUTIONS - Docker Compose Configuration
-# ═══════════════════════════════════════════════════════════════════
-
 version: '3.8'
 
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     container_name: ward-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-ward_ops}
-      POSTGRES_USER: ${POSTGRES_USER:-ward_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_secure_password}
+      POSTGRES_DB: ward_flux
+      POSTGRES_USER: ward
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
@@ -20,44 +16,45 @@ services:
     networks:
       - ward-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ward_admin}"]
+      test: ["CMD-SHELL", "pg_isready -U ward"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
-  # Redis - Message broker for Celery
+  # Redis - Task Queue & Cache
   redis:
     image: redis:7-alpine
     container_name: ward-redis
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
+    ports:
+      - "6379:6379"
     networks:
       - ward-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
-      timeout: 3s
+      timeout: 5s
       retries: 5
     restart: unless-stopped
-    command: redis-server --appendonly yes
 
-  # VictoriaMetrics - Time-series database for metrics
+  # VictoriaMetrics - Time-Series Database
   victoriametrics:
     image: victoriametrics/victoria-metrics:latest
     container_name: ward-victoriametrics
+    command:
+      - '--storageDataPath=/victoria-metrics-data'
+      - '--httpListenAddr=:8428'
+      - '--retentionPeriod=12'
+      - '--search.maxQueryDuration=60s'
+    volumes:
+      - victoria-data:/victoria-metrics-data
     ports:
       - "8428:8428"
-    volumes:
-      - vm-data:/victoria-metrics-data
     networks:
       - ward-network
-    command:
-      - "-storageDataPath=/victoria-metrics-data"
-      - "-retentionPeriod=12"
-      - "-httpListenAddr=:8428"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8428/health"]
       interval: 30s
@@ -65,27 +62,26 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # WARD Application
-  ward-app:
-    build: .
-    container_name: ward-tech-solutions
-    image: wardtechsolutions/network-monitor:latest
+  # WARD FLUX API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ward-api
+    environment:
+      - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - VICTORIA_URL=http://victoriametrics:8428
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - ZABBIX_URL=${ZABBIX_URL}
+      - ZABBIX_USER=${ZABBIX_USER}
+      - ZABBIX_PASSWORD=${ZABBIX_PASSWORD}
+    volumes:
+      - ./logs:/app/logs
+      - api-data:/data
     ports:
       - "5001:5001"
-    volumes:
-      - ward-data:/app/data
-      - ward-logs:/app/logs
-    environment:
-      - DEBUG=False
-      - PORT=5001
-      - SETUP_MODE=enabled
-      # Database configuration
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-ward_admin}:${POSTGRES_PASSWORD:-changeme_secure_password}@postgres:5432/${POSTGRES_DB:-ward_ops}
-      - USE_POSTGRES=true
-      # Monitoring configuration
-      - REDIS_URL=redis://redis:6379/0
-      - VICTORIA_URL=http://victoriametrics:8428
-      - WARD_ENCRYPTION_KEY=${WARD_ENCRYPTION_KEY:-generate_a_secure_key_here}
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,69 +89,116 @@ services:
         condition: service_healthy
       victoriametrics:
         condition: service_healthy
-    restart: unless-stopped
+    networks:
+      - ward-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - ward-network
+    restart: unless-stopped
 
-  # Celery Worker - Background task processor
+  # Celery Worker - SNMP Polling
   celery-worker:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: ward-celery-worker
-    command: celery -A monitoring.celery_app worker --loglevel=info --concurrency=4
-    volumes:
-      - ward-data:/app/data
-      - ward-logs:/app/logs
+    command: celery -A celery_app worker --loglevel=info --concurrency=4
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-ward_admin}:${POSTGRES_PASSWORD:-changeme_secure_password}@postgres:5432/${POSTGRES_DB:-ward_ops}
-      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - VICTORIA_URL=http://victoriametrics:8428
-      - WARD_ENCRYPTION_KEY=${WARD_ENCRYPTION_KEY:-generate_a_secure_key_here}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    volumes:
+      - ./logs:/app/logs
+      - celery-data:/data
     depends_on:
-      - redis
-      - postgres
-      - victoriametrics
-    restart: unless-stopped
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      victoriametrics:
+        condition: service_healthy
     networks:
       - ward-network
+    restart: unless-stopped
 
-  # Celery Beat - Task scheduler
+  # Celery Beat - Task Scheduler
   celery-beat:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: ward-celery-beat
-    command: celery -A monitoring.celery_app beat --loglevel=info
-    volumes:
-      - ward-data:/app/data
-      - ward-logs:/app/logs
+    command: celery -A celery_app beat --loglevel=info
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-ward_admin}:${POSTGRES_PASSWORD:-changeme_secure_password}@postgres:5432/${POSTGRES_DB:-ward_ops}
-      - REDIS_URL=redis://redis:6379/0
-      - VICTORIA_URL=http://victoriametrics:8428
-      - WARD_ENCRYPTION_KEY=${WARD_ENCRYPTION_KEY:-generate_a_secure_key_here}
+      - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    volumes:
+      - ./logs:/app/logs
+      - beat-data:/data
     depends_on:
-      - redis
-      - postgres
-    restart: unless-stopped
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - ward-network
+    restart: unless-stopped
+
+  # Grafana - Metrics Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ward-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - victoriametrics
+    networks:
+      - ward-network
+    restart: unless-stopped
+
+  # Nginx - Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: ward-nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+      - grafana
+    networks:
+      - ward-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  postgres-data:
+  redis-data:
+  victoria-data:
+  grafana-data:
+  api-data:
+  celery-data:
+  beat-data:
 
 networks:
   ward-network:
     driver: bridge
-
-volumes:
-  postgres-data:
-    driver: local
-  ward-data:
-    driver: local
-  ward-logs:
-    driver: local
-  redis-data:
-    driver: local
-  vm-data:
-    driver: local
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

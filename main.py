@@ -217,10 +217,16 @@ from routers import (
     config,
     dashboard,
     devices,
+    devices_standalone,
     diagnostics,
+    discovery,
     infrastructure,
+    monitoring,
     pages,
     reports,
+    settings,
+    snmp_credentials,
+    templates,
     websockets,
     zabbix,
 )
@@ -230,12 +236,18 @@ app.include_router(pages.router)
 app.include_router(config.router)
 app.include_router(bulk.router)
 app.include_router(devices.router)
+app.include_router(devices_standalone.router)
+app.include_router(snmp_credentials.router)
+app.include_router(templates.router)
+app.include_router(discovery.router)
 app.include_router(reports.router)
+app.include_router(settings.router)
 app.include_router(zabbix.router)
 app.include_router(dashboard.router)
 app.include_router(diagnostics.router)
 app.include_router(websockets.router)
 app.include_router(infrastructure.router)
+app.include_router(monitoring.router)
 
 # ============================================
 # Security Middleware
@@ -308,15 +320,19 @@ def url_for(endpoint: str, **values):
     """Flask-compatible url_for function for Jinja2 templates"""
     if endpoint == "static":
         filename = values.get("filename", "")
-        return f"/static/{filename}"
+        return f"/admin/static/{filename}"
     return f"/{endpoint}"
 
 
-# Mount static files and create templates
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# Mount old UI at /admin (legacy/disaster recovery)
+app.mount("/admin/static", StaticFiles(directory="DisasterRecovery/old_ui/static"), name="admin_static")
+templates = Jinja2Templates(directory="DisasterRecovery/old_ui/templates")
 templates.env.auto_reload = True  # Force template reload for development
 templates.env.globals["url_for"] = url_for
+
+# Mount new React UI static files
+app.mount("/assets", StaticFiles(directory="static_new/assets"), name="assets")
+app.mount("/static", StaticFiles(directory="static_new"), name="static")
 
 
 # Helper function to run sync code in thread pool
@@ -892,18 +908,41 @@ async def stream_updates_legacy():
 # ============================================
 # Frontend Routes (Serve React App)
 # ============================================
-# Note: In development, React runs on port 3000 (npm run dev)
-# In production, build React first (npm run build), then uncomment below:
 
-# @app.get("/", response_class=HTMLResponse)
-# async def index(request: Request):
-#     """Serve React app"""
-#     return templates.TemplateResponse("index.html", {"request": request})
-#
-# @app.get("/{full_path:path}", response_class=HTMLResponse)
-# async def catch_all(request: Request, full_path: str):
-#     """Catch all routes for React Router"""
-#     return templates.TemplateResponse("index.html", {"request": request})
+from fastapi.responses import FileResponse
+
+# Serve new React UI as default
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    """Serve React app"""
+    return FileResponse("static_new/index.html")
+
+# Serve old UI at /admin
+@app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin/", response_class=HTMLResponse)
+async def admin_index(request: Request):
+    """Serve old UI (disaster recovery)"""
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+# Serve static files from root (logo, favicon, etc.)
+@app.get("/logo-ward.svg")
+async def serve_logo():
+    """Serve WARD logo"""
+    return FileResponse("static_new/logo-ward.svg")
+
+@app.get("/favicon.svg")
+async def serve_favicon():
+    """Serve favicon"""
+    return FileResponse("static_new/favicon.svg")
+
+# Catch all routes for React Router (except API and admin routes)
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+async def catch_all(request: Request, full_path: str):
+    """Catch all routes for React Router"""
+    # Don't catch API routes or admin routes
+    if full_path.startswith("api/") or full_path.startswith("admin/"):
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse("static_new/index.html")
 
 # ============================================
 # SSH Terminal API

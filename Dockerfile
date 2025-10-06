@@ -1,48 +1,85 @@
-# ═══════════════════════════════════════════════════════════════════
-# WARD TECH SOLUTIONS - Docker Configuration
-# ═══════════════════════════════════════════════════════════════════
+# WARD FLUX - Production Docker Image
+# Multi-stage build for minimal image size
 
-FROM python:3.11-slim
+# Stage 1: Build React Frontend
+FROM node:20-alpine as frontend-builder
 
-# Set working directory
+WORKDIR /frontend
+
+# Copy frontend package files
+COPY frontend/package*.json ./
+
+# Install frontend dependencies
+RUN npm ci --prefer-offline --no-audit
+
+# Copy frontend source
+COPY frontend/ ./
+
+# Build React app
+RUN npm run build
+
+# Stage 2: Build Python Dependencies
+FROM python:3.11-slim as python-builder
+
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
-    traceroute \
-    iputils-ping \
+    g++ \
+    libpq-dev \
+    libsnmp-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first (for better caching)
+# Copy requirements
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Add build argument to bust cache for fresh builds
-ARG CACHEBUST=1
+# Stage 3: Production Image
+FROM python:3.11-slim
+
+# Create non-root user
+RUN useradd -m -u 1000 ward && \
+    mkdir -p /app /data /logs && \
+    chown -R ward:ward /app /data /logs
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    libsnmp40 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python packages from builder
+COPY --from=python-builder /root/.local /home/ward/.local
+
+# Copy built frontend from frontend-builder
+COPY --from=frontend-builder --chown=ward:ward /frontend/dist /app/static
 
 # Copy application code
-COPY . .
-
-# Create necessary directories
-RUN mkdir -p /app/data /app/logs /app/static /app/templates
-
-# Initialize database tables (setup wizard will be shown on first run)
-RUN python init_setup_db.py || true
+COPY --chown=ward:ward . .
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PORT=5001
-ENV SETUP_MODE=enabled
+ENV PATH=/home/ward/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DATABASE_PATH=/data/ward_flux.db \
+    REDIS_URL=redis://redis:6379/0 \
+    VICTORIA_URL=http://victoriametrics:8428
+
+# Switch to non-root user
+USER ward
 
 # Expose port
 EXPOSE 5001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5001/api/v1/health')" || exit 0
+    CMD curl -f http://localhost:5001/api/v1/health || exit 1
 
-# Run application
-CMD ["python", "run.py"]
+# Default command
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5001"]

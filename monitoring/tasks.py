@@ -374,3 +374,101 @@ def _sanitize_metric_name(name: str) -> str:
         sanitized = sanitized.replace("__", "_")
 
     return sanitized.strip("_")
+
+
+# ============================================
+# Discovery Tasks
+# ============================================
+
+@shared_task(bind=True, name="monitoring.tasks.run_scheduled_discovery")
+def run_scheduled_discovery(self):
+    """
+    Run all scheduled discovery rules
+
+    Checks for discovery rules that are due to run and executes them
+    """
+    from models import DiscoveryRule, DiscoveryJob
+    from routers.discovery import run_discovery_scan
+    import uuid
+    from datetime import datetime
+
+    db = SessionLocal()
+    try:
+        # Find rules that are due to run
+        now = datetime.utcnow()
+        rules = db.query(DiscoveryRule).filter(
+            DiscoveryRule.enabled == True,
+            DiscoveryRule.schedule_enabled == True,
+            DiscoveryRule.next_run <= now
+        ).all()
+
+        logger.info(f"Found {len(rules)} discovery rules to run")
+
+        for rule in rules:
+            try:
+                # Create job
+                job = DiscoveryJob(
+                    id=uuid.uuid4(),
+                    rule_id=rule.id,
+                    status='running',
+                    triggered_by='scheduled'
+                )
+                db.add(job)
+                db.commit()
+                db.refresh(job)
+
+                # Run discovery in background
+                logger.info(f"Starting scheduled discovery for rule {rule.name}")
+
+                # Calculate next run time from cron expression
+                if rule.schedule_cron:
+                    from croniter import croniter
+                    cron = croniter(rule.schedule_cron, now)
+                    rule.next_run = cron.get_next(datetime)
+
+                # Run the scan
+                asyncio.run(run_discovery_scan(str(job.id), str(rule.id)))
+
+            except Exception as e:
+                logger.error(f"Error running discovery rule {rule.name}: {e}", exc_info=True)
+
+        db.commit()
+
+    except Exception as e:
+        logger.error(f"Error in scheduled discovery: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
+@shared_task(bind=True, name="monitoring.tasks.cleanup_old_discovery_results")
+def cleanup_old_discovery_results(self, days: int = 30):
+    """
+    Cleanup old discovery results
+
+    Args:
+        days: Number of days to keep results
+    """
+    from models import DiscoveryResult
+    from datetime import datetime, timedelta
+
+    db = SessionLocal()
+    try:
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+        # Delete old results that were not imported
+        deleted = db.query(DiscoveryResult).filter(
+            DiscoveryResult.discovered_at < cutoff_date,
+            DiscoveryResult.status != 'imported'
+        ).delete()
+
+        db.commit()
+        logger.info(f"Cleaned up {deleted} old discovery results")
+
+        return {"deleted": deleted}
+
+    except Exception as e:
+        logger.error(f"Error cleaning up discovery results: {e}", exc_info=True)
+        db.rollback()
+        raise
+    finally:
+        db.close()

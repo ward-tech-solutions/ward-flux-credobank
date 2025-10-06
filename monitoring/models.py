@@ -1,317 +1,289 @@
 """
-WARD FLUX - Monitoring Database Models
-
-SQLAlchemy models for standalone monitoring engine.
+WARD FLUX - Monitoring Models
+Database models for standalone monitoring system
 """
 
 import uuid
 from datetime import datetime
-from typing import Optional
-from sqlalchemy import Column, String, Integer, Boolean, Text, DateTime, ForeignKey, JSON, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-import enum
-
+from enum import Enum
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, JSON, UUID as SQLAlchemyUUID, Enum as SQLAlchemyEnum
 from database import Base
 
 
-class MonitoringMode(enum.Enum):
-    """Monitoring mode enumeration"""
+# ============================================
+# Enums
+# ============================================
 
-    ZABBIX = "zabbix"
-    STANDALONE = "standalone"
-    HYBRID = "hybrid"
+class MonitoringMode(str, Enum):
+    """Monitoring mode selection"""
+    ZABBIX = "ZABBIX"          # Use Zabbix API only
+    STANDALONE = "STANDALONE"   # Use standalone monitoring only
+    HYBRID = "HYBRID"          # Use both sources
 
 
-class AlertSeverity(enum.Enum):
+class AlertSeverity(str, Enum):
     """Alert severity levels"""
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    INFO = "INFO"
 
-    CRITICAL = "critical"
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-    INFO = "info"
 
+# ============================================
+# Core Models
+# ============================================
 
 class MonitoringProfile(Base):
-    """
-    Monitoring profile - defines which monitoring mode is active
-    """
-
+    """Monitoring profile - defines which mode is active"""
     __tablename__ = "monitoring_profiles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False, unique=True)
-    mode = Column(SQLEnum(MonitoringMode), nullable=False, default=MonitoringMode.STANDALONE)
-    is_active = Column(Boolean, default=False, nullable=False)
+    mode = Column(SQLAlchemyEnum(MonitoringMode), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=False)
     description = Column(Text)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    def __repr__(self):
-        return f"<MonitoringProfile(name='{self.name}', mode='{self.mode.value}', active={self.is_active})>"
+class StandaloneDevice(Base):
+    """Standalone devices - independent of Zabbix"""
+    __tablename__ = "standalone_devices"
+
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(200), nullable=False)
+    ip = Column(String(45), nullable=False)  # IPv4 or IPv6
+    hostname = Column(String(255))
+    vendor = Column(String(100))  # Cisco, Fortinet, Juniper, etc.
+    device_type = Column(String(100))  # router, switch, firewall, server, etc.
+    model = Column(String(100))
+    location = Column(String(200))
+    description = Column(Text)
+    enabled = Column(Boolean, nullable=False, default=True)
+
+    # Auto-discovery metadata
+    discovered_at = Column(DateTime)
+    last_seen = Column(DateTime)
+
+    # Organization/grouping
+    tags = Column(JSON)  # ["production", "core", "datacenter-1"]
+    custom_fields = Column(JSON)  # Flexible key-value storage
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class SNMPCredential(Base):
-    """
-    SNMP credentials for devices
-    Supports SNMPv2c and SNMPv3 with encrypted storage
-    """
-
+    """SNMP credentials (v2c/v3) - encrypted storage"""
     __tablename__ = "snmp_credentials"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    device_id = Column(UUID(as_uuid=True), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
-    version = Column(String(10), nullable=False)  # "v2c" or "v3"
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    device_id = Column(SQLAlchemyUUID(as_uuid=True), nullable=False, index=True)
+    version = Column(String(10), nullable=False)  # v2c or v3
 
     # SNMPv2c
-    community_encrypted = Column(Text)  # Encrypted community string
+    community_encrypted = Column(Text)
 
     # SNMPv3
     username = Column(String(100))
-    auth_protocol = Column(String(20))  # MD5, SHA, SHA224, SHA256, SHA384, SHA512
-    auth_key_encrypted = Column(Text)  # Encrypted authentication key
-    priv_protocol = Column(String(20))  # DES, 3DES, AES, AES192, AES256
-    priv_key_encrypted = Column(Text)  # Encrypted privacy key
+    auth_protocol = Column(String(20))  # MD5, SHA
+    auth_key_encrypted = Column(Text)
+    priv_protocol = Column(String(20))  # DES, AES
+    priv_key_encrypted = Column(Text)
     security_level = Column(String(20))  # noAuthNoPriv, authNoPriv, authPriv
 
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    # Relationships
-    device = relationship("Device", backref="snmp_credentials")
-
-    def __repr__(self):
-        return f"<SNMPCredential(device_id='{self.device_id}', version='{self.version}')>"
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class MonitoringTemplate(Base):
-    """
-    Monitoring templates with items and triggers
-    """
-
+    """Monitoring templates - pre-configured monitoring items"""
     __tablename__ = "monitoring_templates"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(200), nullable=False, unique=True)
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), nullable=False, unique=True)
     description = Column(Text)
-    vendor = Column(String(100))  # Cisco, Fortinet, Generic, etc.
-    device_types = Column(JSON)  # ["router", "switch", "firewall"]
-    items = Column(JSON, nullable=False)  # List of monitoring items
-    triggers = Column(JSON)  # List of alert triggers
-    is_builtin = Column(Boolean, default=False)  # Built-in vs custom template
+    vendor = Column(String(100))  # Cisco, Fortinet, etc.
+    device_types = Column(JSON)  # ["router", "switch"]
 
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    # Template items (OIDs to monitor)
+    items = Column(JSON)  # [{"name": "CPU", "oid": "...", "interval": 60}]
 
-    def __repr__(self):
-        return f"<MonitoringTemplate(name='{self.name}', vendor='{self.vendor}')>"
+    # Alert triggers
+    triggers = Column(JSON)  # [{"name": "High CPU", "expression": "cpu > 90"}]
+
+    # Metadata
+    is_default = Column(Boolean, default=False)
+    created_by = Column(SQLAlchemyUUID(as_uuid=True))
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class MonitoringItem(Base):
-    """
-    Individual monitoring items (metrics to collect)
-    """
-
+    """Individual monitoring items - what to monitor"""
     __tablename__ = "monitoring_items"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    device_id = Column(UUID(as_uuid=True), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
-    template_id = Column(UUID(as_uuid=True), ForeignKey("monitoring_templates.id", ondelete="SET NULL"))
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    device_id = Column(SQLAlchemyUUID(as_uuid=True), nullable=False, index=True)
+    template_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("monitoring_templates.id"))
 
-    name = Column(String(200), nullable=False)
+    # Item definition
+    oid_name = Column(String(100), nullable=False)
     oid = Column(String(200), nullable=False)
-    interval_seconds = Column(Integer, default=60, nullable=False)
-    value_type = Column(String(20), nullable=False)  # integer, counter32, counter64, string, gauge
-    units = Column(String(20))
-    is_table = Column(Boolean, default=False)  # Is this a table OID (walk required)
-    enabled = Column(Boolean, default=True, nullable=False)
+    interval = Column(Integer, nullable=False, default=60)  # seconds
 
-    # Custom parameters
-    params = Column(JSON)  # Additional parameters (thresholds, calculations, etc.)
+    # Value processing
+    value_type = Column(String(20), default="integer")  # integer, float, string, gauge, counter
+    units = Column(String(20))  # %, bytes, bps, etc.
 
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    # Item status
+    enabled = Column(Boolean, nullable=False, default=True)
+    last_poll = Column(DateTime)
+    last_value = Column(Text)
+    last_error = Column(Text)
 
-    # Relationships
-    device = relationship("Device", backref="monitoring_items")
-    template = relationship("MonitoringTemplate", backref="monitoring_items")
-
-    def __repr__(self):
-        return f"<MonitoringItem(name='{self.name}', oid='{self.oid}', device_id='{self.device_id}')>"
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class AlertRule(Base):
-    """
-    Alert rules with trigger expressions
-    """
-
+    """Alert rules - threshold-based alerting"""
     __tablename__ = "alert_rules"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    device_id = Column(SQLAlchemyUUID(as_uuid=True), index=True)  # Nullable for global rules
+
+    # Rule definition
     name = Column(String(200), nullable=False)
     description = Column(Text)
-    expression = Column(Text, nullable=False)  # Alert trigger expression
-    severity = Column(SQLEnum(AlertSeverity), nullable=False, default=AlertSeverity.MEDIUM)
-    enabled = Column(Boolean, default=True, nullable=False)
+    expression = Column(String(500), nullable=False)  # e.g., "cpu_usage > 90"
+    severity = Column(SQLAlchemyEnum(AlertSeverity), nullable=False)
 
     # Notification settings
     notification_channels = Column(JSON)  # ["email", "webhook", "sms"]
-    notification_recipients = Column(JSON)  # Email addresses, webhook URLs, etc.
+    notification_config = Column(JSON)  # Email addresses, webhook URLs, etc.
 
-    # Conditions
-    device_id = Column(UUID(as_uuid=True), ForeignKey("devices.id", ondelete="CASCADE"))  # Optional: specific device
-    device_group = Column(String(100))  # Optional: device group filter
-    monitoring_item_id = Column(UUID(as_uuid=True), ForeignKey("monitoring_items.id", ondelete="CASCADE"))
+    # Rule behavior
+    enabled = Column(Boolean, nullable=False, default=True)
+    evaluation_interval = Column(Integer, default=60)  # seconds
+    for_duration = Column(Integer, default=300)  # Alert after condition is true for X seconds
 
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    # Relationships
-    device = relationship("Device", backref="alert_rules")
-    monitoring_item = relationship("MonitoringItem", backref="alert_rules")
-
-    def __repr__(self):
-        return f"<AlertRule(name='{self.name}', severity='{self.severity.value}', enabled={self.enabled})>"
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class AlertHistory(Base):
-    """
-    Alert history and acknowledgments
-    """
-
+    """Alert history - triggered alerts"""
     __tablename__ = "alert_history"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    rule_id = Column(UUID(as_uuid=True), ForeignKey("alert_rules.id", ondelete="CASCADE"), nullable=False)
-    device_id = Column(UUID(as_uuid=True), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    rule_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("alert_rules.id"), nullable=False)
+    device_id = Column(SQLAlchemyUUID(as_uuid=True), index=True)
 
-    severity = Column(SQLEnum(AlertSeverity), nullable=False)
+    # Alert details
+    severity = Column(SQLAlchemyEnum(AlertSeverity), nullable=False)
     message = Column(Text, nullable=False)
-    details = Column(JSON)  # Additional alert details
+    value = Column(String(100))  # Value that triggered the alert
 
-    # Status
-    triggered_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    acknowledged = Column(Boolean, default=False, nullable=False)
-    acknowledged_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    # Alert lifecycle
+    triggered_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    acknowledged = Column(Boolean, default=False)
+    acknowledged_by = Column(SQLAlchemyUUID(as_uuid=True))  # User ID
     acknowledged_at = Column(DateTime)
     resolved_at = Column(DateTime)
 
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    # Notification tracking
+    notifications_sent = Column(JSON)  # [{"channel": "email", "sent_at": "..."}]
 
-    # Relationships
-    rule = relationship("AlertRule", backref="alert_history")
-    device = relationship("Device", backref="alert_history")
-
-    def __repr__(self):
-        return f"<AlertHistory(rule_id='{self.rule_id}', severity='{self.severity.value}', triggered={self.triggered_at})>"
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class DiscoveryRule(Base):
-    """
-    Network discovery rules
-    """
-
+    """Network discovery rules - auto-discover devices"""
     __tablename__ = "discovery_rules"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(200), nullable=False)
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), nullable=False, unique=True)
     description = Column(Text)
-    network_range = Column(String(100), nullable=False)  # CIDR notation: "192.168.1.0/24"
-    enabled = Column(Boolean, default=True, nullable=False)
 
-    # Schedule (cron expression)
-    schedule = Column(String(100))  # e.g., "0 2 * * *" for daily at 2 AM
+    # Discovery scope
+    network_range = Column(String(100), nullable=False)  # "192.168.1.0/24" or "10.0.0.1-10.0.0.254"
 
-    # Discovery settings
-    snmp_discovery = Column(Boolean, default=True)
-    snmp_communities = Column(JSON)  # List of community strings to try
-    ping_only = Column(Boolean, default=False)  # Just ping or full SNMP discovery
+    # Discovery methods
+    ping_scan = Column(Boolean, default=True)
+    snmp_scan = Column(Boolean, default=True)
+    port_scan = Column(Boolean, default=False)
+    ports = Column(JSON)  # [22, 80, 443]
 
-    # Last run
+    # Scheduling
+    enabled = Column(Boolean, default=True)
+    schedule = Column(String(100))  # Cron expression: "0 2 * * *"
     last_run = Column(DateTime)
-    last_devices_found = Column(Integer, default=0)
+    next_run = Column(DateTime)
 
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    # Auto-add settings
+    auto_add_devices = Column(Boolean, default=False)
+    default_template_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("monitoring_templates.id"))
 
-    def __repr__(self):
-        return f"<DiscoveryRule(name='{self.name}', network='{self.network_range}', enabled={self.enabled})>"
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class DiscoveryResult(Base):
-    """
-    Discovery scan results
-    """
-
+    """Discovery results - found devices"""
     __tablename__ = "discovery_results"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    rule_id = Column(UUID(as_uuid=True), ForeignKey("discovery_rules.id", ondelete="CASCADE"), nullable=False)
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    rule_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("discovery_rules.id"), nullable=False)
 
-    ip_address = Column(String(45), nullable=False)  # Supports IPv4 and IPv6
+    # Device info
+    ip_address = Column(String(45), nullable=False)
     hostname = Column(String(255))
     mac_address = Column(String(17))
 
     # Detection results
+    is_alive = Column(Boolean, default=False)
     snmp_reachable = Column(Boolean, default=False)
-    snmp_version = Column(String(10))  # v1, v2c, v3
-    vendor = Column(String(100))
-    device_type = Column(String(50))  # router, switch, firewall, server, etc.
+    snmp_version = Column(String(10))
     sys_descr = Column(Text)
     sys_object_id = Column(String(200))
 
+    # Classification
+    detected_vendor = Column(String(100))
+    detected_type = Column(String(100))
+    open_ports = Column(JSON)
+
     # Status
-    discovered_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    discovered_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     added_to_monitoring = Column(Boolean, default=False)
     added_at = Column(DateTime)
-
-    # Relationships
-    rule = relationship("DiscoveryRule", backref="discovery_results")
-
-    def __repr__(self):
-        return f"<DiscoveryResult(ip='{self.ip_address}', vendor='{self.vendor}', type='{self.device_type}')>"
+    device_id = Column(SQLAlchemyUUID(as_uuid=True))  # Link to created device
 
 
 class MetricBaseline(Base):
-    """
-    Performance baselines for anomaly detection
-    """
-
+    """Performance baselines - normal behavior tracking"""
     __tablename__ = "metric_baselines"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    device_id = Column(UUID(as_uuid=True), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
-    monitoring_item_id = Column(UUID(as_uuid=True), ForeignKey("monitoring_items.id", ondelete="CASCADE"))
-
-    metric_name = Column(String(200), nullable=False)
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    device_id = Column(SQLAlchemyUUID(as_uuid=True), nullable=False, index=True)
+    metric_name = Column(String(100), nullable=False)  # cpu_usage, interface_traffic, etc.
 
     # Baseline statistics
-    min_value = Column(String(50))
-    max_value = Column(String(50))
-    avg_value = Column(String(50))
-    std_deviation = Column(String(50))
+    avg_value = Column(Integer)
+    min_value = Column(Integer)
+    max_value = Column(Integer)
+    std_dev = Column(Integer)
 
-    # Calculation period
-    sample_count = Column(Integer, nullable=False)
-    calculated_from = Column(DateTime, nullable=False)
-    calculated_to = Column(DateTime, nullable=False)
+    # Time context
+    time_period = Column(String(20))  # hourly, daily, weekly
+    hour_of_day = Column(Integer)  # For hourly baselines
+    day_of_week = Column(Integer)  # For daily baselines
 
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    # Metadata
+    sample_count = Column(Integer)
+    last_updated = Column(DateTime)
 
-    # Relationships
-    device = relationship("Device", backref="metric_baselines")
-    monitoring_item = relationship("MonitoringItem", backref="metric_baselines")
-
-    def __repr__(self):
-        return f"<MetricBaseline(device_id='{self.device_id}', metric='{self.metric_name}')>"
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

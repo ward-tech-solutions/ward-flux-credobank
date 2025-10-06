@@ -171,9 +171,25 @@ def init_db():
     """Initialize database and create all tables"""
     # Import all models to ensure they're registered with Base
     try:
-        from models import Organization, SystemConfig, SetupWizardState
+        from models import Organization, SystemConfig, SetupWizardState, Device
     except ImportError:
         pass  # Models might not exist in older versions
+
+    # Import monitoring models
+    try:
+        from monitoring.models import (
+            MonitoringProfile,
+            SNMPCredential,
+            MonitoringTemplate,
+            MonitoringItem,
+            AlertRule,
+            AlertHistory,
+            DiscoveryRule,
+            DiscoveryResult,
+            MetricBaseline,
+        )
+    except ImportError:
+        pass  # Monitoring models might not exist in older versions
 
     # Create all tables
     Base.metadata.create_all(bind=engine)

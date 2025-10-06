@@ -1,0 +1,117 @@
+# ═══════════════════════════════════════════════════════════════════
+# WARD TECH SOLUTIONS - Docker Ignore File
+# Excludes unnecessary files from Docker image builds
+# ═══════════════════════════════════════════════════════════════════
+
+# Git and version control
+.git
+.gitignore
+.gitattributes
+.github
+
+# Development and IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+.claude
+
+# Python cache and temporary files
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments (DO NOT include in Docker images)
+venv/
+ENV/
+env/
+.venv
+
+# Testing artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+tests/
+test_*.py
+*_test.py
+
+# Logs (will be generated in container)
+*.log
+logs/
+
+# Database files (use volumes instead)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+data/*.db
+database.db
+network_monitor.db
+
+# Documentation and markdown files
+*.md
+!README.md
+docs/
+KnowledgeBase/
+DisasterRecovery/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+wheels/
+
+# Frontend build artifacts (will be built in container)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+static_new/
+
+# Development scripts
+setup.sh
+run.py
+
+# Archives and backups
+*.tar.gz
+*.zip
+*.tar
+*.gz
+*.backup
+*.backup2
+*.bak
+*.old
+*.legacy
+*.unused
+
+# Temporary files
+*.tmp
+archive/
+
+# Pre-commit and development tools
+.pre-commit-config.yaml
+pyproject.toml
+pytest.ini
+
+# Docker files themselves (no need in the image)
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Monitoring and SNMP related (optional - uncomment if not needed in production)
+# monitoring/
+# scripts/
+
+# Unnecessary markdown documentation
+PHASE_*.md
+*_COMPLETE.md
+*_STATUS.md
+*_SUMMARY.md
+*_GUIDE.md
+*_FIX.md
+*_REPORT.md

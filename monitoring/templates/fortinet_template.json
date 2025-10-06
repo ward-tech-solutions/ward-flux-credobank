@@ -1,0 +1,251 @@
+{
+  "name": "Fortinet FortiGate Standard",
+  "description": "Standard monitoring template for Fortinet FortiGate firewalls",
+  "vendor": "Fortinet",
+  "device_types": ["firewall", "utm"],
+  "is_default": true,
+  "items": [
+    {
+      "name": "System Description",
+      "oid_name": "sysDescr",
+      "oid": "1.3.6.1.2.1.1.1.0",
+      "interval": 300,
+      "value_type": "string",
+      "units": "",
+      "description": "FortiGate model and FortiOS version"
+    },
+    {
+      "name": "System Uptime",
+      "oid_name": "sysUpTime",
+      "oid": "1.3.6.1.2.1.1.3.0",
+      "interval": 60,
+      "value_type": "integer",
+      "units": "timeticks",
+      "description": "Time since last reboot"
+    },
+    {
+      "name": "CPU Usage",
+      "oid_name": "fgSysCpuUsage",
+      "oid": "1.3.6.1.4.1.12356.101.4.1.3.0",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "%",
+      "description": "Current CPU utilization"
+    },
+    {
+      "name": "Memory Usage",
+      "oid_name": "fgSysMemUsage",
+      "oid": "1.3.6.1.4.1.12356.101.4.1.4.0",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "%",
+      "description": "Current memory utilization"
+    },
+    {
+      "name": "Disk Usage",
+      "oid_name": "fgSysDiskUsage",
+      "oid": "1.3.6.1.4.1.12356.101.4.1.6.0",
+      "interval": 300,
+      "value_type": "gauge",
+      "units": "%",
+      "description": "Hard disk utilization"
+    },
+    {
+      "name": "Active Sessions",
+      "oid_name": "fgSysSesCount",
+      "oid": "1.3.6.1.4.1.12356.101.4.1.8.0",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "sessions",
+      "description": "Current number of active sessions"
+    },
+    {
+      "name": "Session Rate (1min)",
+      "oid_name": "fgSysSesRate1",
+      "oid": "1.3.6.1.4.1.12356.101.4.1.11.0",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "sessions/sec",
+      "description": "New session rate over last minute"
+    },
+    {
+      "name": "VPN SSL State",
+      "oid_name": "fgVpnSslState",
+      "oid": "1.3.6.1.4.1.12356.101.12.2.2.1.1",
+      "interval": 120,
+      "value_type": "integer",
+      "units": "",
+      "description": "SSL VPN tunnel state (1=up)",
+      "is_table": true
+    },
+    {
+      "name": "VPN SSL Users",
+      "oid_name": "fgVpnSslStatsLoginUsers",
+      "oid": "1.3.6.1.4.1.12356.101.12.2.3.1.2",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "users",
+      "description": "Number of SSL VPN users connected"
+    },
+    {
+      "name": "VPN IPSec Tunnel Status",
+      "oid_name": "fgVpnTunEntStatus",
+      "oid": "1.3.6.1.4.1.12356.101.12.2.2.1.20",
+      "interval": 60,
+      "value_type": "integer",
+      "units": "",
+      "description": "IPSec tunnel status (1=down, 2=up)",
+      "is_table": true
+    },
+    {
+      "name": "HA Mode",
+      "oid_name": "fgHaSystemMode",
+      "oid": "1.3.6.1.4.1.12356.101.13.1.1.0",
+      "interval": 300,
+      "value_type": "integer",
+      "units": "",
+      "description": "HA mode (1=standalone, 2=a-a, 3=a-p)"
+    },
+    {
+      "name": "HA Cluster Status",
+      "oid_name": "fgHaStatsClusterUptime",
+      "oid": "1.3.6.1.4.1.12356.101.13.2.1.1.3",
+      "interval": 120,
+      "value_type": "integer",
+      "units": "seconds",
+      "description": "HA cluster uptime"
+    },
+    {
+      "name": "HA Member Status",
+      "oid_name": "fgHaStatsSyncStatus",
+      "oid": "1.3.6.1.4.1.12356.101.13.2.1.1.12",
+      "interval": 60,
+      "value_type": "integer",
+      "units": "",
+      "description": "HA sync status (0=unsynchronized, 1=synchronized)",
+      "is_table": true
+    },
+    {
+      "name": "Firewall Policy Count",
+      "oid_name": "fgFwPolCount",
+      "oid": "1.3.6.1.4.1.12356.101.5.1.1.0",
+      "interval": 300,
+      "value_type": "integer",
+      "units": "policies",
+      "description": "Total number of firewall policies"
+    },
+    {
+      "name": "AV Engine Status",
+      "oid_name": "fgAvStatsActiveEngines",
+      "oid": "1.3.6.1.4.1.12356.101.8.2.1.1.0",
+      "interval": 300,
+      "value_type": "integer",
+      "units": "",
+      "description": "Number of active antivirus engines"
+    },
+    {
+      "name": "IPS Engine Status",
+      "oid_name": "fgIpsStatsIntrusionsDetected",
+      "oid": "1.3.6.1.4.1.12356.101.9.2.1.1.0",
+      "interval": 60,
+      "value_type": "counter32",
+      "units": "intrusions",
+      "description": "Total intrusions detected"
+    },
+    {
+      "name": "Interface Status",
+      "oid_name": "ifOperStatus",
+      "oid": "1.3.6.1.2.1.2.2.1.8",
+      "interval": 60,
+      "value_type": "integer",
+      "units": "",
+      "description": "Interface operational status",
+      "is_table": true
+    },
+    {
+      "name": "Interface Traffic In",
+      "oid_name": "ifHCInOctets",
+      "oid": "1.3.6.1.2.1.31.1.1.1.6",
+      "interval": 60,
+      "value_type": "counter64",
+      "units": "bytes",
+      "description": "High capacity inbound traffic",
+      "is_table": true
+    },
+    {
+      "name": "Interface Traffic Out",
+      "oid_name": "ifHCOutOctets",
+      "oid": "1.3.6.1.2.1.31.1.1.1.10",
+      "interval": 60,
+      "value_type": "counter64",
+      "units": "bytes",
+      "description": "High capacity outbound traffic",
+      "is_table": true
+    }
+  ],
+  "triggers": [
+    {
+      "name": "High CPU Usage",
+      "expression": "fgSysCpuUsage > 85",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "CPU utilization above 85% for 5 minutes"
+    },
+    {
+      "name": "Critical CPU Usage",
+      "expression": "fgSysCpuUsage > 95",
+      "severity": "critical",
+      "for_duration": 120,
+      "description": "CPU utilization above 95% for 2 minutes"
+    },
+    {
+      "name": "High Memory Usage",
+      "expression": "fgSysMemUsage > 85",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "Memory utilization above 85%"
+    },
+    {
+      "name": "Critical Memory Usage",
+      "expression": "fgSysMemUsage > 95",
+      "severity": "critical",
+      "for_duration": 120,
+      "description": "Memory utilization above 95%"
+    },
+    {
+      "name": "High Disk Usage",
+      "expression": "fgSysDiskUsage > 85",
+      "severity": "warning",
+      "for_duration": 600,
+      "description": "Disk utilization above 85%"
+    },
+    {
+      "name": "High Session Count",
+      "expression": "fgSysSesCount > 100000",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "More than 100k active sessions"
+    },
+    {
+      "name": "VPN Tunnel Down",
+      "expression": "fgVpnTunEntStatus == 1",
+      "severity": "error",
+      "for_duration": 120,
+      "description": "IPSec VPN tunnel is down"
+    },
+    {
+      "name": "HA Sync Failed",
+      "expression": "fgHaStatsSyncStatus == 0",
+      "severity": "critical",
+      "for_duration": 180,
+      "description": "HA cluster out of sync"
+    },
+    {
+      "name": "Interface Down",
+      "expression": "ifOperStatus == 2",
+      "severity": "error",
+      "for_duration": 60,
+      "description": "Interface is operationally down"
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+{
+  "name": "Linux Server Standard",
+  "description": "Standard monitoring template for Linux servers with NET-SNMP",
+  "vendor": "Linux",
+  "device_types": ["server", "vm"],
+  "is_default": true,
+  "items": [
+    {
+      "name": "System Description",
+      "oid_name": "sysDescr",
+      "oid": "1.3.6.1.2.1.1.1.0",
+      "interval": 300,
+      "value_type": "string",
+      "units": "",
+      "description": "Linux distribution and kernel version"
+    },
+    {
+      "name": "System Uptime",
+      "oid_name": "sysUpTime",
+      "oid": "1.3.6.1.2.1.1.3.0",
+      "interval": 60,
+      "value_type": "integer",
+      "units": "timeticks",
+      "description": "Time since last reboot"
+    },
+    {
+      "name": "CPU Load 1min",
+      "oid_name": "laLoad_1",
+      "oid": "1.3.6.1.4.1.2021.10.1.3.1",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "",
+      "description": "1 minute load average"
+    },
+    {
+      "name": "CPU Load 5min",
+      "oid_name": "laLoad_5",
+      "oid": "1.3.6.1.4.1.2021.10.1.3.2",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "",
+      "description": "5 minute load average"
+    },
+    {
+      "name": "CPU Load 15min",
+      "oid_name": "laLoad_15",
+      "oid": "1.3.6.1.4.1.2021.10.1.3.3",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "",
+      "description": "15 minute load average"
+    },
+    {
+      "name": "CPU User Time",
+      "oid_name": "ssCpuUser",
+      "oid": "1.3.6.1.4.1.2021.11.9.0",
+      "interval": 60,
+      "value_type": "counter32",
+      "units": "ticks",
+      "description": "CPU time spent in user space"
+    },
+    {
+      "name": "CPU System Time",
+      "oid_name": "ssCpuSystem",
+      "oid": "1.3.6.1.4.1.2021.11.10.0",
+      "interval": 60,
+      "value_type": "counter32",
+      "units": "ticks",
+      "description": "CPU time spent in kernel"
+    },
+    {
+      "name": "CPU Idle Time",
+      "oid_name": "ssCpuIdle",
+      "oid": "1.3.6.1.4.1.2021.11.11.0",
+      "interval": 60,
+      "value_type": "counter32",
+      "units": "ticks",
+      "description": "CPU idle time"
+    },
+    {
+      "name": "Total RAM",
+      "oid_name": "memTotalReal",
+      "oid": "1.3.6.1.4.1.2021.4.5.0",
+      "interval": 300,
+      "value_type": "gauge",
+      "units": "KB",
+      "description": "Total physical RAM"
+    },
+    {
+      "name": "Available RAM",
+      "oid_name": "memAvailReal",
+      "oid": "1.3.6.1.4.1.2021.4.6.0",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "KB",
+      "description": "Available physical RAM"
+    },
+    {
+      "name": "Total Swap",
+      "oid_name": "memTotalSwap",
+      "oid": "1.3.6.1.4.1.2021.4.3.0",
+      "interval": 300,
+      "value_type": "gauge",
+      "units": "KB",
+      "description": "Total swap space"
+    },
+    {
+      "name": "Available Swap",
+      "oid_name": "memAvailSwap",
+      "oid": "1.3.6.1.4.1.2021.4.4.0",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "KB",
+      "description": "Available swap space"
+    },
+    {
+      "name": "Disk Path",
+      "oid_name": "dskPath",
+      "oid": "1.3.6.1.4.1.2021.9.1.2",
+      "interval": 300,
+      "value_type": "string",
+      "units": "",
+      "description": "Mounted filesystem paths",
+      "is_table": true
+    },
+    {
+      "name": "Disk Total",
+      "oid_name": "dskTotal",
+      "oid": "1.3.6.1.4.1.2021.9.1.6",
+      "interval": 300,
+      "value_type": "gauge",
+      "units": "KB",
+      "description": "Total disk space per filesystem",
+      "is_table": true
+    },
+    {
+      "name": "Disk Used",
+      "oid_name": "dskUsed",
+      "oid": "1.3.6.1.4.1.2021.9.1.8",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "KB",
+      "description": "Used disk space per filesystem",
+      "is_table": true
+    },
+    {
+      "name": "Disk Percent Used",
+      "oid_name": "dskPercent",
+      "oid": "1.3.6.1.4.1.2021.9.1.9",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "%",
+      "description": "Disk usage percentage",
+      "is_table": true
+    },
+    {
+      "name": "Process Count",
+      "oid_name": "hrSystemProcesses",
+      "oid": "1.3.6.1.2.1.25.1.6.0",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "processes",
+      "description": "Number of running processes"
+    },
+    {
+      "name": "Interface Status",
+      "oid_name": "ifOperStatus",
+      "oid": "1.3.6.1.2.1.2.2.1.8",
+      "interval": 60,
+      "value_type": "integer",
+      "units": "",
+      "description": "Interface operational status",
+      "is_table": true
+    },
+    {
+      "name": "Interface Traffic In",
+      "oid_name": "ifHCInOctets",
+      "oid": "1.3.6.1.2.1.31.1.1.1.6",
+      "interval": 60,
+      "value_type": "counter64",
+      "units": "bytes",
+      "description": "High capacity inbound traffic",
+      "is_table": true
+    },
+    {
+      "name": "Interface Traffic Out",
+      "oid_name": "ifHCOutOctets",
+      "oid": "1.3.6.1.2.1.31.1.1.1.10",
+      "interval": 60,
+      "value_type": "counter64",
+      "units": "bytes",
+      "description": "High capacity outbound traffic",
+      "is_table": true
+    }
+  ],
+  "triggers": [
+    {
+      "name": "High Load Average",
+      "expression": "laLoad_1 > 4",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "1 minute load average above 4"
+    },
+    {
+      "name": "Critical Load Average",
+      "expression": "laLoad_1 > 8",
+      "severity": "critical",
+      "for_duration": 120,
+      "description": "1 minute load average above 8"
+    },
+    {
+      "name": "Low Memory",
+      "expression": "(memAvailReal / memTotalReal) * 100 < 10",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "Less than 10% RAM available"
+    },
+    {
+      "name": "Critical Low Memory",
+      "expression": "(memAvailReal / memTotalReal) * 100 < 5",
+      "severity": "critical",
+      "for_duration": 120,
+      "description": "Less than 5% RAM available"
+    },
+    {
+      "name": "Swap Usage High",
+      "expression": "((memTotalSwap - memAvailSwap) / memTotalSwap) * 100 > 50",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "More than 50% swap in use"
+    },
+    {
+      "name": "High Disk Usage",
+      "expression": "dskPercent > 85",
+      "severity": "warning",
+      "for_duration": 600,
+      "description": "Disk usage above 85%"
+    },
+    {
+      "name": "Critical Disk Usage",
+      "expression": "dskPercent > 95",
+      "severity": "critical",
+      "for_duration": 300,
+      "description": "Disk usage above 95%"
+    },
+    {
+      "name": "Too Many Processes",
+      "expression": "hrSystemProcesses > 1000",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "More than 1000 processes running"
+    },
+    {
+      "name": "Interface Down",
+      "expression": "ifOperStatus == 2",
+      "severity": "error",
+      "for_duration": 60,
+      "description": "Interface is operationally down"
+    }
+  ]
+}

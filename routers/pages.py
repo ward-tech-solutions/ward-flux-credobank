@@ -14,18 +14,19 @@ def url_for(endpoint: str, **values):
     """Flask-compatible url_for function for Jinja2 templates"""
     if endpoint == "static":
         filename = values.get("filename", "")
-        return f"/static/{filename}"
-    return f"/{endpoint}"
+        return f"/admin/static/{filename}"
+    return f"/admin/{endpoint}"
 
-# Templates with custom url_for
-templates = Jinja2Templates(directory="templates")
+# Templates with custom url_for (old UI in DisasterRecovery)
+templates = Jinja2Templates(directory="DisasterRecovery/old_ui/templates")
 templates.env.globals["url_for"] = url_for
 
-# Create router
-router = APIRouter(tags=["pages"])
+# Create router with /admin prefix
+router = APIRouter(prefix="/admin", tags=["pages"])
 
 
 @router.get("/", response_class=HTMLResponse)
+@router.get("/dashboard", response_class=HTMLResponse)
 async def index_page(request: Request):
     """Serve dashboard"""
     return templates.TemplateResponse("dashboard.html", {"request": request})
