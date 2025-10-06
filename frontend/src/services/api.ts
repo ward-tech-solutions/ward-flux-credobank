@@ -136,6 +136,10 @@ export const devicesAPI = {
   // Get single device details
   getById: (hostid: string) => api.get<Device>(`/devices/${hostid}`),
 
+  // Update device (region/branch assignment)
+  updateDevice: (hostid: string, data: { region?: string; branch?: string }) =>
+    api.put(`/devices/${hostid}`, data),
+
   // Dashboard stats
   getStats: () => api.get<Stats>('/dashboard/stats'),
 

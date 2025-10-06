@@ -11,7 +11,8 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import DeviceDetailsModal from '@/components/DeviceDetailsModal'
 import SSHTerminalModal from '@/components/SSHTerminalModal'
 import { devicesAPI } from '@/services/api'
-import { Wifi, Search, List, Eye, LayoutGrid, Terminal } from 'lucide-react'
+import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit } from 'lucide-react'
+import { Modal } from '@/components/ui/Modal'
 
 export default function Devices() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -32,6 +33,13 @@ export default function Devices() {
   const [sshModalOpen, setSSHModalOpen] = useState(false)
   const [sshDeviceName, setSSHDeviceName] = useState('')
   const [sshDeviceIP, setSSHDeviceIP] = useState('')
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingDevice, setEditingDevice] = useState<any>(null)
+  const [editForm, setEditForm] = useState({
+    region: '',
+    branch: '',
+  })
+  const [savingDevice, setSavingDevice] = useState(false)
 
   const { data: devices, isLoading } = useQuery({
     queryKey: ['devices'],
@@ -97,6 +105,37 @@ export default function Devices() {
     setSSHDeviceName(deviceName)
     setSSHDeviceIP(deviceIP)
     setSSHModalOpen(true)
+  }
+
+  const handleEditDevice = (device: any) => {
+    setEditingDevice(device)
+    setEditForm({
+      region: device.region || '',
+      branch: device.branch || '',
+    })
+    setEditModalOpen(true)
+  }
+
+  const handleSaveDeviceEdit = async () => {
+    if (!editingDevice) return
+
+    setSavingDevice(true)
+    try {
+      await devicesAPI.updateDevice(editingDevice.hostid, {
+        region: editForm.region,
+        branch: editForm.branch,
+      })
+      alert('Device updated successfully!')
+      setEditModalOpen(false)
+      setEditingDevice(null)
+      // Refresh the devices list
+      window.location.reload()
+    } catch (error) {
+      console.error('Failed to update device:', error)
+      alert('Failed to update device')
+    } finally {
+      setSavingDevice(false)
+    }
   }
 
   const handleClearFilters = () => {
@@ -284,6 +323,17 @@ export default function Devices() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleEditDevice(device)
+                      }}
+                      title="Edit Device"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="bg-ward-green/10 hover:bg-ward-green/20 border-ward-green text-ward-green"
                       onClick={(e) => {
                         e.stopPropagation()
@@ -355,6 +405,17 @@ export default function Devices() {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation()
+                              handleEditDevice(device)
+                            }}
+                            title="Edit Device"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
                               handleOpenSSH(device.display_name, device.ip)
                             }}
                             className="text-ward-green hover:text-ward-green/80"
@@ -390,6 +451,101 @@ export default function Devices() {
         deviceName={sshDeviceName}
         deviceIP={sshDeviceIP}
       />
+
+      {/* Edit Device Modal */}
+      <Modal
+        open={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false)
+          setEditingDevice(null)
+        }}
+        title="Edit Device"
+        size="md"
+      >
+        {editingDevice && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Device Name
+              </label>
+              <Input
+                value={editingDevice.display_name}
+                disabled
+                className="bg-gray-50 dark:bg-gray-900"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Read-only</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                IP Address
+              </label>
+              <Input
+                value={editingDevice.ip}
+                disabled
+                className="bg-gray-50 dark:bg-gray-900 font-mono"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Read-only</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Region
+              </label>
+              <select
+                value={editForm.region}
+                onChange={(e) => setEditForm({ ...editForm, region: e.target.value })}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
+              >
+                <option value="">Select Region</option>
+                {regions.map((region) => (
+                  <option key={region} value={region}>
+                    {region}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Assign device to a region
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Branch (City)
+              </label>
+              <Input
+                value={editForm.branch}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, branch: e.target.value })}
+                placeholder="Enter branch/city name"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Branch or city where the device is located
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                onClick={handleSaveDeviceEdit}
+                disabled={savingDevice}
+                className="flex-1"
+              >
+                {savingDevice ? 'Saving...' : 'Save Changes'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditModalOpen(false)
+                  setEditingDevice(null)
+                }}
+                disabled={savingDevice}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

@@ -66,3 +66,60 @@ async def get_device_details(request: Request, hostid: str):
     if details:
         return details
     return JSONResponse(status_code=404, content={"error": "Device not found"})
+
+
+@router.put("/{hostid}")
+async def update_device(
+    request: Request,
+    hostid: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Update device region/branch assignment"""
+    from pydantic import BaseModel
+
+    class DeviceUpdate(BaseModel):
+        region: Optional[str] = None
+        branch: Optional[str] = None
+
+    data = await request.json()
+    update_data = DeviceUpdate(**data)
+
+    # For now, we'll store this in Zabbix host inventory or tags
+    # This is a simplified implementation - you may want to enhance this
+    # to actually update Zabbix host inventory fields
+
+    zabbix = request.app.state.zabbix
+
+    try:
+        # Build inventory update for Zabbix
+        # Zabbix uses inventory fields to store custom data
+        inventory = {}
+        if update_data.region is not None:
+            inventory["location"] = update_data.region
+        if update_data.branch is not None:
+            inventory["site_city"] = update_data.branch
+
+        # Update host inventory in Zabbix
+        if inventory:
+            update_result = await run_in_executor(
+                lambda: zabbix.update_host(hostid, inventory=inventory)
+            )
+
+            if not update_result.get("success"):
+                raise Exception(update_result.get("message", "Unknown error"))
+
+        return {
+            "status": "success",
+            "message": "Device updated successfully",
+            "hostid": hostid,
+            "updated_fields": {
+                "region": update_data.region,
+                "branch": update_data.branch,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Failed to update device {hostid}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to update device: {str(e)}"},
+        )
