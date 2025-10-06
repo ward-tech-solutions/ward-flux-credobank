@@ -41,20 +41,28 @@ services:
     restart: unless-stopped
 
   # WARD FLUX API Server
+  # Supports BOTH standalone SNMP and Zabbix integration
   api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: ward-api
     environment:
+      # Database & Cache
       - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+
+      # Security
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - SECRET_KEY=${SECRET_KEY}
+
+      # Monitoring Mode: "snmp_only", "zabbix_only", or "hybrid"
+      - MONITORING_MODE=${MONITORING_MODE:-snmp_only}
+
+      # Zabbix Integration (optional - only needed if MONITORING_MODE is "zabbix_only" or "hybrid")
       - ZABBIX_URL=${ZABBIX_URL:-}
       - ZABBIX_USER=${ZABBIX_USER:-}
       - ZABBIX_PASSWORD=${ZABBIX_PASSWORD:-}
-      - MONITORING_MODE=${MONITORING_MODE:-snmp_only}
     volumes:
       - ./logs:/app/logs
       - api-data:/data
@@ -75,7 +83,7 @@ services:
       start_period: 40s
     restart: unless-stopped
 
-  # Celery Worker - SNMP Polling
+  # Celery Worker - SNMP Polling & Background Tasks
   celery-worker:
     build:
       context: .
@@ -87,6 +95,9 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - MONITORING_MODE=${MONITORING_MODE:-snmp_only}
+      - ZABBIX_URL=${ZABBIX_URL:-}
+      - ZABBIX_USER=${ZABBIX_USER:-}
+      - ZABBIX_PASSWORD=${ZABBIX_PASSWORD:-}
     volumes:
       - ./logs:/app/logs
       - celery-data:/data
@@ -110,6 +121,7 @@ services:
       - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - MONITORING_MODE=${MONITORING_MODE:-snmp_only}
     volumes:
       - ./logs:/app/logs
       - beat-data:/data
