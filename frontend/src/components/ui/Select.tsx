@@ -1,19 +1,34 @@
-import { HTMLAttributes, forwardRef } from 'react'
+import { forwardRef, SelectHTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
 import { ChevronDown } from 'lucide-react'
 
-export interface SelectProps extends HTMLAttributes<HTMLSelectElement> {
+export interface SelectOption {
+  value: string
+  label: string
+}
+
+export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
   error?: string
   helperText?: string
   fullWidth?: boolean
   disabled?: boolean
-  value?: string
-  options: Array<{ value: string; label: string }>
+  options?: SelectOption[]
 }
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, helperText, fullWidth, disabled, options, ...props }, ref) => {
+  ({ className, label, error, helperText, fullWidth, disabled, options, children, ...props }, ref) => {
+    const renderOptions = () => {
+      if (options && options.length > 0) {
+        return options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))
+      }
+      return children
+    }
+
     return (
       <div className={cn('relative', fullWidth && 'w-full')}>
         {label && (
@@ -38,11 +53,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
             disabled={disabled}
             {...props}
           >
-            {options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+            {renderOptions()}
           </select>
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400 pointer-events-none" />
         </div>

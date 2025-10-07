@@ -834,7 +834,7 @@ export default function Settings() {
                 <Select
                   label="Region"
                   value={userForm.region}
-                  onChange={(e) => setUserForm({ ...userForm, region: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, region: e.target.value })}
                   helperText="Regional managers only see devices in their region"
                 >
                   <option value="">Select a region</option>
@@ -923,7 +923,7 @@ export default function Settings() {
                 <Select
                   label="Region"
                   value={userForm.region}
-                  onChange={(e) => setUserForm({ ...userForm, region: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, region: e.target.value })}
                   helperText="Regional managers only see devices in their region"
                 >
                   <option value="">Select a region</option>
