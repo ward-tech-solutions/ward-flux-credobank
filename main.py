@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, UploadFile, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from contextlib import asynccontextmanager
@@ -230,7 +229,6 @@ from routers import (
     discovery,
     infrastructure,
     monitoring,
-    pages,
     reports,
     settings,
     snmp_credentials,
@@ -240,7 +238,6 @@ from routers import (
 )
 
 app.include_router(auth.router)
-app.include_router(pages.router)
 app.include_router(config.router)
 app.include_router(bulk.router)
 app.include_router(devices.router)
@@ -309,34 +306,13 @@ except ImportError:
 # ============================================
 # Setup Wizard Integration
 # ============================================
-from setup_wizard import router as setup_router
-from middleware_setup import setup_check_middleware
-
-# Add setup middleware (redirects to wizard if not configured)
-# DISABLED: Setup wizard not needed - use Settings page for Zabbix config
-# app.middleware("http")(setup_check_middleware)
-
-# Include setup wizard routes
-app.include_router(setup_router)
+# (Setup wizard removed)
 
 # ============================================
 # Static files and templates
 # ============================================
 
-# Add Flask-compatible url_for function BEFORE creating templates
-def url_for(endpoint: str, **values):
-    """Flask-compatible url_for function for Jinja2 templates"""
-    if endpoint == "static":
-        filename = values.get("filename", "")
-        return f"/admin/static/{filename}"
-    return f"/{endpoint}"
-
-
-# Mount old UI at /admin (legacy/disaster recovery)
-app.mount("/admin/static", StaticFiles(directory="DisasterRecovery/old_ui/static"), name="admin_static")
-templates = Jinja2Templates(directory="DisasterRecovery/old_ui/templates")
-templates.env.auto_reload = True  # Force template reload for development
-templates.env.globals["url_for"] = url_for
+# Legacy admin UI removed; static assets served only from React build
 
 # Mount new React UI static files
 app.mount("/assets", StaticFiles(directory="static_new/assets"), name="assets")
@@ -880,13 +856,6 @@ from fastapi.responses import FileResponse
 async def index():
     """Serve React app"""
     return FileResponse("static_new/index.html")
-
-# Serve old UI at /admin
-@app.get("/admin", response_class=HTMLResponse)
-@app.get("/admin/", response_class=HTMLResponse)
-async def admin_index(request: Request):
-    """Serve old UI (disaster recovery)"""
-    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 # Serve static files from root (logo, favicon, etc.)
 @app.get("/logo-ward.svg")
