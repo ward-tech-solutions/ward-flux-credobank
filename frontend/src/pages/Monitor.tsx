@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Loading'
 import Badge from '@/components/ui/Badge'
+import Select from '@/components/ui/Select'
+import { Button } from '@/components/ui/Button'
 import { Modal, ModalHeader, ModalTitle, ModalContent } from '@/components/ui/Modal'
 import { devicesAPI, type Device } from '@/services/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -516,41 +518,37 @@ export default function Monitor() {
             </div>
 
             {/* Status Filter */}
-            <select
+            <Select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'online' | 'offline')}
-              className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-            >
-              <option value="all">All Status</option>
-              <option value="online">Online Only</option>
-              <option value="offline">Offline Only</option>
-            </select>
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value as 'all' | 'online' | 'offline')}
+              options={[
+                { value: 'all', label: 'All Status' },
+                { value: 'online', label: 'Online Only' },
+                { value: 'offline', label: 'Offline Only' },
+              ]}
+            />
 
             {/* Region Filter - Only show for non-regional managers */}
             {!isRegionalManager && (
-              <select
+              <Select
                 value={regionFilter}
-                onChange={(e) => setRegionFilter(e.target.value)}
-                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-              >
-                <option value="all">All Regions</option>
-                {regions.map(region => (
-                  <option key={region} value={region}>{region}</option>
-                ))}
-              </select>
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRegionFilter(e.target.value)}
+                options={[
+                  { value: 'all', label: 'All Regions' },
+                  ...regions.map(region => ({ value: region, label: region }))
+                ]}
+              />
             )}
 
             {/* Device Type Filter */}
-            <select
+            <Select
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-            >
-              <option value="all">All Types</option>
-              {deviceTypes.map(type => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}
+              options={[
+                { value: 'all', label: 'All Types' },
+                ...deviceTypes.map(type => ({ value: type, label: type }))
+              ]}
+            />
           </div>
 
           {/* Active Filters Summary */}
@@ -597,17 +595,17 @@ export default function Monitor() {
                   Try adjusting your filters or search query
                 </p>
               </div>
-              <button
+              <Button
                 onClick={() => {
                   setStatusFilter('all')
                   setRegionFilter('all')
                   setTypeFilter('all')
                   setSearchQuery('')
                 }}
-                className="mt-2 px-4 py-2 bg-ward-green text-white rounded-lg hover:bg-ward-green/90 transition-colors"
+                className="mt-2"
               >
                 Clear all filters
-              </button>
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import Select from '@/components/ui/Select'
 import { Badge } from '@/components/ui/Badge'
+import { LoadingSpinner } from '@/components/ui/Loading'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import {
   BarChart3,
@@ -199,27 +201,27 @@ export default function Reports() {
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-gray-500" />
-                  <select
+                  <Select
                     value={period}
-                    onChange={(e) => setPeriod(e.target.value)}
-                    className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                  >
-                    <option value="weekly">Last 7 Days</option>
-                    <option value="monthly">Last 30 Days</option>
-                    <option value="quarterly">Last 90 Days</option>
-                  </select>
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPeriod(e.target.value)}
+                    options={[
+                      { value: 'weekly', label: 'Last 7 Days' },
+                      { value: 'monthly', label: 'Last 30 Days' },
+                      { value: 'quarterly', label: 'Last 90 Days' },
+                    ]}
+                  />
                 </div>
 
-                <select
+                <Select
                   value={region}
-                  onChange={(e) => setRegion(e.target.value)}
-                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="">All Regions</option>
-                  <option value="Tbilisi">Tbilisi</option>
-                  <option value="Kakheti">Kakheti</option>
-                  <option value="Adjara">Adjara</option>
-                </select>
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRegion(e.target.value)}
+                  options={[
+                    { value: '', label: 'All Regions' },
+                    { value: 'Tbilisi', label: 'Tbilisi' },
+                    { value: 'Kakheti', label: 'Kakheti' },
+                    { value: 'Adjara', label: 'Adjara' },
+                  ]}
+                />
 
                 <div className="ml-auto">
                   <Button variant="outline" onClick={handleExportCSV}>
@@ -298,7 +300,7 @@ export default function Reports() {
             <CardContent>
               {loading ? (
                 <div className="flex items-center justify-center h-[300px]">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ward-green"></div>
+                  <LoadingSpinner size="lg" />
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
@@ -330,8 +332,7 @@ export default function Reports() {
             <CardContent>
               {loading ? (
                 <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ward-green mx-auto"></div>
-                  <p className="text-gray-500 dark:text-gray-400 mt-4">Loading report...</p>
+                  <LoadingSpinner size="lg" text="Loading report..." />
                 </div>
               ) : (
                 <div className="overflow-x-auto">

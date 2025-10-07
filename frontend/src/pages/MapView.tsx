@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { LoadingSpinner } from '@/components/ui/Loading'
 import { Map, MapPin, Globe } from 'lucide-react'
 import { devicesAPI } from '@/services/api'
 
@@ -118,7 +119,7 @@ export default function MapView() {
           <CardContent className="p-6">
             {loading ? (
               <div className="flex items-center justify-center h-[600px]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ward-green"></div>
+                <LoadingSpinner size="lg" />
               </div>
             ) : (
               <div className="relative bg-gray-100 dark:bg-gray-900 rounded-lg h-[600px] overflow-hidden">

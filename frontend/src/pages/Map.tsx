@@ -6,6 +6,9 @@ import { useQuery } from '@tanstack/react-query'
 import { devicesAPI } from '@/services/api'
 import { Card, CardContent } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
+import Select from '@/components/ui/Select'
+import { Button } from '@/components/ui/Button'
+import { LoadingSpinner } from '@/components/ui/Loading'
 import { Globe, CheckCircle, XCircle } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 
@@ -197,16 +200,15 @@ export default function Map() {
         <CardContent className="p-4">
           <div className="flex items-center gap-4">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Jump to region:</label>
-            <select
+            <Select
               value={selectedRegion}
-              onChange={(e) => setSelectedRegion(e.target.value)}
-              className="flex-1 max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent"
-            >
-              <option value="">All Regions</option>
-              {regions.map(region => (
-                <option key={region} value={region}>{region}</option>
-              ))}
-            </select>
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedRegion(e.target.value)}
+              options={[
+                { value: '', label: 'All Regions' },
+                ...regions.map(region => ({ value: region, label: region }))
+              ]}
+              className="flex-1 max-w-xs"
+            />
             {selectedRegion && (
               <button
                 onClick={() => setSelectedRegion('')}
@@ -225,8 +227,7 @@ export default function Map() {
           {isLoading ? (
             <div className="h-[600px] flex items-center justify-center">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ward-green mx-auto mb-4"></div>
-                <p className="text-gray-500 dark:text-gray-400">Loading map...</p>
+                <LoadingSpinner size="lg" text="Loading map..." />
               </div>
             </div>
           ) : (
@@ -361,12 +362,13 @@ export default function Map() {
                             </div>
 
                             {/* View Devices Button */}
-                            <button
+                            <Button
                               onClick={() => window.location.href = `/devices?search=${encodeURIComponent(firstDevice.branch)}`}
-                              className="mt-3 w-full px-3 py-2 bg-ward-green text-white rounded-lg hover:bg-ward-green-dark transition-colors text-sm font-medium"
+                              className="mt-3 w-full"
+                              size="sm"
                             >
                               View Devices
-                            </button>
+                            </Button>
                           </div>
                         </Popup>
                       </Marker>

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { LoadingSpinner } from '@/components/ui/Loading'
 import { Modal } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { Users as UsersIcon, Plus, Edit2, Trash2, Shield, Search } from 'lucide-react'
@@ -196,8 +197,7 @@ export default function Users() {
         <CardContent>
           {loading ? (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ward-green mx-auto"></div>
-              <p className="text-gray-500 dark:text-gray-400 mt-4">Loading users...</p>
+              <LoadingSpinner size="lg" text="Loading users..." />
             </div>
           ) : (
             <div className="overflow-x-auto">

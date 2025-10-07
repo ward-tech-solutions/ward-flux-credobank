@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
 import { Badge } from '@/components/ui/Badge'
+import { LoadingSpinner } from '@/components/ui/Loading'
 import { devicesAPI, type Device } from '@/services/api'
 import {
   Network,
@@ -642,9 +644,9 @@ export default function Topology() {
                   Select Network Device:
                 </label>
               </div>
-              <select
+              <Select
                 value={selectedDeviceId}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                   const device = networkDevices.find(d => d.hostid === e.target.value)
                   if (device) {
                     setSelectedDeviceId(device.hostid)
@@ -656,15 +658,15 @@ export default function Topology() {
                     window.history.pushState({}, '', url)
                   }
                 }}
-                className="flex-1 max-w-md px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-ward-green focus:border-transparent"
-              >
-                <option value="">Select a Router or Switch...</option>
-                {networkDevices.map((device) => (
-                  <option key={device.hostid} value={device.hostid}>
-                    {device.display_name} ({device.device_type}) - {device.branch}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'Select a Router or Switch...' },
+                  ...networkDevices.map((device) => ({
+                    value: device.hostid,
+                    label: `${device.display_name} (${device.device_type}) - ${device.branch}`
+                  }))
+                ]}
+                className="flex-1 max-w-md"
+              />
               {selectedDeviceId && (
                 <Badge variant={networkDevices.find(d => d.hostid === selectedDeviceId)?.ping_status === 'Up' ? 'success' : 'danger'}>
                   {networkDevices.find(d => d.hostid === selectedDeviceId)?.ping_status || 'Unknown'}
@@ -823,8 +825,7 @@ export default function Topology() {
               {(visJsLoading || loading) && (
                 <div className="absolute inset-0 w-full h-full bg-gray-900 rounded-lg flex items-center justify-center">
                   <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ward-green mx-auto mb-4"></div>
-                    <p className="text-gray-400">Loading network visualization...</p>
+                    <LoadingSpinner size="lg" text="Loading network visualization..." />
                   </div>
                 </div>
               )}

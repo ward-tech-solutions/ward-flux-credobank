@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Loading'
 import Badge from '@/components/ui/Badge'
+import Select from '@/components/ui/Select'
+import { Button } from '@/components/ui/Button'
 import { devicesAPI } from '@/services/api'
 import {
   Activity,
@@ -166,13 +168,12 @@ export default function DashboardEnhanced() {
             Last updated: {new Date().toLocaleTimeString()}
           </p>
         </div>
-        <button
+        <Button
           onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-ward-green text-white rounded-lg hover:bg-ward-green-dark transition-colors flex items-center gap-2"
+          icon={<Activity className="h-4 w-4 animate-spin" />}
         >
-          <Activity className="h-4 w-4 animate-spin" />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* KPI Cards */}
@@ -290,17 +291,11 @@ export default function DashboardEnhanced() {
           <div className="flex items-center justify-between">
             <CardTitle>Active Alerts</CardTitle>
             <div className="flex items-center gap-3">
-              <select
+              <Select
                 value={selectedSeverity}
-                onChange={(e) => setSelectedSeverity(e.target.value)}
-                className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent"
-              >
-                {severityOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedSeverity(e.target.value)}
+                options={severityOptions}
+              />
               <Badge variant="default">{alerts.length}</Badge>
             </div>
           </div>

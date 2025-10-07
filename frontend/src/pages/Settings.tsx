@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
 import { Badge } from '@/components/ui/Badge'
+import { LoadingSpinner } from '@/components/ui/Loading'
 import { Modal } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { Server, Bell, Mail, Shield, Database, Users as UsersIcon, Plus, Edit2, Trash2, Search, Eye, EyeOff, Wrench, RefreshCw, Save, MapPin } from 'lucide-react'
@@ -696,8 +698,7 @@ export default function Settings() {
             <CardContent>
               {loadingUsers ? (
                 <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ward-green mx-auto"></div>
-                  <p className="text-gray-500 dark:text-gray-400 mt-4">Loading users...</p>
+                  <LoadingSpinner size="lg" text="Loading users..." />
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -818,21 +819,17 @@ export default function Settings() {
                 autoComplete="new-password"
                 required
               />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Role
-                </label>
-                <select
-                  value={userForm.role}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, role: e.target.value as any })}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="technician">Technician</option>
-                  <option value="regional_manager">Regional Manager</option>
-                  <option value="admin">Administrator</option>
-                  <option value="viewer">Viewer</option>
-                </select>
-              </div>
+              <Select
+                label="Role"
+                value={userForm.role}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, role: e.target.value as any })}
+                options={[
+                  { value: 'technician', label: 'Technician' },
+                  { value: 'regional_manager', label: 'Regional Manager' },
+                  { value: 'admin', label: 'Administrator' },
+                  { value: 'viewer', label: 'Viewer' },
+                ]}
+              />
               {userForm.role === 'regional_manager' && (
                 <Input
                   label="Region"
@@ -898,21 +895,17 @@ export default function Settings() {
                 placeholder="Enter new password"
                 autoComplete="new-password"
               />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Role
-                </label>
-                <select
-                  value={userForm.role}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, role: e.target.value as any })}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="technician">Technician</option>
-                  <option value="regional_manager">Regional Manager</option>
-                  <option value="admin">Administrator</option>
-                  <option value="viewer">Viewer</option>
-                </select>
-              </div>
+              <Select
+                label="Role"
+                value={userForm.role}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, role: e.target.value as any })}
+                options={[
+                  { value: 'technician', label: 'Technician' },
+                  { value: 'regional_manager', label: 'Regional Manager' },
+                  { value: 'admin', label: 'Administrator' },
+                  { value: 'viewer', label: 'Viewer' },
+                ]}
+              />
               {userForm.role === 'regional_manager' && (
                 <Input
                   label="Region"
