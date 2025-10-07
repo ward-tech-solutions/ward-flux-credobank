@@ -169,6 +169,28 @@ async def lifespan(app: FastAPI):
 
     # Startup - use the working synchronous client
     app.state.zabbix = ZabbixClient()
+
+    # Load Zabbix credentials from database if available
+    try:
+        from database import SessionLocal
+        from models import SystemConfig
+
+        db = SessionLocal()
+        configs = {cfg.key: cfg.value for cfg in db.query(SystemConfig).filter(SystemConfig.key.in_(["zabbix_url", "zabbix_user", "zabbix_password"]))}
+        db.close()
+
+        if all(configs.get(k) for k in ["zabbix_url", "zabbix_user", "zabbix_password"]):
+            os.environ["ZABBIX_URL"] = configs["zabbix_url"]
+            os.environ["ZABBIX_USER"] = configs["zabbix_user"]
+            os.environ["ZABBIX_PASSWORD"] = configs["zabbix_password"]
+            app.state.zabbix.reconfigure(
+                url=configs["zabbix_url"],
+                user=configs["zabbix_user"],
+                password=configs["zabbix_password"],
+            )
+    except Exception as e:
+        logger.info(f"Warning: Unable to load Zabbix settings from database: {e}")
+
     # Initialize WebSocket connections list
     websocket_connections: List[WebSocket] = []
     app.state.websocket_connections = websocket_connections
@@ -950,9 +972,19 @@ async def ssh_connect(ssh_request: SSHConnectRequest, current_user: User = Depen
 @app.get("/api/v1/settings/zabbix")
 async def get_zabbix_settings(current_user: User = Depends(get_current_active_user)):
     """Get current Zabbix settings"""
-    import os
+    try:
+        from database import SessionLocal
+        from models import SystemConfig
 
-    return {"zabbix_url": os.getenv("ZABBIX_URL", ""), "zabbix_user": os.getenv("ZABBIX_USER", "")}
+        db = SessionLocal()
+        configs = {cfg.key: cfg.value for cfg in db.query(SystemConfig).filter(SystemConfig.key.in_(["zabbix_url", "zabbix_user"]))}
+        db.close()
+        return {
+            "zabbix_url": configs.get("zabbix_url", os.getenv("ZABBIX_URL", "")),
+            "zabbix_user": configs.get("zabbix_user", os.getenv("ZABBIX_USER", "")),
+        }
+    except Exception:
+        return {"zabbix_url": os.getenv("ZABBIX_URL", ""), "zabbix_user": os.getenv("ZABBIX_USER", "")}
 
 
 @app.post("/api/v1/settings/test-zabbix")
@@ -973,15 +1005,22 @@ async def test_zabbix_settings(config: dict, current_user: User = Depends(get_cu
 @app.post("/api/v1/settings/zabbix")
 async def save_zabbix_settings(request: Request, config: dict, current_user: User = Depends(get_current_active_user)):
     """Save Zabbix settings and reconfigure"""
-    from dotenv import set_key
     import os
 
     try:
-        # Save to .env file
-        env_file = ".env"
-        set_key(env_file, "ZABBIX_URL", config["zabbix_url"])
-        set_key(env_file, "ZABBIX_USER", config["zabbix_user"])
-        set_key(env_file, "ZABBIX_PASSWORD", config["zabbix_password"])
+        from database import SessionLocal
+        from models import SystemConfig
+
+        db = SessionLocal()
+        for key_name in ["zabbix_url", "zabbix_user", "zabbix_password"]:
+            entry = db.query(SystemConfig).filter(SystemConfig.key == key_name).first()
+            if entry:
+                entry.value = config[key_name]
+            else:
+                entry = SystemConfig(key=key_name, value=config[key_name])
+                db.add(entry)
+        db.commit()
+        db.close()
 
         # Update environment variables
         os.environ["ZABBIX_URL"] = config["zabbix_url"]
