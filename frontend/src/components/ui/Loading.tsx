@@ -1,5 +1,5 @@
 import { HTMLAttributes, forwardRef } from 'react'
-import { cn } from '../../lib/utils.ts'
+import { cn } from '@/lib/utils.ts'
 import { Loader2 } from 'lucide-react'
 
 export interface LoadingSpinnerProps extends HTMLAttributes<HTMLDivElement> {

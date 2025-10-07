@@ -1,5 +1,5 @@
 import { forwardRef, SelectHTMLAttributes } from 'react'
-import { cn } from '../../lib/utils.ts'
+import { cn } from '@/lib/utils.ts'
 import { ChevronDown } from 'lucide-react'
 
 export interface SelectOption {

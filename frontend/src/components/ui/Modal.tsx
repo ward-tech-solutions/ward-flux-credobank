@@ -1,5 +1,5 @@
 import { HTMLAttributes, forwardRef, useEffect } from 'react'
-import { cn } from '../../lib/utils.ts'
+import { cn } from '@/lib/utils.ts'
 import { X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
