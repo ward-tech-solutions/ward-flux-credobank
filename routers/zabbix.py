@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
 # Create router
-router = APIRouter(prefix="/api/v1", tags=["zabbix"])
+router = APIRouter(prefix="/api/v1/zabbix", tags=["zabbix"])
 
 
 # Pydantic models for request validation

@@ -5,7 +5,7 @@ import Input from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { Server, Bell, Mail, Shield, Database, Users as UsersIcon, Plus, Edit2, Trash2, Search, Eye, EyeOff, Wrench, RefreshCw, Save, MapPin, Settings as SettingsIcon } from 'lucide-react'
+import { Server, Bell, Mail, Shield, Database, Users as UsersIcon, Plus, Edit2, Trash2, Search, Eye, EyeOff, Wrench, RefreshCw, Save, MapPin } from 'lucide-react'
 import api, { authAPI } from '@/services/api'
 
 interface User {
@@ -82,13 +82,6 @@ export default function Settings() {
     region: '',
   })
 
-  // Device Management state
-  const [deviceSource, setDeviceSource] = useState<'zabbix' | 'standalone'>(() => {
-    const saved = localStorage.getItem('device-default-source')
-    return (saved === 'zabbix' || saved === 'standalone') ? saved : 'zabbix'
-  })
-  const [monitoringMode, setMonitoringMode] = useState<string>('Loading...')
-  const [savingDeviceSettings, setSavingDeviceSettings] = useState(false)
 
   useEffect(() => {
     if (activeSection === 'users') {
@@ -96,8 +89,6 @@ export default function Settings() {
     } else if (activeSection === 'config') {
       loadMonitoredGroups()
       loadCities()
-    } else if (activeSection === 'device-management') {
-      loadDeviceManagementSettings()
     }
   }, [activeSection])
 
@@ -306,44 +297,6 @@ export default function Settings() {
     }
   }
 
-  // Device Management functions
-  const loadDeviceManagementSettings = async () => {
-    try {
-      // Check if we have both Zabbix and Standalone devices
-      const zabbixResponse = await api.get('/devices')
-      const standaloneResponse = await api.get('/devices/standalone/list')
-
-      const hasZabbix = zabbixResponse.data && zabbixResponse.data.length > 0
-      const hasStandalone = standaloneResponse.data && standaloneResponse.data.length > 0
-
-      if (hasZabbix && hasStandalone) {
-        setMonitoringMode('Hybrid (Zabbix + Standalone)')
-      } else if (hasZabbix) {
-        setMonitoringMode('Zabbix Only')
-      } else if (hasStandalone) {
-        setMonitoringMode('Standalone Only')
-      } else {
-        setMonitoringMode('No Devices')
-      }
-    } catch (error) {
-      console.error('Failed to load device management settings:', error)
-      setMonitoringMode('Unknown')
-    }
-  }
-
-  const handleSaveDeviceSource = async () => {
-    setSavingDeviceSettings(true)
-    try {
-      // Save to localStorage for now
-      localStorage.setItem('device-default-source', deviceSource)
-      alert('Device source preference saved successfully!')
-    } catch (error) {
-      console.error('Failed to save device source:', error)
-      alert('Failed to save device source preference')
-    } finally {
-      setSavingDeviceSettings(false)
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -422,17 +375,6 @@ export default function Settings() {
             >
               <Wrench className="h-4 w-4 inline-block mr-2" />
               Config
-            </button>
-            <button
-              onClick={() => setActiveSection('device-management')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeSection === 'device-management'
-                  ? 'bg-ward-green text-white'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-              }`}
-            >
-              <SettingsIcon className="h-4 w-4 inline-block mr-2" />
-              Device Management
             </button>
           </div>
         </CardContent>
@@ -1130,100 +1072,6 @@ export default function Settings() {
         </>
       )}
 
-      {/* Device Management Section */}
-      {activeSection === 'device-management' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-ward-green/10 rounded-lg">
-                <SettingsIcon className="h-6 w-6 text-ward-green" />
-              </div>
-              <div>
-                <CardTitle>Device Management Settings</CardTitle>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Configure default device source and monitoring preferences
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Current Monitoring Mode */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Monitoring Mode</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Detected based on configured devices
-                  </p>
-                </div>
-                <Badge variant="default" className="text-sm">
-                  {monitoringMode}
-                </Badge>
-              </div>
-            </div>
-
-            {/* Default Device Source */}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Default Device Source
-                </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                  Choose where new devices should be added by default
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <label className="flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:border-ward-green/50"
-                  style={{ borderColor: deviceSource === 'zabbix' ? '#22c55e' : undefined }}
-                >
-                  <input
-                    type="radio"
-                    name="device-source"
-                    value="zabbix"
-                    checked={deviceSource === 'zabbix'}
-                    onChange={(e) => setDeviceSource(e.target.value as 'zabbix' | 'standalone')}
-                    className="mt-1 w-5 h-5 text-ward-green focus:ring-ward-green"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 dark:text-gray-100">Add to Zabbix</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      Devices will be added to Zabbix monitoring system. Recommended for production environments with full monitoring capabilities.
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:border-ward-green/50"
-                  style={{ borderColor: deviceSource === 'standalone' ? '#22c55e' : undefined }}
-                >
-                  <input
-                    type="radio"
-                    name="device-source"
-                    value="standalone"
-                    checked={deviceSource === 'standalone'}
-                    onChange={(e) => setDeviceSource(e.target.value as 'zabbix' | 'standalone')}
-                    className="mt-1 w-5 h-5 text-ward-green focus:ring-ward-green"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 dark:text-gray-100">Add to Standalone</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      Devices will be managed independently without Zabbix integration. Useful for lightweight monitoring or devices not compatible with Zabbix.
-                    </p>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Save Button */}
-            <div className="flex justify-end pt-4">
-              <Button onClick={handleSaveDeviceSource} disabled={savingDeviceSettings}>
-                <Save className="h-4 w-4 mr-2" />
-                {savingDeviceSettings ? 'Saving...' : 'Save Preferences'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

@@ -146,7 +146,7 @@ export const devicesAPI = {
   // Get alerts
   getAlerts: (severity?: string) => {
     const params = severity ? `?severity=${severity}` : ''
-    return api.get(`/alerts${params}`)
+    return api.get(`/zabbix/alerts${params}`)
   },
 
   // Standalone devices (separate from Zabbix)
@@ -155,7 +155,13 @@ export const devicesAPI = {
     create: (device: any) => api.post('/devices/standalone', device),
     update: (id: string, device: any) => api.put(`/devices/standalone/${id}`, device),
     delete: (id: string) => api.delete(`/devices/standalone/${id}`),
-  }
+  },
+
+  // Create Zabbix device
+  createZabbix: (device: any) => api.post('/hosts', device),
+
+  // Create Standalone device (convenience method)
+  createStandalone: (device: any) => api.post('/devices/standalone', device),
 }
 
 // Discovery
