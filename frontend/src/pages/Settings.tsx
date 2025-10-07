@@ -831,13 +831,26 @@ export default function Settings() {
                 ]}
               />
               {userForm.role === 'regional_manager' && (
-                <Input
+                <Select
                   label="Region"
                   value={userForm.region}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, region: e.target.value })}
-                  placeholder="Enter region (e.g., Kakheti)"
+                  onChange={(e) => setUserForm({ ...userForm, region: e.target.value })}
                   helperText="Regional managers only see devices in their region"
-                />
+                >
+                  <option value="">Select a region</option>
+                  <option value="Tbilisi">Tbilisi</option>
+                  <option value="Kvemo Kartli">Kvemo Kartli</option>
+                  <option value="Kakheti">Kakheti</option>
+                  <option value="Mtskheta-Mtianeti">Mtskheta-Mtianeti</option>
+                  <option value="Samtskhe-Javakheti">Samtskhe-Javakheti</option>
+                  <option value="Shida Kartli">Shida Kartli</option>
+                  <option value="Imereti">Imereti</option>
+                  <option value="Samegrelo">Samegrelo</option>
+                  <option value="Guria">Guria</option>
+                  <option value="Achara">Achara</option>
+                  <option value="Racha-Lechkhumi">Racha-Lechkhumi</option>
+                  <option value="Kvemo Svaneti">Kvemo Svaneti</option>
+                </Select>
               )}
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleAddUser} className="flex-1">
@@ -907,13 +920,26 @@ export default function Settings() {
                 ]}
               />
               {userForm.role === 'regional_manager' && (
-                <Input
+                <Select
                   label="Region"
                   value={userForm.region}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, region: e.target.value })}
-                  placeholder="Enter region (e.g., Kakheti)"
+                  onChange={(e) => setUserForm({ ...userForm, region: e.target.value })}
                   helperText="Regional managers only see devices in their region"
-                />
+                >
+                  <option value="">Select a region</option>
+                  <option value="Tbilisi">Tbilisi</option>
+                  <option value="Kvemo Kartli">Kvemo Kartli</option>
+                  <option value="Kakheti">Kakheti</option>
+                  <option value="Mtskheta-Mtianeti">Mtskheta-Mtianeti</option>
+                  <option value="Samtskhe-Javakheti">Samtskhe-Javakheti</option>
+                  <option value="Shida Kartli">Shida Kartli</option>
+                  <option value="Imereti">Imereti</option>
+                  <option value="Samegrelo">Samegrelo</option>
+                  <option value="Guria">Guria</option>
+                  <option value="Achara">Achara</option>
+                  <option value="Racha-Lechkhumi">Racha-Lechkhumi</option>
+                  <option value="Kvemo Svaneti">Kvemo Svaneti</option>
+                </Select>
               )}
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleEditUser} className="flex-1">

@@ -140,6 +140,14 @@ export const devicesAPI = {
   updateDevice: (hostid: string, data: { region?: string; branch?: string }) =>
     api.put(`/devices/${hostid}`, data),
 
+  // Get device ping history
+  getHistory: (hostid: string, timeRange: '24h' | '7d' | '30d' = '24h') =>
+    api.get(`/devices/${hostid}/history?time_range=${timeRange}`),
+
+  // Ping device
+  pingDevice: (hostid: string) =>
+    api.post(`/devices/${hostid}/ping`),
+
   // Dashboard stats
   getStats: () => api.get<Stats>('/dashboard/stats'),
 

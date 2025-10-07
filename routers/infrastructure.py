@@ -35,12 +35,12 @@ async def get_router_interfaces(request: Request, hostid: str, current_user: Use
 @router.get("/topology")
 async def get_topology(
     request: Request,
-    view: str = "hierarchical",
+    view: str = "discovery",  # Changed default to discovery mode
     limit: int = 200,
     region: Optional[str] = None,
     current_user: User = Depends(get_current_active_user),
 ):
-    """Get network topology data with user permissions - Enhanced with core router hierarchy"""
+    """Get network topology data discovered from interface descriptions"""
     zabbix = request.app.state.zabbix
     groupids = get_monitored_groupids()
     loop = asyncio.get_event_loop()
@@ -65,16 +65,129 @@ async def get_topology(
 
     nodes = []
     edges = []
+    edges_set = set()  # Track edges to avoid duplicates
 
-    # Identify core routers and categorize devices
-    from collections import defaultdict
+    # Build device name mapping for connection discovery
+    device_name_map = {}  # Maps normalized device names to hostids
+    for device in devices:
+        display_name = device.get("display_name", "").lower().strip()
+        # Store multiple name variations for matching
+        device_name_map[display_name] = device["hostid"]
+        # Also store without suffixes like "-881", "-1111"
+        base_name = display_name.split("-")[0].strip()
+        if base_name and base_name != display_name:
+            device_name_map[base_name] = device["hostid"]
 
+    logger.info(f"[Topology] Built device name map with {len(device_name_map)} entries")
+
+    # Create nodes for all devices
+    for device in devices:
+        status = device.get("ping_status", "Unknown")
+        device_type = device.get("device_type", "Unknown")
+        ip = device.get("ip", "")
+
+        # Determine device type based on IP if not set
+        if ip and device_type in ["Switch", "L3 Switch", "Branch Switch"]:
+            last_octet = ip.split(".")[-1] if "." in ip else ""
+            if last_octet == "5":
+                device_type = "Router"
+            elif last_octet in ["245", "246"]:
+                device_type = "Switch"
+
+        # Color and size based on device type
+        if device_type == "Core Router":
+            color = "#FF6B35" if status == "Up" else "#dc3545"
+            size = 35
+            shape = "diamond"
+        elif device_type in ["Router", "Switch", "L3 Switch", "Branch Switch"]:
+            color = "#14b8a6" if status == "Up" else "#dc3545"
+            size = 25
+            shape = "box"
+        else:
+            color = "#6B7280" if status == "Up" else "#dc3545"
+            size = 15
+            shape = "dot"
+
+        nodes.append({
+            "id": device["hostid"],
+            "label": device["display_name"],
+            "title": f"{device['display_name']}\n{ip}\nType: {device_type}\nStatus: {status}",
+            "color": color,
+            "size": size,
+            "shape": shape,
+            "deviceType": device_type,
+            "branch": device.get("branch", "Unknown"),
+        })
+
+    logger.info(f"[Topology] Created {len(nodes)} nodes")
+
+    # Discover connections from interface descriptions
+    connection_count = 0
+    for device in devices:
+        try:
+            # Fetch interfaces for this device
+            interfaces = await loop.run_in_executor(
+                executor, lambda d=device: zabbix.get_router_interfaces(d["hostid"])
+            )
+
+            # Parse interface descriptions to find connections
+            for iface_name, iface_data in interfaces.items():
+                description = iface_data.get("description", "").lower().strip()
+                if not description or len(description) < 3:
+                    continue
+
+                # Skip management interfaces
+                if any(skip in description for skip in ["mgmt", "loopback", "null", "vlan"]):
+                    continue
+
+                # Try to match description to device names
+                matched_hostid = None
+                for device_name, hostid in device_name_map.items():
+                    if device_name in description or description in device_name:
+                        # Don't connect device to itself
+                        if hostid != device["hostid"]:
+                            matched_hostid = hostid
+                            break
+
+                if matched_hostid:
+                    # Create edge (avoid duplicates)
+                    edge_key = tuple(sorted([device["hostid"], matched_hostid]))
+                    if edge_key not in edges_set:
+                        edges_set.add(edge_key)
+
+                        # Get bandwidth info
+                        bw_in_mbps = iface_data.get("bandwidth_in", 0) / 1000000
+                        bw_out_mbps = iface_data.get("bandwidth_out", 0) / 1000000
+                        iface_status = iface_data.get("status", "unknown")
+
+                        edge_label = f"↓{bw_in_mbps:.1f}M ↑{bw_out_mbps:.1f}M" if bw_in_mbps > 0 else ""
+
+                        edges.append({
+                            "from": device["hostid"],
+                            "to": matched_hostid,
+                            "label": edge_label,
+                            "title": f"Interface: {iface_name}\nDescription: {iface_data.get('description', '')}\n↓ {bw_in_mbps:.2f} Mbps\n↑ {bw_out_mbps:.2f} Mbps\nStatus: {iface_status}",
+                            "color": "#14b8a6" if iface_status == "up" else "#dc3545",
+                            "width": 3 if bw_in_mbps > 100 else 2,
+                            "font": {"size": 10, "color": "#00d9ff"},
+                        })
+                        connection_count += 1
+
+        except Exception as e:
+            logger.debug(f"[Topology] Could not fetch interfaces for {device.get('display_name', 'unknown')}: {e}")
+            continue
+
+    logger.info(f"[Topology] Discovered {connection_count} connections from interface descriptions")
+
+    # Count device types for stats
     core_routers = [d for d in devices if d.get("device_type") == "Core Router"]
-    branch_switches = [d for d in devices if d.get("device_type") in ["Switch", "L3 Switch", "Branch Switch"]]
+    branch_switches = [d for d in devices if d.get("device_type") in ["Switch", "L3 Switch", "Branch Switch", "Router"]]
     end_devices = [d for d in devices if d not in core_routers and d not in branch_switches]
 
-    if view == "hierarchical":
-        # Level 0: Core Routers
+    # Legacy hierarchical view support removed - now using discovery mode only
+
+    if False and view == "hierarchical":
+        # Level 0: Core Routers (LEGACY CODE - DISABLED)
         for router in core_routers:
             status = router.get("ping_status", "Unknown")
             # Fetch interface statistics for core routers
@@ -120,6 +233,17 @@ async def get_topology(
         for branch_name, switches in branches_by_region.items():
             for switch in switches:
                 status = switch.get("ping_status", "Unknown")
+
+                # Determine device type based on IP address last octet
+                ip = switch.get("ip", "")
+                device_type = "Switch"  # Default
+                if ip:
+                    last_octet = ip.split(".")[-1] if "." in ip else ""
+                    if last_octet == "5":
+                        device_type = "Router"
+                    elif last_octet in ["245", "246"]:
+                        device_type = "Switch"
+
                 nodes.append(
                     {
                         "id": switch["hostid"],
@@ -131,6 +255,7 @@ async def get_topology(
                         "color": "#14b8a6" if status == "Up" else "#dc3545",
                         "shape": "box",
                         "branch": branch_name,
+                        "deviceType": device_type,  # Add deviceType field
                     }
                 )
 

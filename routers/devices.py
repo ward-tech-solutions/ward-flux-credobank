@@ -123,3 +123,109 @@ async def update_device(
             status_code=500,
             content={"error": f"Failed to update device: {str(e)}"},
         )
+
+
+@router.get("/{hostid}/history")
+async def get_device_history(
+    request: Request,
+    hostid: str,
+    time_range: str = "24h",  # 24h, 7d, 30d
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get real ping history from Zabbix for a device"""
+    import time
+
+    zabbix = request.app.state.zabbix
+    loop = asyncio.get_event_loop()
+
+    # Convert time range to seconds
+    time_map = {"24h": 86400, "7d": 604800, "30d": 2592000}
+    time_from = int(time.time()) - time_map.get(time_range, 86400)
+
+    history = await loop.run_in_executor(
+        None,
+        lambda: zabbix.get_device_ping_history(hostid, time_from)
+    )
+    return {"hostid": hostid, "history": history, "time_range": time_range}
+
+
+@router.post("/{hostid}/ping")
+async def ping_device(
+    request: Request,
+    hostid: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Execute ping command for a device"""
+    import subprocess
+    import time
+
+    zabbix = request.app.state.zabbix
+
+    # Get device details to get IP
+    loop = asyncio.get_event_loop()
+    device = await loop.run_in_executor(
+        None,
+        lambda: zabbix.get_host_details(hostid)
+    )
+
+    if not device:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Device not found"}
+        )
+
+    ip = device.get("ip")
+    if not ip:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Device has no IP address"}
+        )
+
+    try:
+        # Execute ping command (platform-independent)
+        import platform
+        param = "-n" if platform.system().lower() == "windows" else "-c"
+
+        start_time = time.time()
+        result = subprocess.run(
+            ["ping", param, "4", ip],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        elapsed_time = int((time.time() - start_time) * 1000)
+
+        success = result.returncode == 0
+
+        # Parse response time from output
+        response_time = None
+        if success:
+            # Try to extract time from output
+            output_lower = result.stdout.lower()
+            if "time=" in output_lower:
+                # Extract time value
+                import re
+                time_match = re.search(r'time[=<](\d+\.?\d*)\s*ms', output_lower)
+                if time_match:
+                    response_time = float(time_match.group(1))
+
+        return {
+            "success": success,
+            "ip": ip,
+            "response_time": response_time or elapsed_time // 4 if success else None,
+            "output": result.stdout[:500],  # Limit output
+            "error": result.stderr[:500] if not success else None
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "ip": ip,
+            "response_time": None,
+            "error": "Ping timeout (10s)"
+        }
+    except Exception as e:
+        logger.error(f"Failed to ping device {hostid}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to ping device: {str(e)}"}
+        )

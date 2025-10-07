@@ -203,6 +203,7 @@ class AlertHistory(Base):
 class DiscoveryRule(Base):
     """Network discovery rules - auto-discover devices"""
     __tablename__ = "discovery_rules"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False, unique=True)
@@ -234,6 +235,7 @@ class DiscoveryRule(Base):
 class DiscoveryResult(Base):
     """Discovery results - found devices"""
     __tablename__ = "discovery_results"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     rule_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("discovery_rules.id"), nullable=False)

@@ -19,4 +19,19 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // Optimize bundle size with code splitting
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['react', 'react-dom', 'react-router-dom'],
+          'charts': ['recharts'],
+          'maps': ['leaflet', 'react-leaflet', 'react-leaflet-cluster'],
+          'ui': ['lucide-react', 'clsx', 'tailwind-merge'],
+          'query': ['@tanstack/react-query', 'axios'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600, // Increase warning limit to 600KB
+  },
 })

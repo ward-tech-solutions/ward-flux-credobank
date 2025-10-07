@@ -870,6 +870,47 @@ class ZabbixClient:
 
         return {"branch": branch_name, "region": region, "ip": ip, "device_type": device_type}
 
+    def get_device_ping_history(self, hostid: str, time_from: int):
+        """Get ping/availability history for a device"""
+        try:
+            # Get icmpping item for the device
+            items = self.zapi.item.get(
+                hostids=hostid,
+                search={"key_": "icmpping"},
+                output=["itemid", "name", "key_"]
+            )
+
+            if not items:
+                logger.warning(f"No icmpping item found for host {hostid}")
+                return []
+
+            item_id = items[0]["itemid"]
+
+            # Get history data (type 3 = unsigned int for icmpping)
+            history = self.zapi.history.get(
+                itemids=item_id,
+                history=3,  # Type: Unsigned int
+                time_from=time_from,
+                time_till=int(time.time()),
+                output="extend",
+                sortfield="clock",
+                sortorder="ASC",
+                limit=1000
+            )
+
+            # Transform to frontend format
+            return [
+                {
+                    "timestamp": int(h["clock"]) * 1000,  # Convert to milliseconds
+                    "value": int(h["value"]),  # 1 = UP, 0 = DOWN
+                    "clock": int(h["clock"])
+                }
+                for h in history
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get ping history for {hostid}: {e}")
+            return []
+
     def calculate_availability(self, hostid, period_hours=168):
         """
         Calculate device availability from Zabbix history

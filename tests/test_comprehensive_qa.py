@@ -14,6 +14,12 @@ from datetime import datetime, timedelta
 import json
 import os
 
+# Ensure security environment variables are set before importing the app
+os.environ.setdefault("SECRET_KEY", "test-secret-key-change-me")
+os.environ.setdefault("ENCRYPTION_KEY", "Z4dL4W6p2E4oZ1wR0Tn44K3UthW9ZkHqT7f0Yy5tw6Q=")
+os.environ.setdefault("DEFAULT_ADMIN_PASSWORD", "Ward@2025!")
+os.environ.setdefault("WARD_ENCRYPTION_KEY", "T5Vzgu0kNimC_JB1pZ-8R1t8eSGYbT5XN8jvwp5KVyE=")
+
 # Set test mode before importing app
 os.environ["TESTING"] = "true"
 

@@ -148,7 +148,7 @@ export default function Topology() {
   useEffect(() => {
     loadVisJS()
       .then(() => {
-        console.log('[Topology] vis.js ready')
+        // vis.js ready
         setVisJsLoading(false)
       })
       .catch(err => {
@@ -194,11 +194,11 @@ export default function Topology() {
 
     const attemptLoad = () => {
       if (canvasRef.current) {
-        console.log('[Topology] Canvas ready, loading topology data')
+        // Canvas ready, loading topology data
         loadTopologyData()
       } else if (retries < maxRetries) {
         retries++
-        console.log(`[Topology] Canvas not ready, retry ${retries}/${maxRetries}`)
+        // Canvas not ready, retrying...
         setTimeout(attemptLoad, 100 * retries) // Increasing delay: 100ms, 200ms, 300ms...
       } else {
         console.error('[Topology] Canvas failed to initialize after', maxRetries, 'retries')
@@ -210,7 +210,7 @@ export default function Topology() {
     const timer = setTimeout(attemptLoad, 50)
 
     return () => clearTimeout(timer)
-  }, [visJsLoading])
+  }, [visJsLoading, selectedDeviceId])
 
   // Focus and highlight selected device when selection changes
   useEffect(() => {
@@ -219,7 +219,7 @@ export default function Topology() {
       const node = nodesRef.current.get(selectedDeviceId)
 
       if (node) {
-        console.log('[Topology] Device selection changed, focusing on device:', selectedDeviceId)
+        // Device selection changed, focusing on device
 
         // Select and focus on the node
         networkRef.current.selectNodes([selectedDeviceId])
@@ -234,7 +234,7 @@ export default function Topology() {
         // Automatically show device details
         handleNodeClick(node)
       } else {
-        console.warn('[Topology] Device not found in topology:', selectedDeviceId, selectedDeviceName)
+        // Device not found in topology
         // Optionally show a message to the user
         setShowDetailsPanel(false)
         setSelectedDevice(null)
@@ -246,7 +246,7 @@ export default function Topology() {
   useEffect(() => {
     if (!selectedDeviceId || !selectedDeviceName) return
 
-    console.log(`[Topology] Setting up interface monitoring for: ${selectedDeviceName}`)
+    // Setting up interface monitoring
 
     // Fetch immediately
     fetchRouterInterfaces(selectedDeviceId, selectedDeviceName)
@@ -271,17 +271,17 @@ export default function Topology() {
     return new Promise((resolve, reject) => {
       // Check if already loaded
       if (window.vis) {
-        console.log('[Topology] vis.js already loaded')
+        // vis.js already loaded
         resolve()
         return
       }
 
-      // Load vis.js from CDN
+      // Load vis.js from CDN (using jsdelivr for better reliability)
       const script = document.createElement('script')
-      script.src = 'https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js'
+      script.src = 'https://cdn.jsdelivr.net/npm/vis-network@9.1.6/dist/vis-network.min.js'
       script.async = true
       script.onload = () => {
-        console.log('[Topology] vis.js loaded successfully')
+        // vis.js loaded successfully
         resolve()
       }
       script.onerror = () => {
@@ -293,7 +293,7 @@ export default function Topology() {
       // Load vis.js CSS
       const link = document.createElement('link')
       link.rel = 'stylesheet'
-      link.href = 'https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.css'
+      link.href = 'https://cdn.jsdelivr.net/npm/vis-network@9.1.6/dist/vis-network.min.css'
       document.head.appendChild(link)
     })
   }
@@ -305,7 +305,7 @@ export default function Topology() {
       // Build URL with optional device filter
       let url = '/api/topology?view=hierarchical&limit=200'
       if (selectedDeviceId) {
-        console.log('[Topology] Loading topology for device:', selectedDeviceId)
+        // Loading topology for selected device
         // Note: Backend would need to support device filtering in the future
         // For now, we'll filter on the frontend
       }
@@ -317,7 +317,7 @@ export default function Topology() {
       }
 
       const data: TopologyData = await response.json()
-      console.log('[Topology] Data loaded:', data.stats)
+      // Data loaded successfully
 
       if (!window.vis) {
         console.error('[Topology] vis.js not available')
@@ -329,25 +329,114 @@ export default function Topology() {
       let filteredNodes = data.nodes || []
       let filteredEdges = data.edges || []
 
-      console.log(`[Topology] Total network: ${filteredNodes.length} nodes and ${filteredEdges.length} edges`)
+      // Processing network data
 
-      // Enhance nodes with device-specific icons
+      // Filter nodes and edges based on selected device
+      if (selectedDeviceId) {
+        // Filtering topology for selected device
+
+        // Find all directly connected nodes (neighbors)
+        const connectedNodeIds = new Set<string>()
+        connectedNodeIds.add(selectedDeviceId) // Add the selected device itself
+        connectedNodeIds.add(String(selectedDeviceId)) // Also add string version for matching
+
+        // Find all edges connected to the selected device
+        const relevantEdges = filteredEdges.filter((edge: DeviceEdge) => {
+          // Convert IDs to strings for consistent comparison
+          const fromId = String(edge.from)
+          const toId = String(edge.to)
+          const selectedId = String(selectedDeviceId)
+          const matches = fromId === selectedId || toId === selectedId
+
+          if (matches) {
+            // Found matching edge
+          }
+
+          return matches
+        })
+
+        // Found edges connected to device
+
+        // Add all neighbor node IDs
+        relevantEdges.forEach((edge: DeviceEdge) => {
+          const fromId = String(edge.from)
+          const toId = String(edge.to)
+          const selectedId = String(selectedDeviceId)
+
+          if (fromId === selectedId) {
+            connectedNodeIds.add(edge.to)
+            connectedNodeIds.add(String(edge.to))
+            // Added neighbor node
+          }
+          if (toId === selectedId) {
+            connectedNodeIds.add(edge.from)
+            connectedNodeIds.add(String(edge.from))
+            // Added neighbor node
+          }
+        })
+
+        // Filter nodes to show selected device and its neighbors (exclude only core routers)
+        filteredNodes = filteredNodes.filter((node: DeviceNode) => {
+          const nodeId = String(node.id)
+          const isConnected = connectedNodeIds.has(node.id) || connectedNodeIds.has(nodeId)
+          const deviceType = (node.deviceType || '').toLowerCase()
+          const isCoreRouter = deviceType.includes('core')
+
+          // If it's the selected device, always include it
+          if (nodeId === String(selectedDeviceId)) {
+            return true
+          }
+
+          // For neighbors: include all except core routers
+          const shouldInclude = isConnected && !isCoreRouter
+          if (isConnected) {
+          }
+
+          return shouldInclude
+        })
+
+        // Use the relevant edges
+        filteredEdges = relevantEdges
+
+      }
+
+      // Enhance nodes with device-specific icons and extract IP for label
       const enhancedNodes = filteredNodes.map((node: DeviceNode) => {
         const deviceType = node.deviceType || 'Unknown'
         const visualization = getDeviceVisualization(deviceType)
 
+        // Extract IP address from title field (format: "DeviceName\nIP\n...")
+        let ipAddress = ''
+        if (node.title) {
+          const titleLines = node.title.split('\n')
+          if (titleLines.length > 1) {
+            ipAddress = titleLines[1]  // Second line is typically the IP
+          }
+        }
+
+        // Create label with device name and IP - use title's first line if label is empty
+        let displayLabel = node.label || ''
+        if (!displayLabel && node.title) {
+          displayLabel = node.title.split('\n')[0]  // Use first line from title if label is empty
+        }
+        const labelWithIP = ipAddress ? `${displayLabel}\n${ipAddress}` : displayLabel
+
         return {
           ...node,
+          label: labelWithIP,  // Add IP address to label
           shape: visualization.shape,
           icon: {
             code: visualization.unicode,
-            size: node.level === 0 ? 50 : node.level === 1 ? 40 : 30,
+            size: 60,  // Larger icon size for better visibility
             color: node.color || visualization.color
           },
           font: {
             ...node.font,
-            size: node.level === 0 ? 16 : node.level === 1 ? 14 : 12
-          }
+            size: 16,  // Larger font for better readability
+            multi: 'html',
+            bold: true
+          },
+          size: 40  // Increase node size
         }
       })
 
@@ -390,6 +479,18 @@ export default function Topology() {
       // Create network visualization
       createNetworkVisualization()
 
+      // Force fit after data loads (especially important for small filtered views)
+      setTimeout(() => {
+        if (networkRef.current) {
+          networkRef.current.fit({
+            animation: {
+              duration: 500,
+              easingFunction: 'easeInOutQuad'
+            }
+          })
+        }
+      }, 300)
+
       setLoading(false)
     } catch (error) {
       console.error('[Topology] Error loading data:', error)
@@ -411,8 +512,8 @@ export default function Topology() {
       return
     }
 
-    console.log('[Topology] Creating network with', nodesRef.current.length, 'nodes and', edgesRef.current.length, 'edges')
-    console.log('[Topology] Container dimensions:', canvasRef.current.offsetWidth, 'x', canvasRef.current.offsetHeight)
+    // Creating network visualization
+    // Setting up network visualization with container dimensions
 
     const isDark = document.documentElement.classList.contains('dark')
 
@@ -478,9 +579,9 @@ export default function Topology() {
           fit: true
         },
         hierarchicalRepulsion: {
-          nodeDistance: 400,
-          springLength: 450,
-          springConstant: 0.002,
+          nodeDistance: 200,  // Reduced for better small network visibility
+          springLength: 250,  // Reduced for better small network visibility
+          springConstant: 0.01,
           damping: 0.09
         },
         solver: 'hierarchicalRepulsion'

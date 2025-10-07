@@ -2,8 +2,10 @@
 Authentication and authorization utilities
 """
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Optional
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -16,7 +18,13 @@ from database import get_db, User, UserRole
 logger = logging.getLogger(__name__)
 
 # Security configuration
-SECRET_KEY = "your-secret-key-change-this-in-production-use-openssl-rand-hex-32"
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is required but was not found. "
+        "Set SECRET_KEY to a strong value (e.g. openssl rand -base64 32)."
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 

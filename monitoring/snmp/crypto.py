@@ -9,13 +9,13 @@ from cryptography.fernet import Fernet
 
 logger = logging.getLogger(__name__)
 
-# Get encryption key from environment or generate one
+# Get encryption key from environment
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
 if not ENCRYPTION_KEY:
-    # Generate a key for development (NEVER do this in production!)
-    logger.warning("No ENCRYPTION_KEY found in environment. Generating temporary key (development only)!")
-    ENCRYPTION_KEY = Fernet.generate_key().decode()
-    os.environ["ENCRYPTION_KEY"] = ENCRYPTION_KEY
+    raise RuntimeError(
+        "ENCRYPTION_KEY environment variable is required but was not found. "
+        "Generate one with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+    )
 
 # Initialize Fernet cipher
 try:

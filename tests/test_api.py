@@ -4,10 +4,49 @@ WARD TECH SOLUTIONS - API Test Suite
 Copyright © 2025 WARD Tech Solutions
 ═══════════════════════════════════════════════════════════════════
 """
+import os
+
+# Ensure security-sensitive environment variables are set before importing the app
+os.environ.setdefault("SECRET_KEY", "test-secret-key-change-me")
+os.environ.setdefault("ENCRYPTION_KEY", "Z4dL4W6p2E4oZ1wR0Tn44K3UthW9ZkHqT7f0Yy5tw6Q=")
+os.environ.setdefault("DEFAULT_ADMIN_PASSWORD", "Ward@2025!")
+
 import pytest
 from httpx import AsyncClient
 from fastapi.testclient import TestClient
+from passlib.context import CryptContext
+
 from main import app
+from database import SessionLocal, User, UserRole, init_db
+
+# Ensure database schema exists and default admin user is provisioned for tests
+init_db()
+_db = SessionLocal()
+try:
+    pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+    admin = _db.query(User).filter(User.username == "admin").first()
+    hashed_password = pwd_context.hash(os.environ["DEFAULT_ADMIN_PASSWORD"])
+
+    if not admin:
+        admin = User(
+            username="admin",
+            email="admin@wardops.tech",
+            full_name="Administrator",
+            hashed_password=hashed_password,
+            role=UserRole.ADMIN,
+            is_active=True,
+            is_superuser=True,
+        )
+        _db.add(admin)
+    else:
+        admin.hashed_password = hashed_password
+        admin.role = UserRole.ADMIN
+        admin.is_active = True
+        admin.is_superuser = True
+
+    _db.commit()
+finally:
+    _db.close()
 
 # Synchronous test client for simpler tests
 client = TestClient(app)
