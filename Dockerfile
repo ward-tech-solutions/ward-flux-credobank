@@ -61,8 +61,8 @@ RUN chmod +x /app/docker-entrypoint.sh && chown ward:ward /app/docker-entrypoint
 # Copy Python packages from builder
 COPY --from=python-builder /root/.local /home/ward/.local
 
-# Copy built frontend from frontend-builder
-COPY --from=frontend-builder --chown=ward:ward /frontend/dist /app/static
+# Copy built frontend from frontend-builder into expected static_new directory
+COPY --from=frontend-builder --chown=ward:ward /frontend/dist /app/static_new
 
 # Copy application code
 COPY --chown=ward:ward . .

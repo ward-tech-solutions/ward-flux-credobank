@@ -71,7 +71,6 @@ wheels/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
-static_new/
 
 # Development scripts
 setup.sh
