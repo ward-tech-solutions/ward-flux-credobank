@@ -130,7 +130,32 @@ docker-compose ps
 
 **Default Credentials:**
 - Username: `admin`
-- Password: `admin` (change immediately after first login)
+- Password: `admin123` (change immediately after first login)
+
+## Prebuilt Container Image
+
+Production images are published automatically to GitHub Container Registry. Pull the latest build directly:
+
+```bash
+docker pull ghcr.io/ward-tech-solutions/ward-flux-v2:latest
+```
+
+Run the container with persistent volumes and required secrets:
+
+```bash
+docker run -d \
+  --name ward-flux \
+  -p 5001:5001 \
+  -v ward-flux-data:/data \
+  -v ward-flux-logs:/logs \
+  -e SECRET_KEY="$(openssl rand -base64 32)" \
+  -e ENCRYPTION_KEY="$(python3 - <<'PY';from cryptography.fernet import Fernet;print(Fernet.generate_key().decode());PY)" \
+  -e DEFAULT_ADMIN_PASSWORD="admin123" \
+  -e DATABASE_URL="sqlite:////data/ward_flux.db" \
+  ghcr.io/ward-tech-solutions/ward-flux-v2:latest
+```
+
+Additional environment variables (e.g., `REDIS_URL`, `ZABBIX_URL`, `ZABBIX_USER`, `ZABBIX_PASSWORD`) can be supplied to enable advanced features. On first launch the platform creates an admin account (`admin` / `admin123`); update the password immediately after logging in.
 
 ## Manual Installation
 

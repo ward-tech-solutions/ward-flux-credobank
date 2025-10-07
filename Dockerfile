@@ -54,6 +54,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh && chown ward:ward /app/docker-entrypoint.sh
+
 # Copy Python packages from builder
 COPY --from=python-builder /root/.local /home/ward/.local
 
@@ -82,4 +86,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:5001/api/v1/health || exit 1
 
 # Default command
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5001"]
