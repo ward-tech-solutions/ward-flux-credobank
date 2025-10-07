@@ -72,61 +72,57 @@ A modern, enterprise-grade network monitoring platform built with FastAPI, React
 
 ## Quick Start with Docker
 
-### 1. Clone the Repository
+> ✅ Copy‑paste friendly commands below  
+> ✅ Default admin user: **admin / admin123** (update the password straight after login)
+
+### 1. Clone and Prepare
 ```bash
+# Optional: clone the repository if you want the compose files or templates
 git clone https://github.com/ward-tech-solutions/ward-flux.git
 cd ward-flux
-```
 
-### 2. Configure Environment Variables
-```bash
-# Copy the example environment file
+# Copy baseline env file and edit secrets
 cp .env.example .env
 
-# Edit .env with your configuration
-nano .env
+# Generate strong secrets (adjust to your secrets manager as needed)
+SECRET_KEY="$(openssl rand -base64 32)"
+ENCRYPTION_KEY="$(python3 - <<'PY'
+from cryptography.fernet import Fernet
+print(Fernet.generate_key().decode())
+PY
+)"
+
+printf "\nSECRET_KEY=%s\nENCRYPTION_KEY=%s\n" "$SECRET_KEY" "$ENCRYPTION_KEY" >> .env
 ```
 
-**Required Environment Variables:**
+### 2. One-Container Startup (SQLite + logs persisted)
 ```bash
-# Database
-POSTGRES_PASSWORD=your_secure_password
-DATABASE_URL=postgresql://ward:your_secure_password@postgres:5432/ward_flux
-
-# Redis
-REDIS_PASSWORD=your_redis_password
-REDIS_URL=redis://:your_redis_password@redis:6379/0
-
-# Security (IMPORTANT: Generate these!)
-ENCRYPTION_KEY=<generate with: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
-SECRET_KEY=<generate with: openssl rand -base64 32>
-
-# Zabbix (Optional - only if using Zabbix integration)
-ZABBIX_URL=http://your-zabbix-server/api_jsonrpc.php
-ZABBIX_USER=your_zabbix_username
-ZABBIX_PASSWORD=your_zabbix_password
-
-# Grafana
-GRAFANA_PASSWORD=your_grafana_password
+docker run -d \
+  --name ward-flux \
+  -p 5001:5001 \
+  -v ward-flux-data:/data \
+  -v ward-flux-logs:/logs \
+  -e SECRET_KEY="${SECRET_KEY}" \
+  -e ENCRYPTION_KEY="${ENCRYPTION_KEY}" \
+  -e DEFAULT_ADMIN_PASSWORD="admin123" \
+  ghcr.io/ward-tech-solutions/ward-flux-v2:latest
 ```
 
-### 3. Launch the Stack
+### 3. Full Stack via Docker Compose (Postgres, Redis, optional workers)
 ```bash
-# Start all services
-docker-compose up -d
+# Bring everything online
+docker compose up -d
 
-# View logs
-docker-compose logs -f api
-
-# Check service health
-docker-compose ps
+# Follow API logs and inspect service health
+docker compose logs -f api
+docker compose ps
 ```
 
 ### 4. Access the Platform
-- **Web Interface**: http://localhost:5001
-- **API Documentation**: http://localhost:5001/docs
-- **Grafana**: http://localhost:3000
-- **VictoriaMetrics**: http://localhost:8428
+- **Web Interface**: http://localhost:5001  
+- **API Docs**: http://localhost:5001/docs  
+- **Grafana** (if enabled): http://localhost:3000  
+- **VictoriaMetrics** (if enabled): http://localhost:8428
 
 **Default Credentials:**
 - Username: `admin`
@@ -140,22 +136,7 @@ Production images are published automatically to GitHub Container Registry. Pull
 docker pull ghcr.io/ward-tech-solutions/ward-flux-v2:latest
 ```
 
-Run the container with persistent volumes and required secrets:
-
-```bash
-docker run -d \
-  --name ward-flux \
-  -p 5001:5001 \
-  -v ward-flux-data:/data \
-  -v ward-flux-logs:/logs \
-  -e SECRET_KEY="$(openssl rand -base64 32)" \
-  -e ENCRYPTION_KEY="$(python3 - <<'PY';from cryptography.fernet import Fernet;print(Fernet.generate_key().decode());PY)" \
-  -e DEFAULT_ADMIN_PASSWORD="admin123" \
-  -e DATABASE_URL="sqlite:////data/ward_flux.db" \
-  ghcr.io/ward-tech-solutions/ward-flux-v2:latest
-```
-
-Additional environment variables (e.g., `REDIS_URL`, `ZABBIX_URL`, `ZABBIX_USER`, `ZABBIX_PASSWORD`) can be supplied to enable advanced features. On first launch the platform creates an admin account (`admin` / `admin123`); update the password immediately after logging in.
+Additional environment variables (e.g., `DATABASE_URL`, `REDIS_URL`, `ZABBIX_URL`, `ZABBIX_USER`, `ZABBIX_PASSWORD`) can be supplied to enable advanced features or external services. On first launch the container seeds the default admin account (`admin` / `admin123`).
 
 ## Manual Installation
 
