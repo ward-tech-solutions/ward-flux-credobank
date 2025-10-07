@@ -259,7 +259,7 @@ export default function Map() {
                     const count = markers.length
                     const onlineCount = markers.filter((m: any) => {
                       const device = m.options.device
-                      return device.ping_status === 'Up' || device.available === 'Available'
+                      return device && (device.ping_status === 'Up' || device.available === 'Available')
                     }).length
                     const allOnline = onlineCount === count
                     const allOffline = onlineCount === 0

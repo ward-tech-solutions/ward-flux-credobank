@@ -40,7 +40,7 @@ export default function Sidebar() {
             alt="WARD FLUX"
           />
           <span className="ml-3 text-xl font-bold text-gray-900 dark:text-white">
-            WARD FLUX
+            FLUX
           </span>
         </div>
 

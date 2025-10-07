@@ -25,6 +25,50 @@ declare global {
   }
 }
 
+// Device type to icon/shape mapping for topology visualization
+const getDeviceVisualization = (deviceType: string): { shape: string; unicode: string; color: string } => {
+  const type = deviceType?.toLowerCase() || ''
+
+  // Switch devices
+  if (type.includes('switch')) {
+    return { shape: 'icon', unicode: '⚡', color: '#14b8a6' } // Network/Switch
+  }
+  // Router devices
+  if (type.includes('router') && !type.includes('core')) {
+    return { shape: 'icon', unicode: '🌐', color: '#3b82f6' } // Globe/Router
+  }
+  // Core Router
+  if (type.includes('core')) {
+    return { shape: 'icon', unicode: '🖥️', color: '#FF6B35' } // Monitor/Core
+  }
+  // Access Point / WiFi
+  if (type.includes('access point') || type.includes('wifi') || type.includes('wireless')) {
+    return { shape: 'icon', unicode: '📡', color: '#10b981' } // WiFi
+  }
+  // NVR / Camera
+  if (type.includes('nvr') || type.includes('camera')) {
+    return { shape: 'icon', unicode: '📹', color: '#8b5cf6' } // Video
+  }
+  // Paybox
+  if (type.includes('paybox')) {
+    return { shape: 'icon', unicode: '💳', color: '#ec4899' } // Credit Card
+  }
+  // ATM
+  if (type.includes('atm')) {
+    return { shape: 'icon', unicode: '💵', color: '#f59e0b' } // Banknote
+  }
+  // Biostar
+  if (type.includes('biostar') || type.includes('biometric')) {
+    return { shape: 'icon', unicode: '👆', color: '#6366f1' } // Fingerprint
+  }
+  // Disaster Recovery
+  if (type.includes('disaster') || type.includes('dr')) {
+    return { shape: 'icon', unicode: '🛡️', color: '#14b8a6' } // Shield
+  }
+  // Default - Server
+  return { shape: 'icon', unicode: '🖥️', color: '#6b7280' } // Server
+}
+
 interface DeviceNode {
   id: string
   label: string
@@ -168,6 +212,36 @@ export default function Topology() {
     return () => clearTimeout(timer)
   }, [visJsLoading])
 
+  // Focus and highlight selected device when selection changes
+  useEffect(() => {
+    if (!visJsLoading && window.vis && networkRef.current && selectedDeviceId && nodesRef.current) {
+      // Check if the node exists in the topology
+      const node = nodesRef.current.get(selectedDeviceId)
+
+      if (node) {
+        console.log('[Topology] Device selection changed, focusing on device:', selectedDeviceId)
+
+        // Select and focus on the node
+        networkRef.current.selectNodes([selectedDeviceId])
+        networkRef.current.focus(selectedDeviceId, {
+          scale: 1.5,
+          animation: {
+            duration: 1000,
+            easingFunction: 'easeInOutQuad'
+          }
+        })
+
+        // Automatically show device details
+        handleNodeClick(node)
+      } else {
+        console.warn('[Topology] Device not found in topology:', selectedDeviceId, selectedDeviceName)
+        // Optionally show a message to the user
+        setShowDetailsPanel(false)
+        setSelectedDevice(null)
+      }
+    }
+  }, [selectedDeviceId])
+
   // Fetch router interfaces using REST API with polling
   useEffect(() => {
     if (!selectedDeviceId || !selectedDeviceName) return
@@ -227,7 +301,16 @@ export default function Topology() {
   const loadTopologyData = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/topology?view=hierarchical&limit=200')
+
+      // Build URL with optional device filter
+      let url = '/api/topology?view=hierarchical&limit=200'
+      if (selectedDeviceId) {
+        console.log('[Topology] Loading topology for device:', selectedDeviceId)
+        // Note: Backend would need to support device filtering in the future
+        // For now, we'll filter on the frontend
+      }
+
+      const response = await fetch(url)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -243,8 +326,63 @@ export default function Topology() {
       }
 
       // Initialize DataSets
-      nodesRef.current = new window.vis.DataSet(data.nodes || [])
-      edgesRef.current = new window.vis.DataSet(data.edges || [])
+      let filteredNodes = data.nodes || []
+      let filteredEdges = data.edges || []
+
+      console.log(`[Topology] Total network: ${filteredNodes.length} nodes and ${filteredEdges.length} edges`)
+
+      // Enhance nodes with device-specific icons
+      const enhancedNodes = filteredNodes.map((node: DeviceNode) => {
+        const deviceType = node.deviceType || 'Unknown'
+        const visualization = getDeviceVisualization(deviceType)
+
+        return {
+          ...node,
+          shape: visualization.shape,
+          icon: {
+            code: visualization.unicode,
+            size: node.level === 0 ? 50 : node.level === 1 ? 40 : 30,
+            color: node.color || visualization.color
+          },
+          font: {
+            ...node.font,
+            size: node.level === 0 ? 16 : node.level === 1 ? 14 : 12
+          }
+        }
+      })
+
+      // Enhance edges with bandwidth-based width
+      const enhancedEdges = filteredEdges.map((edge: DeviceEdge) => {
+        let width = edge.width || 2
+
+        // Parse bandwidth from label if available (format: "↓123.4M ↑56.7M")
+        if (edge.label) {
+          const match = edge.label.match(/↓(\d+\.?\d*)M/)
+          if (match) {
+            const bandwidthMbps = parseFloat(match[1])
+            // Scale width based on bandwidth: 0-100 Mbps = 2-4px, 100-500 Mbps = 4-6px, 500+ Mbps = 6-10px
+            if (bandwidthMbps > 500) {
+              width = 8
+            } else if (bandwidthMbps > 100) {
+              width = 5
+            } else if (bandwidthMbps > 10) {
+              width = 3
+            } else {
+              width = 2
+            }
+          }
+        }
+
+        return {
+          ...edge,
+          width,
+          selectionWidth: 2, // Additional width when selected
+          hoverWidth: 1.5 // Additional width multiplier on hover
+        }
+      })
+
+      nodesRef.current = new window.vis.DataSet(enhancedNodes)
+      edgesRef.current = new window.vis.DataSet(enhancedEdges)
 
       // Update statistics
       updateStatistics(data.stats)
@@ -321,6 +459,16 @@ export default function Topology() {
             enabled: false
           }
         },
+        selectionWidth: 2,
+        hoverWidth: 1.5,
+        chosen: {
+          edge: function(values: any, _id: any, selected: any, hovering: any) {
+            if (hovering || selected) {
+              values.width *= 1.5
+              values.color = '#5EBBA8'
+            }
+          }
+        }
       },
       physics: {
         enabled: true,
@@ -346,7 +494,9 @@ export default function Topology() {
         hover: true,
         tooltipDelay: 100,
         navigationButtons: false,
-        keyboard: true
+        keyboard: true,
+        selectConnectedEdges: false,
+        hoverConnectedEdges: true
       }
     }
 
@@ -400,6 +550,11 @@ export default function Topology() {
         const nodeId = params.nodes[0]
         const node = nodesRef.current.get(nodeId)
         handleNodeClick(node)
+      } else if (params.edges.length > 0) {
+        // Edge clicked - show bandwidth info
+        const edgeId = params.edges[0]
+        const edge = edgesRef.current.get(edgeId)
+        handleEdgeClick(edge)
       } else {
         setShowDetailsPanel(false)
         setSelectedDevice(null)
@@ -416,7 +571,7 @@ export default function Topology() {
       }
     })
 
-    // Hover events
+    // Hover events for nodes
     networkRef.current.on('hoverNode', () => {
       if (canvasRef.current) {
         canvasRef.current.style.cursor = 'pointer'
@@ -424,6 +579,19 @@ export default function Topology() {
     })
 
     networkRef.current.on('blurNode', () => {
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = 'default'
+      }
+    })
+
+    // Hover events for edges - cursor only, vis.js handles visual highlighting
+    networkRef.current.on('hoverEdge', () => {
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = 'pointer'
+      }
+    })
+
+    networkRef.current.on('blurEdge', () => {
       if (canvasRef.current) {
         canvasRef.current.style.cursor = 'default'
       }
@@ -440,6 +608,26 @@ export default function Topology() {
     } else {
       setInterfaceData(null)
     }
+  }
+
+  const handleEdgeClick = (edge: any) => {
+    // Create a pseudo-device object to display edge/connection info
+    const fromNode = nodesRef.current.get(edge.from)
+    const toNode = nodesRef.current.get(edge.to)
+
+    const connectionInfo = {
+      id: edge.id,
+      label: `Connection: ${fromNode?.label || 'Unknown'} → ${toNode?.label || 'Unknown'}`,
+      isEdge: true,
+      edgeLabel: edge.label || 'No bandwidth data',
+      edgeTitle: edge.title || 'Connection details unavailable',
+      fromDevice: fromNode?.label || 'Unknown',
+      toDevice: toNode?.label || 'Unknown'
+    }
+
+    setSelectedDevice(connectionInfo)
+    setShowDetailsPanel(true)
+    setInterfaceData(null)
   }
 
   const fetchRouterInterfaces = useCallback(async (hostid: string, routerName: string) => {
@@ -846,25 +1034,62 @@ export default function Topology() {
                   <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-1">{selectedDevice.label}</p>
                 </div>
 
-                {selectedDevice.deviceType && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Type</label>
-                    <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">{selectedDevice.deviceType}</p>
-                  </div>
-                )}
+                {selectedDevice.isEdge ? (
+                  // Display edge/connection information
+                  <>
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+                      <label className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 block">
+                        Connection Details
+                      </label>
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-xs text-gray-500 dark:text-gray-400">From</label>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedDevice.fromDevice}</p>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 dark:text-gray-400">To</label>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedDevice.toDevice}</p>
+                        </div>
+                        {selectedDevice.edgeLabel && selectedDevice.edgeLabel !== 'No bandwidth data' && (
+                          <div className="bg-ward-green/10 dark:bg-ward-green/20 p-3 rounded-lg mt-2">
+                            <label className="text-xs font-medium text-ward-green dark:text-ward-green">Bandwidth</label>
+                            <p className="text-sm font-mono text-gray-900 dark:text-gray-100 mt-1">{selectedDevice.edgeLabel}</p>
+                          </div>
+                        )}
+                        {selectedDevice.edgeTitle && (
+                          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg mt-2">
+                            <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                              {selectedDevice.edgeTitle}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  // Display device information
+                  <>
+                    {selectedDevice.deviceType && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Type</label>
+                        <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">{selectedDevice.deviceType}</p>
+                      </div>
+                    )}
 
-                {selectedDevice.branch && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Branch</label>
-                    <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">{selectedDevice.branch}</p>
-                  </div>
-                )}
+                    {selectedDevice.branch && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Branch</label>
+                        <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">{selectedDevice.branch}</p>
+                      </div>
+                    )}
 
-                {selectedDevice.region && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Region</label>
-                    <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">{selectedDevice.region}</p>
-                  </div>
+                    {selectedDevice.region && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Region</label>
+                        <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">{selectedDevice.region}</p>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Interface Data for Core Routers */}

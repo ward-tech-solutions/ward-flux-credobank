@@ -13,20 +13,30 @@ import {
   TrendingUp,
   Server,
   XCircle,
+  CreditCard,
+  Banknote,
+  Video,
+  Wifi,
+  Network,
+  Globe,
+  Monitor,
+  Fingerprint,
+  Shield,
+  Package,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 // Device type icons mapping
-const deviceIcons: Record<string, string> = {
-  Paybox: '💳',
-  ATM: '💵',
-  NVR: '📹',
-  'Access Point': '📡',
-  Switch: '🔀',
-  Router: '🌐',
-  'Core Router': '🖥️',
-  Biostar: '👆',
-  'Disaster Recovery': '🛡️',
+const deviceIcons: Record<string, any> = {
+  Paybox: CreditCard,
+  ATM: Banknote,
+  NVR: Video,
+  'Access Point': Wifi,
+  Switch: Network,
+  Router: Globe,
+  'Core Router': Monitor,
+  Biostar: Fingerprint,
+  'Disaster Recovery': Shield,
 }
 
 export default function DashboardEnhanced() {
@@ -249,14 +259,14 @@ export default function DashboardEnhanced() {
             {Object.entries(deviceTypeStats).map(([type, data]: [string, any]) => {
               const uptime =
                 data.total > 0 ? Math.round((data.online / data.total) * 100) : 0
-              const icon = deviceIcons[type] || '📦'
+              const IconComponent = deviceIcons[type] || Package
               return (
                 <div
                   key={type}
                   className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
                 >
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-2xl">{icon}</span>
+                    <IconComponent className="h-6 w-6 text-ward-green" />
                     <h4 className="font-semibold text-gray-900 dark:text-gray-100">{type}</h4>
                   </div>
                   <div className="grid grid-cols-3 gap-2 mb-3">
