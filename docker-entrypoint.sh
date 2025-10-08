@@ -32,6 +32,6 @@ fi
 cd /app
 DATABASE_URL=${DATABASE_URL:-"sqlite:////data/ward_flux.db"}
 echo "[entrypoint] Seeding database at ${DATABASE_URL}"
-PYTHONPATH=/app python3 -m scripts.seed_core --database-url "${DATABASE_URL}"
+PYTHONPATH=/app python3 /app/scripts/seed_core.py --database-url "${DATABASE_URL}"
 
 exec "$@"
