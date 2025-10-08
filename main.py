@@ -330,18 +330,22 @@ except ImportError:
 # ============================================
 # (Setup wizard removed)
 
+from pathlib import Path
+
+static_new_dir = Path("static_new")
+assets_dir = static_new_dir / "assets"
+if assets_dir.exists() and static_new_dir.exists():
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    app.mount("/static", StaticFiles(directory=static_new_dir), name="static")
+else:
+    logger.warning("React build not found. Run npm run build to generate static assets.")
+
+
 @app.on_event("startup")
 async def startup_event():
-    # Mount static assets at runtime to support lifespan/init behavior
-    from pathlib import Path
-
+    # Ensure Zabbix client exists when server starts/reloads
     if not hasattr(app.state, "zabbix"):
         app.state.zabbix = ZabbixClient()
-
-    static_new = Path("static_new")
-    if static_new.exists() and static_new.is_dir():
-        app.mount("/assets", StaticFiles(directory=static_new / "assets"), name="assets")
-        app.mount("/static", StaticFiles(directory=static_new), name="static")
 
 
 # Helper function to run sync code in thread pool
