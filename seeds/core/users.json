@@ -1,0 +1,11 @@
+[
+  {
+    "username": "admin",
+    "email": "admin@wardops.tech",
+    "full_name": "Platform Administrator",
+    "role": "admin",
+    "is_active": true,
+    "is_superuser": true,
+    "default_password_env": "DEFAULT_ADMIN_PASSWORD"
+  }
+]

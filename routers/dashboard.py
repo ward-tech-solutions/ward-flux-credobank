@@ -30,9 +30,10 @@ async def health_check(request: Request):
     try:
         # Check database connection
         from database import SessionLocal
+        from sqlalchemy import text
 
         db = SessionLocal()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
         db_status = "healthy"
     except Exception as e:
@@ -40,8 +41,11 @@ async def health_check(request: Request):
 
     # Check Zabbix connection
     try:
-        zabbix = request.app.state.zabbix
-        zabbix_status = "connected" if zabbix.zapi else "disconnected"
+        zabbix = getattr(request.app.state, "zabbix", None)
+        if zabbix and getattr(zabbix, "zapi", None):
+            zabbix_status = "connected"
+        else:
+            zabbix_status = "not_configured"
     except Exception as e:
         zabbix_status = f"error: {str(e)}"
 

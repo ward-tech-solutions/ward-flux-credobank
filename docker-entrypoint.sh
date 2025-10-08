@@ -28,4 +28,9 @@ if [[ -z "${DEFAULT_ADMIN_PASSWORD:-}" ]]; then
   echo "[entrypoint] DEFAULT_ADMIN_PASSWORD not provided, using default 'admin123'"
 fi
 
+# Ensure database schema and baseline data exist before the API starts.
+DATABASE_URL=${DATABASE_URL:-"sqlite:////data/ward_flux.db"}
+echo "[entrypoint] Seeding database at ${DATABASE_URL}"
+python scripts/seed_core.py --database-url "${DATABASE_URL}"
+
 exec "$@"

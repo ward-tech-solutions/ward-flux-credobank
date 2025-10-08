@@ -70,63 +70,63 @@ A modern, enterprise-grade network monitoring platform built with FastAPI, React
 - Redis 7+
 - VictoriaMetrics (optional, for production)
 
-## Quick Start with Docker
+## Quick Start (Zero Configuration)
 
-> ✅ Copy‑paste friendly commands below  
-> ✅ Default admin user: **admin / admin123** (update the password straight after login)
+> ✅ Pull, run, log in with **admin / admin123**  
+> ✅ Zabbix, users, and other settings can be managed from the UI after login  
+> ✅ Secrets and database seed are auto-generated if you do nothing
 
-### 1. Clone and Prepare
-```bash
-# Optional: clone the repository if you want the compose files or templates
-git clone https://github.com/ward-tech-solutions/ward-flux.git
-cd ward-flux
-
-# Copy baseline env file and edit secrets
-cp .env.example .env
-
-# Generate strong secrets (adjust to your secrets manager as needed)
-SECRET_KEY="$(openssl rand -base64 32)"
-ENCRYPTION_KEY="$(python3 - <<'PY'
-from cryptography.fernet import Fernet
-print(Fernet.generate_key().decode())
-PY
-)"
-
-printf "\nSECRET_KEY=%s\nENCRYPTION_KEY=%s\n" "$SECRET_KEY" "$ENCRYPTION_KEY" >> .env
-```
-
-### 2. One-Container Startup (SQLite + logs persisted)
 ```bash
 docker run -d \
   --name ward-flux \
   -p 5001:5001 \
   -v ward-flux-data:/data \
   -v ward-flux-logs:/logs \
-  -e SECRET_KEY="${SECRET_KEY}" \
-  -e ENCRYPTION_KEY="${ENCRYPTION_KEY}" \
-  -e DEFAULT_ADMIN_PASSWORD="admin123" \
   ghcr.io/ward-tech-solutions/ward-flux-v2:latest
 ```
 
-### 3. Full Stack via Docker Compose (Postgres, Redis, optional workers)
-```bash
-# Bring everything online
-docker compose up -d
+The container entrypoint will:
+1. Generate strong secrets if none are supplied.
+2. Seed the database (including the `admin / admin123` account, monitoring profiles, etc.).
+3. Start the API on port **5001**.
 
-# Follow API logs and inspect service health
-docker compose logs -f api
-docker compose ps
+Open `http://localhost:5001`, sign in with the default credentials, and immediately change the password.  
+From the UI you can configure Zabbix endpoints, select host groups, add/remove users, and update passwords.
+
+### Optional overrides
+
+If you *do* want to provide your own secrets or external services, set these environment variables before `docker run`:
+
+| Variable | Purpose | Default behaviour |
+|----------|---------|-------------------|
+| `SECRET_KEY` | JWT/signing secret | auto-generated |
+| `ENCRYPTION_KEY` | Fernet key for credential storage | auto-generated |
+| `DEFAULT_ADMIN_PASSWORD` | Initial admin password | `admin123` |
+| `DATABASE_URL` | SQL database connection string | SQLite at `/data/ward_flux.db` |
+| `REDIS_URL` | Redis connection for background jobs | `redis://redis:6379/0` |
+| `WARD_ENCRYPTION_KEY` | Optional separate key for SNMP credentials | auto-generated |
+| `CORS_ORIGINS` | Allowed web origins | `*` |
+| `ZABBIX_URL`, `ZABBIX_USER`, `ZABBIX_PASSWORD` | Pre-configure Zabbix | configure later from UI |
+
+Example with PostgreSQL and custom secrets:
+
+```bash
+docker run -d \
+  --name ward-flux \
+  -p 5001:5001 \
+  -v ward-flux-data:/data \
+  -v ward-flux-logs:/logs \
+  -e DATABASE_URL="postgresql://ward:StrongPass@pg-host:5432/ward_flux" \
+  -e SECRET_KEY="$(openssl rand -base64 32)" \
+  -e ENCRYPTION_KEY="$(python - <<'PY'
+from cryptography.fernet import Fernet
+print(Fernet.generate_key().decode())
+PY
+)" \
+  ghcr.io/ward-tech-solutions/ward-flux-v2:latest
 ```
 
-### 4. Access the Platform
-- **Web Interface**: http://localhost:5001  
-- **API Docs**: http://localhost:5001/docs  
-- **Grafana** (if enabled): http://localhost:3000  
-- **VictoriaMetrics** (if enabled): http://localhost:8428
-
-**Default Credentials:**
-- Username: `admin`
-- Password: `admin123` (change immediately after first login)
+The rest of this README covers manual install, advanced deployment, and operations.
 
 ## Prebuilt Container Image
 
@@ -157,6 +157,41 @@ npm install
 npm run build
 cd ..
 ```
+
+## Database Seeding
+
+The platform ships with an idempotent seeding script that loads canonical users, monitoring profiles, and system configuration.
+
+```bash
+# Configure secrets expected by the seed (or rely on your .env file)
+export DEFAULT_ADMIN_PASSWORD="ChangeMe123!"
+export ENCRYPTION_KEY="..."          # 44-char Fernet key
+export WARD_ENCRYPTION_KEY="..."     # Optional SNMP credential key
+
+# Apply migrations and seed the database (SQLite example)
+python scripts/seed_core.py --database-url sqlite:///data/ward_ops.db
+
+# PostgreSQL example
+python scripts/seed_core.py --database-url postgresql://user:pass@host/dbname
+```
+
+The script reads structured JSON files under `seeds/core/`. Update those files to align the baseline records with your production defaults.
+
+## Automated Testing
+
+### Backend
+```bash
+pytest
+```
+
+### Frontend
+```bash
+cd frontend
+npm install        # first run only
+npm run test       # Execute Vitest unit tests
+```
+
+Both suites are fully deterministic and can be wired into CI/CD pipelines without additional setup.
 
 ### 3. Initialize Database
 ```bash

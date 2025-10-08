@@ -18,6 +18,10 @@ from passlib.context import CryptContext
 
 from main import app
 from database import SessionLocal, User, UserRole, init_db
+from tests.zabbix_stub import StaticZabbixClient
+
+
+app.state.zabbix = StaticZabbixClient()
 
 # Ensure database schema exists and default admin user is provisioned for tests
 init_db()
@@ -185,7 +189,7 @@ class TestAsyncEndpoints:
             token = login_response.json()["access_token"]
 
             # Get templates
-            response = await ac.get("/api/v1/templates", headers={"Authorization": f"Bearer {token}"})
+            response = await ac.get("/api/v1/zabbix/templates", headers={"Authorization": f"Bearer {token}"})
             assert response.status_code == 200
             data = response.json()
             assert isinstance(data, list)

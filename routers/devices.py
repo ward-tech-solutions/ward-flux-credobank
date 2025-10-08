@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
-from auth import get_current_active_user
+from auth import get_current_active_user, require_manager_or_admin
 from database import User, UserRole
 from routers.utils import get_monitored_groupids, run_in_executor
 
@@ -72,7 +72,7 @@ async def get_device_details(request: Request, hostid: str):
 async def update_device(
     request: Request,
     hostid: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_manager_or_admin),
 ):
     """Update device region/branch assignment"""
     from pydantic import BaseModel

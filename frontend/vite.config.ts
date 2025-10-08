@@ -34,4 +34,10 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 600, // Increase warning limit to 600KB
   },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/setupTests.ts',
+    css: true,
+  },
 })
