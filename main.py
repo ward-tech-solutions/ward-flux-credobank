@@ -330,15 +330,18 @@ except ImportError:
 # ============================================
 # (Setup wizard removed)
 
-# ============================================
-# Static files and templates
-# ============================================
+@app.on_event("startup")
+async def startup_event():
+    # Mount static assets at runtime to support lifespan/init behavior
+    from pathlib import Path
 
-# Legacy admin UI removed; static assets served only from React build
+    if not hasattr(app.state, "zabbix"):
+        app.state.zabbix = ZabbixClient()
 
-# Mount new React UI static files
-app.mount("/assets", StaticFiles(directory="static_new/assets"), name="assets")
-app.mount("/static", StaticFiles(directory="static_new"), name="static")
+    static_new = Path("static_new")
+    if static_new.exists() and static_new.is_dir():
+        app.mount("/assets", StaticFiles(directory=static_new / "assets"), name="assets")
+        app.mount("/static", StaticFiles(directory=static_new), name="static")
 
 
 # Helper function to run sync code in thread pool

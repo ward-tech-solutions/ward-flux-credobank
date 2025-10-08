@@ -21,7 +21,12 @@ async def run_in_executor(func, *args):
 
 def get_zabbix_client(request):
     """Get Zabbix client from app state"""
-    return request.app.state.zabbix
+    state = request.app.state
+    if not hasattr(state, "zabbix") or state.zabbix is None:
+        from zabbix_client import ZabbixClient
+
+        state.zabbix = ZabbixClient()
+    return state.zabbix
 
 
 def get_monitored_groupids():
