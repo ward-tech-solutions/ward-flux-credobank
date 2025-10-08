@@ -4,11 +4,12 @@ System settings management
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 
 from auth import get_current_active_user, require_admin
+from routers.utils import get_zabbix_client
 from database import User
 
 logger = logging.getLogger(__name__)
@@ -67,18 +68,32 @@ def get_zabbix_settings(current_user: User = Depends(get_current_active_user)):
 @router.post("/zabbix")
 def save_zabbix_settings(
     settings: ZabbixSettings,
+    request: Request,
     current_user: User = Depends(require_admin)
 ):
     """Save Zabbix settings (admin only)"""
+    stored = _settings_storage.get("zabbix", {})
+    password = settings.password or stored.get("password")
+
+    if not password:
+        raise HTTPException(status_code=400, detail="Password is required when configuring Zabbix")
+
     try:
+        client = get_zabbix_client(request)
+        client.reconfigure(settings.url, settings.username, password)
+
+        if not client.is_configured():
+            raise HTTPException(status_code=400, detail="Unable to connect to Zabbix with provided credentials")
+
         _settings_storage["zabbix"] = {
             "url": settings.url,
             "username": settings.username,
+            "password": password,
         }
-        if settings.password:
-            _settings_storage["zabbix"]["password"] = settings.password
 
         return {"success": True, "message": "Zabbix settings saved"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error saving Zabbix settings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -90,9 +105,22 @@ def test_zabbix_connection(
     current_user: User = Depends(require_admin)
 ):
     """Test Zabbix connection"""
+    password = settings.password
+    if not password:
+        raise HTTPException(status_code=400, detail="Password is required to test Zabbix connectivity")
+
     try:
-        # TODO: Implement actual Zabbix connection test
-        return {"success": True, "message": "Zabbix connection test successful"}
+        from zabbix_client import ZabbixClient
+
+        client = ZabbixClient(settings.url, settings.username, password)
+        if not client.is_configured():
+            raise HTTPException(status_code=400, detail="Unable to authenticate with Zabbix")
+
+        # Basic request to confirm API works
+        client.get_all_groups()
+        return {"success": True, "message": "Zabbix connection successful"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error testing Zabbix connection: {e}")
         raise HTTPException(status_code=500, detail=str(e))
