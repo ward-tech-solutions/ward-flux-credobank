@@ -3,22 +3,18 @@ WARD Tech Solutions - Reports Router
 Handles downtime reports and MTTR analysis
 """
 import logging
-import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
+from sqlalchemy import func, and_
+from sqlalchemy.orm import Session
 
 from fastapi import APIRouter, Depends, Request
 
 from auth import get_current_active_user
-from database import User, UserRole
-from routers.utils import get_monitored_groupids, run_in_executor
-
-# Create thread pool executor
-import concurrent.futures
+from database import User, UserRole, get_db, PingResult
+from monitoring.models import StandaloneDevice, AlertHistory
 
 logger = logging.getLogger(__name__)
-
-executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
 # Create router
 router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
@@ -26,99 +22,178 @@ router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
 
 @router.get("/downtime")
 async def get_downtime_report(
-    request: Request,
     period: str = "weekly",
     region: Optional[str] = None,
     device_type: Optional[str] = None,
     current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
-    """Generate downtime report with user permissions"""
-    zabbix = request.app.state.zabbix
-    groupids = get_monitored_groupids()
-    loop = asyncio.get_event_loop()
-    devices = await loop.run_in_executor(executor, lambda: zabbix.get_all_hosts(group_ids=groupids))
+    """Generate downtime report from standalone monitoring data"""
+
+    # Calculate time range based on period
+    period_hours = {"daily": 24, "weekly": 168, "monthly": 720}
+    hours = period_hours.get(period, 168)
+    cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+
+    # Get all standalone devices
+    query = db.query(StandaloneDevice)
 
     # Apply user permission filtering (non-admin users)
     if current_user.role != UserRole.ADMIN:
-        # Filter by region if user has regional restriction
         if current_user.region:
-            devices = [d for d in devices if d.get("region") == current_user.region]
-
-        # Filter by branches if user has branch restrictions
+            query = query.filter(StandaloneDevice.region == current_user.region)
         if current_user.branches:
             allowed_branches = [b.strip() for b in current_user.branches.split(",")]
-            devices = [d for d in devices if d.get("branch") in allowed_branches]
+            query = query.filter(StandaloneDevice.branch.in_(allowed_branches))
 
+    # Apply additional filters
     if region:
-        devices = [d for d in devices if d["region"] == region]
+        query = query.filter(StandaloneDevice.region == region)
     if device_type:
-        devices = [d for d in devices if d["device_type"] == device_type]
+        query = query.filter(StandaloneDevice.device_type == device_type)
+
+    devices = query.all()
 
     report = {
         "period": period,
-        "generated_at": datetime.now().isoformat(),
+        "generated_at": datetime.utcnow().isoformat(),
         "total_devices": len(devices),
         "summary": {"total_downtime_hours": 0, "average_availability": 0, "devices_with_downtime": 0},
         "devices": [],
     }
 
     for device in devices:
-        is_down = device.get("ping_status") == "Down"
-        downtime_hours = 2.5 if is_down else 0.1
-        availability = 95.5 if is_down else 99.9
+        # Calculate real availability from ping results
+        ping_stats = (
+            db.query(
+                func.count(PingResult.id).label("total_pings"),
+                func.sum(func.cast(PingResult.is_reachable, func.INTEGER)).label("successful_pings"),
+            )
+            .filter(
+                and_(
+                    PingResult.device_ip == device.ip,
+                    PingResult.timestamp >= cutoff_time
+                )
+            )
+            .first()
+        )
+
+        total_pings = ping_stats.total_pings or 0
+        successful_pings = ping_stats.successful_pings or 0
+
+        if total_pings > 0:
+            availability = round((successful_pings / total_pings) * 100, 2)
+            downtime_hours = round(hours * (1 - availability / 100), 2)
+        else:
+            availability = 0.0
+            downtime_hours = hours
+
+        # Count incidents from alert history
+        incident_count = (
+            db.query(func.count(AlertHistory.id))
+            .filter(
+                and_(
+                    AlertHistory.device_id == device.id,
+                    AlertHistory.triggered_at >= cutoff_time
+                )
+            )
+            .scalar() or 0
+        )
 
         report["devices"].append(
             {
-                "hostid": device["hostid"],
-                "name": device["display_name"],
-                "region": device["region"],
-                "branch": device["branch"],
-                "device_type": device["device_type"],
+                "hostid": str(device.id),
+                "name": device.name,
+                "region": device.region or "Unknown",
+                "branch": device.branch or "Unknown",
+                "device_type": device.device_type or "Unknown",
                 "downtime_hours": downtime_hours,
                 "availability_percent": availability,
-                "incidents": 1 if is_down else 0,
+                "incidents": incident_count,
             }
         )
 
         report["summary"]["total_downtime_hours"] += downtime_hours
-        if is_down:
+        if availability < 99.0:
             report["summary"]["devices_with_downtime"] += 1
 
-    report["summary"]["average_availability"] = round(
-        sum(d["availability_percent"] for d in report["devices"]) / len(devices) if devices else 0, 2
-    )
+    if len(devices) > 0:
+        report["summary"]["average_availability"] = round(
+            sum(d["availability_percent"] for d in report["devices"]) / len(devices), 2
+        )
+    else:
+        report["summary"]["average_availability"] = 0.0
 
     return report
 
 
 @router.get("/mttr-extended")
-async def get_mttr_extended(request: Request):
-    """Extended MTTR trends and analysis"""
-    zabbix = request.app.state.zabbix
-    base_mttr = await run_in_executor(zabbix.get_mttr_stats)
-    devices = await run_in_executor(zabbix.get_all_hosts)
+async def get_mttr_extended(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Extended MTTR trends and analysis from standalone monitoring"""
 
-    device_downtime = []
-    for device in devices:
-        if device.get("triggers"):
-            downtime_minutes = len(device["triggers"]) * 15
-            device_downtime.append(
-                {
-                    "name": device["display_name"],
-                    "hostid": device["hostid"],
-                    "region": device["region"],
-                    "downtime_minutes": downtime_minutes,
-                    "incident_count": len(device["triggers"]),
-                }
+    # Calculate MTTR from resolved alerts in last 30 days
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+    resolved_alerts = (
+        db.query(AlertHistory)
+        .filter(
+            and_(
+                AlertHistory.resolved_at.isnot(None),
+                AlertHistory.triggered_at >= thirty_days_ago
             )
+        )
+        .all()
+    )
 
-    device_downtime.sort(key=lambda x: x["downtime_minutes"], reverse=True)
+    if resolved_alerts:
+        total_resolution_time = sum(
+            (alert.resolved_at - alert.triggered_at).total_seconds() / 60
+            for alert in resolved_alerts
+        )
+        avg_mttr_minutes = round(total_resolution_time / len(resolved_alerts), 2)
+    else:
+        avg_mttr_minutes = 0.0
+
+    # Find top problem devices by incident count
+    device_alerts = (
+        db.query(
+            StandaloneDevice.id,
+            StandaloneDevice.name,
+            StandaloneDevice.region,
+            func.count(AlertHistory.id).label("incident_count"),
+        )
+        .join(AlertHistory, StandaloneDevice.id == AlertHistory.device_id)
+        .filter(AlertHistory.triggered_at >= thirty_days_ago)
+        .group_by(StandaloneDevice.id, StandaloneDevice.name, StandaloneDevice.region)
+        .order_by(func.count(AlertHistory.id).desc())
+        .limit(10)
+        .all()
+    )
+
+    top_problem_devices = [
+        {
+            "hostid": str(device.id),
+            "name": device.name,
+            "region": device.region or "Unknown",
+            "incident_count": device.incident_count,
+            "downtime_minutes": round(device.incident_count * 15, 2),  # Estimate 15 min avg per incident
+        }
+        for device in device_alerts
+    ]
 
     return {
-        **base_mttr,
-        "top_problem_devices": device_downtime[:10],
+        "avg_mttr_minutes": avg_mttr_minutes,
+        "total_alerts": len(resolved_alerts),
+        "resolved_alerts": len(resolved_alerts),
+        "unresolved_alerts": db.query(func.count(AlertHistory.id))
+        .filter(AlertHistory.resolved_at.is_(None))
+        .scalar() or 0,
+        "top_problem_devices": top_problem_devices,
         "trends": {
-            "improving": base_mttr.get("avg_mttr_minutes", 0) < 30,
-            "recommendation": "Focus on preventive maintenance for top 10 problem devices",
+            "improving": avg_mttr_minutes < 30,
+            "recommendation": "Focus on preventive maintenance for top 10 problem devices" if top_problem_devices else "No major issues detected",
         },
     }
