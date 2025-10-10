@@ -74,11 +74,14 @@ class NetworkDiagnostics:
 
         # Parse packet statistics
         # Example: "5 packets transmitted, 5 received, 0% packet loss"
-        packet_match = re.search(r"(\d+) packets transmitted, (\d+) (?:packets )?received, (\d+)%", output)
+        packet_match = re.search(
+            r"(\d+)\s+packets transmitted,\s+(\d+)\s+(?:packets\s+)?received,\s+([\d.]+)%", output
+        )
         if packet_match:
             result["packets_sent"] = int(packet_match.group(1))
             result["packets_received"] = int(packet_match.group(2))
-            result["packet_loss_percent"] = int(packet_match.group(3))
+            loss_percent = float(packet_match.group(3))
+            result["packet_loss_percent"] = loss_percent
             result["is_reachable"] = result["packets_received"] > 0
 
         # Parse RTT statistics
@@ -106,11 +109,11 @@ class NetworkDiagnostics:
         }
 
         # Parse packet statistics
-        packet_match = re.search(r"Sent = (\d+), Received = (\d+), Lost = \d+ \((\d+)% loss\)", output)
+        packet_match = re.search(r"Sent = (\d+), Received = (\d+), Lost = \d+ \(([\d.]+)% loss\)", output)
         if packet_match:
             result["packets_sent"] = int(packet_match.group(1))
             result["packets_received"] = int(packet_match.group(2))
-            result["packet_loss_percent"] = int(packet_match.group(3))
+            result["packet_loss_percent"] = float(packet_match.group(3))
             result["is_reachable"] = result["packets_received"] > 0
 
         # Parse RTT statistics

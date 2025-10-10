@@ -9,9 +9,11 @@ import re
 import socket
 import subprocess
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, List, Tuple
 
-from fastapi import APIRouter, Depends, Request
+import sqlite3
+
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -26,10 +28,66 @@ from database import (
     get_db,
 )
 from network_diagnostics import NetworkDiagnostics
-from routers.utils import run_in_executor
+from routers.utils import run_in_executor, extract_city_from_hostname
+from zabbix_client import BRANCH_COORDINATES, REGION_COORDINATES
 
 # Create router
 router = APIRouter(prefix="/api/v1/diagnostics", tags=["diagnostics"])
+
+
+def _lookup_city_coordinates(city: str) -> Optional[Dict[str, float]]:
+    if not city:
+        return None
+    try:
+        conn = sqlite3.connect("data/ward_ops.db")
+        cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT latitude, longitude FROM georgian_cities WHERE lower(name_en)=?",
+            (city.lower(),),
+        ).fetchone()
+        conn.close()
+        if row:
+            return {"lat": row[0], "lng": row[1]}
+    except Exception as exc:
+        logging.getLogger(__name__).warning(f"Failed to lookup coordinates for {city}: {exc}")
+    return None
+
+
+def _coordinates_for_host(host: Optional[Dict[str, any]]) -> Optional[Dict[str, float]]:
+    if not host:
+        return None
+    branch = (host.get("branch") or "").lower()
+    if branch:
+        coords = BRANCH_COORDINATES.get(branch)
+        if coords:
+            return {"lat": coords["lat"], "lng": coords["lng"]}
+    region = host.get("region")
+    if region:
+        coords = REGION_COORDINATES.get(region)
+        if coords:
+            return {"lat": coords["lat"], "lng": coords["lng"]}
+    return None
+
+
+def _coordinates_for_hop(hop: TracerouteResult, host_map: Dict[str, Dict], device_host: Optional[Dict]) -> Optional[Dict[str, float]]:
+    # Attempt exact host match by IP first
+    host = host_map.get(hop.hop_ip)
+    coords = _coordinates_for_host(host)
+    if coords:
+        return coords
+
+    if hop.hop_hostname:
+        city = extract_city_from_hostname(hop.hop_hostname)
+        coords = _lookup_city_coordinates(city)
+        if coords:
+            return coords
+
+    # Fallback to device host location for the first hop or when nothing else available
+    if hop.hop_number == 1 and device_host:
+        coords = _coordinates_for_host(device_host)
+        if coords:
+            return coords
+    return None
 
 
 @router.post("/ping")
@@ -62,15 +120,23 @@ async def ping_device(
         device_name = ip
 
     # Store in database
+    def _to_int(value: Optional[float]) -> Optional[int]:
+        if value is None:
+            return None
+        try:
+            return int(round(float(value)))
+        except (TypeError, ValueError):
+            return None
+
     ping_record = PingResult(
         device_ip=ip,
         device_name=device_name,
         packets_sent=result["packets_sent"],
         packets_received=result["packets_received"],
-        packet_loss_percent=result["packet_loss_percent"],
-        min_rtt_ms=result.get("min_rtt_ms"),
-        avg_rtt_ms=result.get("avg_rtt_ms"),
-        max_rtt_ms=result.get("max_rtt_ms"),
+        packet_loss_percent=_to_int(result.get("packet_loss_percent")),
+        min_rtt_ms=_to_int(result.get("min_rtt_ms")),
+        avg_rtt_ms=_to_int(result.get("avg_rtt_ms")),
+        max_rtt_ms=_to_int(result.get("max_rtt_ms")),
         is_reachable=result["is_reachable"],
     )
     db.add(ping_record)
@@ -177,6 +243,237 @@ async def get_traceroute_history(
             {"hop_number": h.hop_number, "ip": h.hop_ip, "hostname": h.hop_hostname, "latency_ms": h.latency_ms}
             for h in hops
         ],
+    }
+
+
+# ============================================
+# DASHBOARD AGGREGATION
+# ============================================
+
+
+def _build_host_index(hosts: List[Dict]) -> Dict[str, Dict]:
+    index: Dict[str, Dict] = {}
+    for host in hosts or []:
+        ip = host.get("ip")
+        if ip:
+            index[ip] = host
+    return index
+
+
+@router.get("/dashboard/summary")
+async def diagnostics_summary(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return aggregated diagnostics data for dashboard visualizations."""
+
+    # Fetch host metadata from Zabbix for region/branch mapping
+    host_index: Dict[str, Dict] = {}
+    try:
+        zabbix = request.app.state.zabbix
+        hosts = await run_in_executor(zabbix.get_all_hosts)
+        host_index = _build_host_index(hosts)
+    except Exception as exc:
+        logging.getLogger(__name__).warning(f"Failed to fetch hosts from Zabbix: {exc}")
+
+    recent_pings: List[PingResult] = (
+        db.query(PingResult).order_by(PingResult.timestamp.desc()).limit(20).all()
+    )
+
+    # Status card for ping tool
+    total_pings = len(recent_pings)
+    successful_pings = sum(1 for p in recent_pings if p.is_reachable)
+    avg_latency = (
+        sum(p.avg_rtt_ms or 0 for p in recent_pings if p.avg_rtt_ms is not None) / successful_pings
+        if successful_pings
+        else None
+    )
+
+    # Aggregate latency by region/branch
+    region_aggregate: Dict[str, Dict[str, float]] = {}
+    for ping in recent_pings:
+        host = host_index.get(ping.device_ip)
+        region = host.get("region") if host else None
+        branch = host.get("branch") if host else None
+        key = region or branch or "Unknown"
+        stats = region_aggregate.setdefault(
+            key,
+            {"samples": 0, "latency_total": 0.0, "latency_count": 0, "packet_loss_total": 0.0},
+        )
+        stats["samples"] += 1
+        if ping.avg_rtt_ms is not None:
+            stats["latency_total"] += ping.avg_rtt_ms
+            stats["latency_count"] += 1
+        stats["packet_loss_total"] += ping.packet_loss_percent or 0
+
+    region_latency = [
+        {
+            "region": region,
+            "avg_latency": (values["latency_total"] / values["latency_count"]) if values["latency_count"] else None,
+            "avg_packet_loss": values["packet_loss_total"] / values["samples"],
+            "samples": values["samples"],
+        }
+        for region, values in region_aggregate.items()
+    ]
+    region_latency.sort(key=lambda item: (item["avg_latency"] or float("inf")))
+
+    # Recent ping results detail (limit 8)
+    recent_ping_detail = [
+        {
+            "device_ip": p.device_ip,
+            "device_name": p.device_name or host_index.get(p.device_ip, {}).get("display_name") or p.device_ip,
+            "avg_rtt_ms": p.avg_rtt_ms,
+            "packet_loss_percent": p.packet_loss_percent,
+            "is_reachable": p.is_reachable,
+            "timestamp": p.timestamp.isoformat(),
+        }
+        for p in recent_pings[:8]
+    ]
+
+    # Recent traceroute summaries
+    recent_traceroutes: List[Dict] = []
+    subquery = (
+        db.query(TracerouteResult.device_ip, func.max(TracerouteResult.timestamp).label("ts"))
+        .group_by(TracerouteResult.device_ip)
+        .order_by(func.max(TracerouteResult.timestamp).desc())
+        .limit(5)
+        .all()
+    )
+
+    for device_ip, ts in subquery:
+        hops = (
+            db.query(TracerouteResult)
+            .filter(TracerouteResult.device_ip == device_ip, TracerouteResult.timestamp == ts)
+            .order_by(TracerouteResult.hop_number)
+            .all()
+        )
+        host = host_index.get(device_ip)
+        recent_traceroutes.append(
+            {
+                "device_ip": device_ip,
+                "device_name": host.get("display_name") if host else (hops[0].device_name if hops else device_ip),
+                "timestamp": ts.isoformat() if ts else None,
+                "hop_count": len(hops),
+                "last_latency_ms": hops[-1].latency_ms if hops else None,
+                "region": host.get("region") if host else None,
+            }
+        )
+
+    # Timeline combining ping & traceroute events
+    timeline_entries: List[Dict] = []
+    for p in recent_pings:
+        timeline_entries.append(
+            {
+                "type": "ping",
+                "device_ip": p.device_ip,
+                "device_name": p.device_name or host_index.get(p.device_ip, {}).get("display_name") or p.device_ip,
+                "status": "success" if p.is_reachable else "failure",
+                "avg_rtt_ms": p.avg_rtt_ms,
+                "timestamp": p.timestamp.isoformat(),
+            }
+        )
+
+    traceroute_rows = (
+        db.query(TracerouteResult)
+        .order_by(TracerouteResult.timestamp.desc(), TracerouteResult.hop_number)
+        .limit(60)
+        .all()
+    )
+    seen_trace: set[Tuple[str, datetime]] = set()
+    for row in traceroute_rows:
+        key = (row.device_ip, row.timestamp)
+        if key in seen_trace:
+            continue
+        seen_trace.add(key)
+        host = host_index.get(row.device_ip)
+        timeline_entries.append(
+            {
+                "type": "traceroute",
+                "device_ip": row.device_ip,
+                "device_name": host.get("display_name") if host else (row.device_name or row.device_ip),
+                "status": "success",
+                "timestamp": row.timestamp.isoformat(),
+            }
+        )
+        if len(seen_trace) >= 10:
+            break
+
+    timeline_entries.sort(key=lambda item: item["timestamp"], reverse=True)
+    timeline_entries = timeline_entries[:20]
+
+    summary = {
+        "status_cards": {
+            "ping": {
+                "total": total_pings,
+                "success": successful_pings,
+                "failures": total_pings - successful_pings,
+                "avg_latency": avg_latency,
+            },
+            "traceroute": {
+                "total": len(subquery),
+                "success": len(subquery),
+            },
+        },
+        "recent_pings": recent_ping_detail,
+        "region_latency": region_latency,
+        "recent_traceroutes": recent_traceroutes,
+        "timeline": timeline_entries,
+    }
+
+    return summary
+
+
+@router.get("/traceroute/map")
+async def traceroute_map(
+    ip: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return traceroute hops with coordinates for visualization."""
+
+    latest = db.query(func.max(TracerouteResult.timestamp)).filter(TracerouteResult.device_ip == ip).scalar()
+    if not latest:
+        raise HTTPException(status_code=404, detail="No traceroute history found for this device")
+
+    hops = (
+        db.query(TracerouteResult)
+        .filter(TracerouteResult.device_ip == ip, TracerouteResult.timestamp == latest)
+        .order_by(TracerouteResult.hop_number)
+        .all()
+    )
+
+    host_index: Dict[str, Dict] = {}
+    device_host: Optional[Dict] = None
+    try:
+        zabbix = request.app.state.zabbix
+        hosts = await run_in_executor(zabbix.get_all_hosts)
+        host_index = _build_host_index(hosts)
+        device_host = host_index.get(ip)
+    except Exception as exc:
+        logging.getLogger(__name__).warning(f"Failed to fetch hosts from Zabbix: {exc}")
+
+    hop_payload = []
+    for hop in hops:
+        coords = _coordinates_for_hop(hop, host_index, device_host)
+        hop_payload.append(
+            {
+                "hop_number": hop.hop_number,
+                "ip": hop.hop_ip,
+                "hostname": hop.hop_hostname,
+                "latency_ms": hop.latency_ms,
+                "coordinates": coords,
+            }
+        )
+
+    device_name = device_host.get("display_name") if device_host else (hops[0].device_name if hops else ip)
+
+    return {
+        "device_ip": ip,
+        "device_name": device_name,
+        "timestamp": latest.isoformat(),
+        "hops": hop_payload,
     }
 
 

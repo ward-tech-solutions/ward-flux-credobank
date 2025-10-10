@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Network Monitoring{% endblock %}</title>
+    <!-- Favicon - Replace with actual favicon.ico file when available -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>" type="image/svg+xml">
+    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>" type="image/svg+xml">
+    <meta name="description" content="Network monitoring and management system for branch devices">
+    <meta name="theme-color" content="#1a8fff">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/honeycomb.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/honeycomb-modern.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/device-compact.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ward-theme.css') }}?v=14">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dark-theme.css') }}?v=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/notifications.css') }}?v=1">
+    {% block extra_css %}{% endblock %}
+
+    <!-- WARD Button Styles - Complete Redesign -->
+    <style>
+        /* Reset and redesign both buttons from scratch */
+        #ward-add-device-btn,
+        #ward-logout-btn {
+            all: unset; /* Reset ALL CSS properties */
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1.25rem;
+            background-color: rgb(94, 187, 168);
+            color: rgb(255, 255, 255);
+            border: none;
+            border-radius: 6px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            box-sizing: border-box;
+        }
+
+        #ward-add-device-btn:hover,
+        #ward-logout-btn:hover {
+            background-color: rgb(74, 157, 138);
+        }
+
+        #ward-add-device-btn:active,
+        #ward-logout-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Ensure icons inherit white color */
+        #ward-add-device-btn i,
+        #ward-logout-btn i {
+            color: rgb(255, 255, 255);
+        }
+
+        /* Ensure spans inherit white color */
+        #ward-add-device-btn span,
+        #ward-logout-btn span {
+            color: rgb(255, 255, 255);
+        }
+    </style>
+
+    <!-- Force header styling override -->
+    <style>
+        /* Force WARD green on both buttons */
+        .btn-add,
+        .logout-btn,
+        button[onclick*="add-host"],
+        button[onclick*="logout"] {
+            background: #5EBBA8 !important;
+            color: white !important;
+            border: none !important;
+            padding: 0.5rem 1.25rem !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .btn-add:hover,
+        .logout-btn:hover,
+        button[onclick*="add-host"]:hover,
+        button[onclick*="logout"]:hover {
+            background: #4A9D8A !important;
+            transform: translateY(-1px);
+        }
+
+        /* User info styling */
+        .user-info {
+            display: flex !important;
+            align-items: center !important;
+            gap: 0.75rem !important;
+            padding: 0.5rem 1rem !important;
+            background: #F8F9FA !important;
+            border-radius: 8px !important;
+        }
+
+        .user-info i {
+            color: #5EBBA8 !important;
+            font-size: 1.125rem !important;
+        }
+
+        #user-name {
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            color: #000 !important;
+        }
+
+        #user-role {
+            font-size: 11px !important;
+            color: #6c757d !important;
+            text-transform: uppercase !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="topnav">
+        <div class="topnav-left">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='img/logo-ward.svg') }}" alt="WARD OPS">
+                <span class="logo-text">WARD Tech</span>
+            </div>
+        </div>
+
+        <div class="topnav-center">
+            <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">
+                <i class="fas fa-th-large"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/devices" class="nav-item {% if request.path == '/devices' %}active{% endif %}">
+                <i class="fas fa-server"></i>
+                <span>Devices</span>
+            </a>
+            <a href="/map" class="nav-item {% if request.path == '/map' %}active{% endif %}">
+                <i class="fas fa-map-marked-alt"></i>
+                <span>Map</span>
+            </a>
+            <a href="/topology" class="nav-item {% if request.path == '/topology' %}active{% endif %}">
+                <i class="fas fa-project-diagram"></i>
+                <span>Topology</span>
+            </a>
+            <a href="/reports" class="nav-item {% if request.path == '/reports' %}active{% endif %}">
+                <i class="fas fa-chart-bar"></i>
+                <span>Reports</span>
+            </a>
+        </div>
+
+        <div class="topnav-right">
+            <!-- Admin Only: User Management -->
+            <a href="/users" class="nav-item" id="users-link" style="display: none;" data-role="admin">
+                <i class="fas fa-users-cog"></i>
+                <span>Users</span>
+            </a>
+
+            <!-- Admin Only: Configuration -->
+            <a href="/config" class="nav-item {% if request.path == '/config' %}active{% endif %}" id="config-link" style="display: none;" data-role="admin">
+                <i class="fas fa-cog"></i>
+                <span>Config</span>
+            </a>
+
+            <!-- Dark Mode Toggle -->
+            <button id="theme-toggle" class="btn-secondary" style="padding: 0.5rem 1rem; margin-right: 0.5rem;" title="Toggle dark mode">
+                <i class="fas fa-moon" id="theme-icon"></i>
+            </button>
+
+            <!-- Notifications Bell -->
+            <div class="notification-wrapper" style="position: relative; margin-right: 0.5rem;">
+                <button id="notification-toggle" class="btn-secondary" style="padding: 0.5rem 1rem; position: relative;" title="Notifications">
+                    <i class="fas fa-bell"></i>
+                    <span id="notification-badge" class="notification-badge" style="display: none;">0</span>
+                </button>
+
+                <!-- Notification Dropdown -->
+                <div id="notification-dropdown" class="notification-dropdown" style="display: none;">
+                    <div class="notification-header">
+                        <h3>Notifications</h3>
+                        <div class="notification-controls">
+                            <label class="notification-toggle-switch" title="Enable/Disable Notifications">
+                                <input type="checkbox" id="notification-enabled" checked>
+                                <span class="slider"></span>
+                            </label>
+                            <button class="btn-clear-all" onclick="clearAllNotifications()">
+                                <i class="fas fa-check-double"></i> Clear All
+                            </button>
+                        </div>
+                    </div>
+                    <div class="notification-list" id="notification-list">
+                        <div class="notification-empty">
+                            <i class="fas fa-inbox"></i>
+                            <p>No new notifications</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WARD CUSTOM BUTTONS - ZERO OLD CSS -->
+            <div style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1.25rem; background: rgb(94, 187, 168); color: rgb(255, 255, 255); border: none; border-radius: 6px; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" onclick="window.location.href='/add-host'">
+                <i class="fas fa-plus" style="color: rgb(255, 255, 255);"></i>
+                <span style="color: rgb(255, 255, 255);">Add Device</span>
+            </div>
+
+            <!-- User Info -->
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; background: #F8F9FA; border-radius: 8px;">
+                <i class="fas fa-user-circle" style="color: #5EBBA8; font-size: 1.125rem;"></i>
+                <div style="text-align: left; line-height: 1.4;">
+                    <div id="user-name" style="font-weight: 600; font-size: 14px; color: #000;">Loading...</div>
+                    <div id="user-role" style="font-size: 11px; color: #6c757d; text-transform: uppercase;"></div>
+                </div>
+            </div>
+
+            <div style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1.25rem; background: rgb(94, 187, 168); color: rgb(255, 255, 255); border: none; border-radius: 6px; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" onclick="auth.logout()">
+                <i class="fas fa-sign-out-alt" style="color: rgb(255, 255, 255);"></i>
+                <span style="color: rgb(255, 255, 255);">Logout</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        {% if show_sidebar %}
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">DEVICE GROUPS</span>
+            </div>
+            <div class="sidebar-content" id="sidebar-content">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <span>Loading groups...</span>
+                </div>
+            </div>
+        </aside>
+        {% endif %}
+
+        <!-- Main Content -->
+        <main class="main-content {% if not show_sidebar %}no-sidebar{% endif %}">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- WARD Tech Solutions Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <!-- Company Info -->
+            <div class="footer-section footer-about">
+                <div class="footer-logo">
+                    <img src="{{ url_for('static', filename='img/logo-ward.svg') }}" alt="WARD OPS">
+                    <span>WARD Tech Solutions</span>
+                </div>
+                <p class="footer-description">
+                    We are a WARD Ops community, working together to understand and overcome the obstacles digital products face.
+                    We leverage automation to streamline processes, minimize manual tasks and human errors, improving efficiency,
+                    productivity, reliability, and cost-effectiveness.
+                </p>
+                <p class="footer-tagline">
+                    <strong>We WARD the jungle.</strong>
+                </p>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="footer-section">
+                <h4 class="footer-title">Platform</h4>
+                <ul class="footer-links">
+                    <li><a href="/"><i class="fas fa-th-large"></i> Dashboard</a></li>
+                    <li><a href="/devices"><i class="fas fa-server"></i> Devices</a></li>
+                    <li><a href="/map"><i class="fas fa-map-marked-alt"></i> Map View</a></li>
+                    <li><a href="/topology"><i class="fas fa-project-diagram"></i> Topology</a></li>
+                    <li><a href="/reports"><i class="fas fa-chart-bar"></i> Reports</a></li>
+                </ul>
+            </div>
+
+            <!-- Documentation & Resources -->
+            <div class="footer-section">
+                <h4 class="footer-title">Documentation</h4>
+                <ul class="footer-links">
+                    <li><a href="https://github.com/anthropics/claude-code" target="_blank"><i class="fas fa-book"></i> User Guide</a></li>
+                    <li><a href="https://docs.zabbix.com" target="_blank"><i class="fas fa-code"></i> API Reference</a></li>
+                    <li><a href="#"><i class="fas fa-life-ring"></i> Support Center</a></li>
+                    <li><a href="#"><i class="fas fa-rocket"></i> Release Notes</a></li>
+                    <li><a href="#"><i class="fas fa-question-circle"></i> FAQ</a></li>
+                </ul>
+            </div>
+
+            <!-- Contact & Social -->
+            <div class="footer-section">
+                <h4 class="footer-title">Connect</h4>
+                <ul class="footer-contact">
+                    <li><i class="fas fa-envelope"></i> <a href="mailto:info@wardops.tech">info@wardops.tech</a></li>
+                    <li><i class="fas fa-globe"></i> <a href="https://wardops.tech" target="_blank">wardops.tech</a></li>
+                    <li><i class="fas fa-map-marker-alt"></i> Tbilisi, Georgia</li>
+                </ul>
+                <div class="footer-social">
+                    <a href="#" class="social-link" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>
+                    <a href="#" class="social-link" aria-label="GitHub"><i class="fab fa-github"></i></a>
+                    <a href="#" class="social-link" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Bottom -->
+        <div class="footer-bottom">
+            <div class="footer-bottom-content">
+                <div class="copyright">
+                    &copy; 2025 <strong>WARD Tech Solutions</strong>
+                </div>
+                <div class="footer-links-bottom">
+                    <a href="#">Privacy Policy</a>
+                    <span class="separator">|</span>
+                    <a href="#">Terms of Service</a>
+                    <span class="separator">|</span>
+                    <a href="#">Security</a>
+                </div>
+                <div class="powered-by">
+                    Powered by <strong>WARD Tech</strong>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Authentication Script (load first) -->
+    <script src="{{ url_for('static', filename='js/auth.js') }}?v=2"></script>
+
+    <!-- Theme Switcher (load early) -->
+    <script src="{{ url_for('static', filename='js/theme-switcher.js') }}?v=1"></script>
+
+    <!-- Notification System -->
+    <script src="{{ url_for('static', filename='js/notifications.js') }}?v=1"></script>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="{{ url_for('static', filename='js/common.js') }}?v=4"></script>
+    {% if show_sidebar %}
+    <script src="{{ url_for('static', filename='js/sidebar.js') }}?v=4"></script>
+    {% endif %}
+
+    <!-- Force button colors on load -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Force WARD green color on both buttons
+            const wardGreen = '#5EBBA8';
+
+            function forceButtonColor(btn) {
+                if (btn) {
+                    // Remove any classes that might interfere
+                    btn.classList.remove('btn-primary', 'btn-secondary', 'btn-info');
+
+                    // Clear existing background styles
+                    btn.style.background = '';
+                    btn.style.backgroundColor = '';
+                    btn.style.backgroundImage = '';
+
+                    // Set background color properly
+                    btn.style.setProperty('background-color', wardGreen, 'important');
+                    btn.style.setProperty('background-image', 'none', 'important');
+                    btn.style.setProperty('color', 'white', 'important');
+                    btn.style.setProperty('border', 'none', 'important');
+
+                    // Also set on hover
+                    btn.addEventListener('mouseenter', function() {
+                        this.style.setProperty('background-color', wardGreen, 'important');
+                    });
+                }
+            }
+
+            const buttons = document.querySelectorAll('.btn-add, button[onclick*="add-host"], button[onclick*="logout"], button[onclick*="auth.logout"]');
+            buttons.forEach(forceButtonColor);
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

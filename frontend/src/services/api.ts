@@ -225,10 +225,16 @@ export const settingsAPI = {
 
 // Diagnostics
 export const diagnosticsAPI = {
-  ping: (host: string) => api.post('/diagnostics/ping', { host }),
-  traceroute: (host: string) => api.post('/diagnostics/traceroute', { host }),
-  dnsLookup: (host: string) => api.post('/diagnostics/dns-lookup', { host }),
-  portScan: (host: string, ports: string) => api.post('/diagnostics/port-scan', { host, ports }),
+  ping: (ip: string, count = 5) =>
+    api.post('/diagnostics/ping', null, { params: { ip, count } }),
+  traceroute: (ip: string, maxHops = 30) =>
+    api.post('/diagnostics/traceroute', null, { params: { ip, max_hops: maxHops } }),
+  dnsLookup: (hostname: string) =>
+    api.post('/diagnostics/dns/lookup', null, { params: { hostname } }),
+  portScan: (ip: string, ports: string) =>
+    api.post('/diagnostics/portscan', null, { params: { ip, ports } }),
+  summary: () => api.get('/diagnostics/dashboard/summary'),
+  tracerouteMap: (ip: string) => api.get('/diagnostics/traceroute/map', { params: { ip } }),
 }
 
 // SSH Terminal

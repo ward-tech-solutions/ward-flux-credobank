@@ -332,13 +332,38 @@ except ImportError:
 
 from pathlib import Path
 
-static_new_dir = Path("static_new")
-assets_dir = static_new_dir / "assets"
-if assets_dir.exists() and static_new_dir.exists():
-    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
-    app.mount("/static", StaticFiles(directory=static_new_dir), name="static")
+
+def _resolve_frontend_build_dir() -> Path | None:
+    """Return the active frontend build directory, preferring Vite dist output."""
+    dist_dir = Path("frontend/dist")
+    if dist_dir.exists():
+        return dist_dir
+    legacy_dir = Path("static_new")
+    if legacy_dir.exists():
+        logger.warning("Using legacy static_new assets. Run npm run build to refresh frontend.")
+        return legacy_dir
+    return None
+
+
+FRONTEND_BUILD_DIR = _resolve_frontend_build_dir()
+
+if FRONTEND_BUILD_DIR:
+    assets_dir = FRONTEND_BUILD_DIR / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    app.mount("/static", StaticFiles(directory=FRONTEND_BUILD_DIR), name="static")
 else:
     logger.warning("React build not found. Run npm run build to generate static assets.")
+
+
+def _frontend_file(relative_path: str) -> Path:
+    """Resolve a file inside the compiled frontend bundle."""
+    if not FRONTEND_BUILD_DIR:
+        raise HTTPException(status_code=503, detail="Frontend build not available")
+    file_path = FRONTEND_BUILD_DIR / relative_path
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Asset not found: {relative_path}")
+    return file_path
 
 
 @app.on_event("startup")
@@ -884,18 +909,18 @@ from fastapi.responses import FileResponse
 @app.get("/", response_class=HTMLResponse)
 async def index():
     """Serve React app"""
-    return FileResponse("static_new/index.html")
+    return FileResponse(_frontend_file("index.html"))
 
 # Serve static files from root (logo, favicon, etc.)
 @app.get("/logo-ward.svg")
 async def serve_logo():
     """Serve WARD logo"""
-    return FileResponse("static_new/logo-ward.svg")
+    return FileResponse(_frontend_file("logo-ward.svg"))
 
 @app.get("/favicon.svg")
 async def serve_favicon():
     """Serve favicon"""
-    return FileResponse("static_new/favicon.svg")
+    return FileResponse(_frontend_file("favicon.svg"))
 
 # Catch all routes for React Router (except API and admin routes)
 @app.get("/{full_path:path}", response_class=HTMLResponse)
@@ -904,7 +929,7 @@ async def catch_all(request: Request, full_path: str):
     # Don't catch API routes or admin routes
     if full_path.startswith("api/") or full_path.startswith("admin/"):
         raise HTTPException(status_code=404, detail="Not found")
-    return FileResponse("static_new/index.html")
+    return FileResponse(_frontend_file("index.html"))
 
 # ============================================
 # SSH Terminal API
