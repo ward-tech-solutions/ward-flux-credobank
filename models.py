@@ -88,7 +88,7 @@ class SetupWizardState(Base):
 # ============================================
 
 class DiscoveryRule(Base):
-    """Network discovery rule configuration"""
+    """Network discovery rule configuration - matches actual DB schema"""
 
     __tablename__ = "discovery_rules"
     __table_args__ = {'extend_existing': True}
@@ -96,45 +96,20 @@ class DiscoveryRule(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(200), nullable=False)
     description = Column(Text)
+    network_range = Column(String(100), nullable=False)  # Single range for now
     enabled = Column(Boolean, default=True)
-
-    # Network Configuration
-    network_ranges = Column(JSON, nullable=False)  # ["192.168.1.0/24", "10.0.0.0/16"]
-    excluded_ips = Column(JSON)  # ["192.168.1.1", "192.168.1.254"]
-
-    # Discovery Methods
-    use_ping = Column(Boolean, default=True)
-    use_snmp = Column(Boolean, default=True)
-    use_ssh = Column(Boolean, default=False)
-
-    # SNMP Configuration
+    schedule = Column(String(100))  # Cron schedule
+    snmp_discovery = Column(Boolean, default=True)
     snmp_communities = Column(JSON)  # ["public", "private"]
-    snmp_v3_credentials = Column(JSON)  # Array of v3 credential objects
-    snmp_ports = Column(JSON, default=lambda: [161])  # [161, 1161]
-
-    # SSH Configuration
-    ssh_port = Column(Integer, default=22)
-    ssh_credentials = Column(JSON)  # Array of SSH credential objects
-
-    # Scheduling
-    schedule_enabled = Column(Boolean, default=False)
-    schedule_cron = Column(String(100))  # "0 */6 * * *"
+    ping_only = Column(Boolean, default=False)
     last_run = Column(DateTime)
-    next_run = Column(DateTime)
-
-    # Auto-Import Settings
-    auto_import = Column(Boolean, default=False)
-    auto_assign_template = Column(Boolean, default=True)
-    default_monitoring_profile = Column(UUID(as_uuid=True), ForeignKey('monitoring_profiles.id'))
-
-    # Metadata
-    created_by = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    last_devices_found = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class DiscoveryResult(Base):
-    """Discovered device from network scan"""
+    """Discovered device from network scan - matches actual DB schema"""
 
     __tablename__ = "discovery_results"
     __table_args__ = {'extend_existing': True}
@@ -143,40 +118,22 @@ class DiscoveryResult(Base):
     rule_id = Column(UUID(as_uuid=True), ForeignKey('discovery_rules.id', ondelete='CASCADE'), nullable=False)
 
     # Device Information
-    ip = Column(String(45), nullable=False, index=True)
-    hostname = Column(String(200))
+    ip_address = Column(String(45), nullable=False)  # DB uses ip_address not ip
+    hostname = Column(String(255))
     mac_address = Column(String(17))
     vendor = Column(String(100))
-    device_type = Column(String(100))
-    model = Column(String(200))
-    os_version = Column(String(200))
-
-    # Discovery Details
-    discovered_via = Column(String(50))  # 'ping', 'snmp', 'ssh'
-    ping_responsive = Column(Boolean, default=False)
-    ping_latency_ms = Column(Float)
-    snmp_responsive = Column(Boolean, default=False)
-    snmp_version = Column(String(10))  # 'v1', 'v2c', 'v3'
-    snmp_community = Column(String(100))  # Community that worked
-    ssh_responsive = Column(Boolean, default=False)
+    device_type = Column(String(50))
 
     # SNMP Data
+    snmp_reachable = Column(Boolean, default=False)
+    snmp_version = Column(String(10))
     sys_descr = Column(Text)
-    sys_name = Column(String(200))
-    sys_oid = Column(String(200))
-    sys_uptime = Column(BigInteger)
-    sys_contact = Column(String(200))
-    sys_location = Column(String(200))
-
-    # Status
-    status = Column(String(50), default='discovered')  # 'discovered', 'imported', 'ignored', 'failed'
-    import_status = Column(String(50))  # 'pending', 'success', 'failed'
-    imported_device_id = Column(UUID(as_uuid=True), ForeignKey('standalone_devices.id'))
-    failure_reason = Column(Text)
+    sys_object_id = Column(String(200))
 
     # Metadata
-    discovered_at = Column(DateTime, server_default=func.now(), index=True)
-    imported_at = Column(DateTime)
+    discovered_at = Column(DateTime, server_default=func.now())
+    added_to_monitoring = Column(Boolean, default=False)
+    added_at = Column(DateTime)
 
 
 class DiscoveryJob(Base):
