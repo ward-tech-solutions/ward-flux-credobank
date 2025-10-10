@@ -5,14 +5,14 @@ CRUD operations for standalone devices (no Zabbix dependency)
 
 import logging
 import uuid
-from typing import List, Optional
+from typing import Dict, List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from pydantic import BaseModel, Field, IPvAnyAddress
 
-from database import get_db, User
+from database import PingResult, get_db, User
 from auth import get_current_active_user
 from monitoring.models import StandaloneDevice
 
@@ -71,10 +71,37 @@ class StandaloneDeviceResponse(BaseModel):
     custom_fields: Optional[dict]
     created_at: datetime
     updated_at: datetime
+    region: Optional[str] = None
+    branch: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    available: Optional[str] = None
+    ping_status: Optional[str] = None
+    ping_response_time: Optional[float] = None
+    last_ping_timestamp: Optional[str] = None
+    problems: int = 0
 
     @classmethod
-    def from_orm(cls, obj):
+    def from_model(cls, obj: StandaloneDevice, ping_result: Optional[PingResult] = None):
         """Convert ORM object to Pydantic model, converting UUID to string"""
+        fields = obj.custom_fields or {}
+        branch = fields.get("branch")
+        region = fields.get("region")
+        latitude = fields.get("latitude")
+        longitude = fields.get("longitude")
+        problems = fields.get("problems") or 0
+
+        if ping_result:
+            ping_status = "Up" if ping_result.is_reachable else "Down"
+            ping_response_time = ping_result.avg_rtt_ms
+            last_ping_timestamp = ping_result.timestamp.isoformat() if ping_result.timestamp else None
+            available = "Available" if ping_result.is_reachable else "Unavailable"
+        else:
+            ping_status = fields.get("ping_status")
+            ping_response_time = fields.get("ping_response_time")
+            last_ping_timestamp = fields.get("synced_at")
+            available = fields.get("available")
+
         data = {
             'id': str(obj.id),
             'name': obj.name,
@@ -92,12 +119,40 @@ class StandaloneDeviceResponse(BaseModel):
             'custom_fields': obj.custom_fields,
             'created_at': obj.created_at,
             'updated_at': obj.updated_at,
+            'region': region,
+            'branch': branch,
+            'latitude': latitude,
+            'longitude': longitude,
+            'available': available or ("Available" if obj.enabled else "Unavailable"),
+            'ping_status': ping_status,
+            'ping_response_time': ping_response_time,
+            'last_ping_timestamp': last_ping_timestamp,
+            'problems': problems,
         }
         return cls(**data)
 
     class Config:
         from_attributes = True
-        from_attributes = True
+
+
+def _latest_ping_lookup(db: Session, ips: List[str]) -> Dict[str, PingResult]:
+    """Return the most recent PingResult per IP."""
+    if not ips:
+        return {}
+
+    rows = (
+        db.query(PingResult)
+        .filter(PingResult.device_ip.in_(ips))
+        .order_by(PingResult.device_ip, PingResult.timestamp.desc())
+        .all()
+    )
+
+    lookup: Dict[str, PingResult] = {}
+    for row in rows:
+        ip = row.device_ip
+        if ip and ip not in lookup:
+            lookup[ip] = row
+    return lookup
 
 
 # ============================================
@@ -110,6 +165,8 @@ def list_devices(
     vendor: Optional[str] = None,
     device_type: Optional[str] = None,
     location: Optional[str] = None,
+    region: Optional[str] = None,
+    branch: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -128,11 +185,26 @@ def list_devices(
     if location:
         query = query.filter(StandaloneDevice.location == location)
 
-    # Apply pagination
-    devices = query.offset(skip).limit(limit).all()
+    devices = query.all()
 
-    logger.info(f"Retrieved {len(devices)} standalone devices")
-    return [StandaloneDeviceResponse.from_orm(d) for d in devices]
+    # Filter by region/branch using custom fields
+    def matches_region(dev):
+        fields = dev.custom_fields or {}
+        if region and fields.get("region") != region:
+            return False
+        if branch and fields.get("branch") != branch:
+            return False
+        return True
+
+    filtered_devices = [d for d in devices if matches_region(d)]
+
+    # Apply pagination after filtering
+    paginated_devices = filtered_devices[skip : skip + limit]
+
+    ping_lookup = _latest_ping_lookup(db, [d.ip for d in paginated_devices if d.ip])
+
+    logger.info(f"Retrieved {len(paginated_devices)} standalone devices")
+    return [StandaloneDeviceResponse.from_model(d, ping_lookup.get(d.ip)) for d in paginated_devices]
 
 
 @router.post("", response_model=StandaloneDeviceResponse, status_code=status.HTTP_201_CREATED)
@@ -172,7 +244,8 @@ def create_device(
     db.refresh(new_device)
 
     logger.info(f"Created standalone device: {new_device.name} ({new_device.ip})")
-    return StandaloneDeviceResponse.from_orm(new_device)
+    ping_lookup = _latest_ping_lookup(db, [new_device.ip])
+    return StandaloneDeviceResponse.from_model(new_device, ping_lookup.get(new_device.ip))
 
 
 @router.get("/{device_id}", response_model=StandaloneDeviceResponse)
@@ -186,8 +259,8 @@ def get_device(
     device = db.query(StandaloneDevice).filter_by(id=uuid.UUID(device_id)).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
-
-    return StandaloneDeviceResponse.from_orm(device)
+    ping_lookup = _latest_ping_lookup(db, [device.ip])
+    return StandaloneDeviceResponse.from_model(device, ping_lookup.get(device.ip))
 
 
 @router.put("/{device_id}", response_model=StandaloneDeviceResponse)
@@ -222,7 +295,8 @@ def update_device(
     db.refresh(device)
 
     logger.info(f"Updated standalone device: {device.name} ({device.ip})")
-    return StandaloneDeviceResponse.from_orm(device)
+    ping_lookup = _latest_ping_lookup(db, [device.ip])
+    return StandaloneDeviceResponse.from_model(device, ping_lookup.get(device.ip))
 
 
 @router.delete("/{device_id}")
@@ -302,7 +376,9 @@ def bulk_create_devices(
     if errors:
         logger.warning(f"Bulk creation errors: {errors}")
 
-    return [StandaloneDeviceResponse.from_orm(d) for d in created_devices]
+    ping_lookup = _latest_ping_lookup(db, [d.ip for d in created_devices if d.ip])
+
+    return [StandaloneDeviceResponse.from_model(d, ping_lookup.get(d.ip)) for d in created_devices]
 
 
 @router.post("/bulk/enable")
