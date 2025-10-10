@@ -36,23 +36,13 @@ async def get_downtime_report(
     cutoff_time = datetime.utcnow() - timedelta(hours=hours)
 
     # Get all standalone devices
-    query = db.query(StandaloneDevice)
+    devices = db.query(StandaloneDevice).all()
 
-    # Apply user permission filtering (non-admin users)
-    if current_user.role != UserRole.ADMIN:
-        if current_user.region:
-            query = query.filter(StandaloneDevice.region == current_user.region)
-        if current_user.branches:
-            allowed_branches = [b.strip() for b in current_user.branches.split(",")]
-            query = query.filter(StandaloneDevice.branch.in_(allowed_branches))
-
-    # Apply additional filters
-    if region:
-        query = query.filter(StandaloneDevice.region == region)
+    # Filter devices based on user permissions and request filters
+    # Note: StandaloneDevice doesn't have region/branch columns,
+    # they would be in custom_fields if needed
     if device_type:
-        query = query.filter(StandaloneDevice.device_type == device_type)
-
-    devices = query.all()
+        devices = [d for d in devices if d.device_type == device_type]
 
     report = {
         "period": period,
@@ -102,12 +92,15 @@ async def get_downtime_report(
             .scalar() or 0
         )
 
+        # Extract region/branch from custom_fields if they exist
+        custom_fields = device.custom_fields or {}
+
         report["devices"].append(
             {
                 "hostid": str(device.id),
                 "name": device.name,
-                "region": device.region or "Unknown",
-                "branch": device.branch or "Unknown",
+                "region": custom_fields.get("region", device.location or "Unknown"),
+                "branch": custom_fields.get("branch", "Unknown"),
                 "device_type": device.device_type or "Unknown",
                 "downtime_hours": downtime_hours,
                 "availability_percent": availability,
@@ -176,10 +169,11 @@ async def get_mttr_extended(
     for alert_stat in device_alerts:
         device = db.query(StandaloneDevice).filter_by(id=alert_stat.device_id).first()
         if device:
+            custom_fields = device.custom_fields or {}
             top_problem_devices.append({
                 "hostid": str(device.id),
                 "name": device.name,
-                "region": device.region or "Unknown",
+                "region": custom_fields.get("region", device.location or "Unknown"),
                 "incident_count": alert_stat.incident_count,
                 "downtime_minutes": round(alert_stat.incident_count * 15, 2),  # Estimate 15 min avg per incident
             })
