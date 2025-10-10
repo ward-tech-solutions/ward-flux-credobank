@@ -43,9 +43,12 @@ def migrate_sqlite_to_postgres(sqlite_path: str, postgres_url: str):
     logger.info("📊 Creating tables in PostgreSQL...")
     from database import Base
 
+    # Import all models to register them with Base.metadata
     try:
-        from models import Organization, SystemConfig, SetupWizardState
-    except ImportError:
+        from models import Organization, SystemConfig, SetupWizardState, DiscoveryRule, DiscoveryJob, DiscoveryResult, DiscoveryCredential
+        from monitoring.models import MonitoringProfile, StandaloneDevice, AlertRule, AlertHistory
+    except ImportError as e:
+        logger.warning(f"Some models could not be imported: {e}")
         pass
 
     Base.metadata.create_all(bind=postgres_engine)

@@ -22,7 +22,9 @@ from auth import get_current_active_user
 from database import MTRResult, PerformanceBaseline, PingResult, TracerouteResult, User, get_db
 from network_diagnostics import NetworkDiagnostics
 from routers.utils import run_in_executor, extract_city_from_hostname
-from zabbix_client import BRANCH_COORDINATES, REGION_COORDINATES
+# from zabbix_client import BRANCH_COORDINATES, REGION_COORDINATES  # zabbix_client.py was removed
+BRANCH_COORDINATES = {}
+REGION_COORDINATES = {}
 from monitoring.models import StandaloneDevice
 
 # Create router

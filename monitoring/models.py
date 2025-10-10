@@ -97,23 +97,7 @@ class SNMPCredential(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-class PingResult(Base):
-    """Ping monitoring results"""
-    __tablename__ = "ping_results"
-    __table_args__ = {'extend_existing': True}
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    device_ip = Column(String(50), nullable=False, index=True)
-    device_name = Column(String(255))
-    packets_sent = Column(Integer)
-    packets_received = Column(Integer)
-    packet_loss_percent = Column(Integer)
-    min_rtt_ms = Column(Integer)
-    avg_rtt_ms = Column(Integer)
-    max_rtt_ms = Column(Integer)
-    is_reachable = Column(Boolean)
-    timestamp = Column(DateTime, index=True)
-
+# PingResult model is defined in database.py to avoid duplication
 
 class MonitoringTemplate(Base):
     """Monitoring templates - pre-configured monitoring items"""

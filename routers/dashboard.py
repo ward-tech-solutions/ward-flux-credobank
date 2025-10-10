@@ -82,7 +82,7 @@ async def get_dashboard_stats(
         zabbix_stats = await _get_zabbix_dashboard_stats(request, region, current_user)
         return _merge_dashboard_stats(standalone_stats, zabbix_stats)
 
-logger.warning("Unknown monitoring mode detected, defaulting to standalone stats")
+    logger.warning("Unknown monitoring mode detected, defaulting to standalone stats")
     return _get_standalone_dashboard_stats(db, region, current_user)
 
 

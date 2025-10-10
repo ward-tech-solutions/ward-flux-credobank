@@ -83,7 +83,6 @@ class User(Base):
 
 class PingResult(Base):
     """Independent ping check results"""
-
     __tablename__ = "ping_results"
 
     id = Column(Integer, primary_key=True, index=True)

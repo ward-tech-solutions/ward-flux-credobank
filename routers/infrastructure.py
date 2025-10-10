@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 
 from auth import get_current_active_user
 from database import PingResult, User, UserRole, get_db
-from monitoring.models import NetworkTopology, StandaloneDevice
+from models import NetworkTopology
+from monitoring.models import StandaloneDevice
 
 logger = logging.getLogger(__name__)
 

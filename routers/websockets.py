@@ -11,9 +11,9 @@ from typing import Dict, List
 
 from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
 
-from database import SessionLocal
-from monitoring.models import AlertHistory, NetworkTopology, StandaloneDevice
-from database import PingResult
+from database import SessionLocal, PingResult
+from monitoring.models import AlertHistory, StandaloneDevice
+from models import NetworkTopology
 
 # Create router
 router = APIRouter(tags=["websockets"])
