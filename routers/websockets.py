@@ -4,17 +4,16 @@ Handles real-time WebSocket connections for device updates, router interfaces, a
 """
 import logging
 import asyncio
-import concurrent.futures
+import uuid
 import json
 from datetime import datetime, timezone
-from typing import List
+from typing import Dict, List
 
 from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
 
-from routers.utils import run_in_executor
-
-# Thread pool executor
-executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+from database import SessionLocal
+from monitoring.models import AlertHistory, NetworkTopology, StandaloneDevice
+from database import PingResult
 
 # Create router
 router = APIRouter(tags=["websockets"])
@@ -70,21 +69,34 @@ async def monitor_device_changes(app: FastAPI):
 
     while True:
         try:
-            zabbix = app.state.zabbix
-            # Note: sync client doesn't have use_cache param, just call get_all_hosts
-            devices = await run_in_executor(zabbix.get_all_hosts)
+            session = SessionLocal()
+            devices = session.query(StandaloneDevice).all()
+
+            ping_lookup: Dict[str, PingResult] = {}
+            for ping in (
+                session.query(PingResult)
+                .order_by(PingResult.device_ip, PingResult.timestamp.desc())
+                .all()
+            ):
+                if ping.device_ip not in ping_lookup:
+                    ping_lookup[ping.device_ip] = ping
+
             changes = []
 
             for device in devices:
-                device_id = device["hostid"]
-                current_status = device.get("ping_status", "Unknown")
+                device_id = str(device.id)
+                ping = ping_lookup.get(device.ip)
+                if ping:
+                    current_status = "Up" if ping.is_reachable else "Down"
+                else:
+                    current_status = (device.custom_fields or {}).get("ping_status", "Unknown")
 
                 if device_id in last_state:
                     if last_state[device_id] != current_status:
                         changes.append(
                             {
                                 "hostid": device_id,
-                                "hostname": device["display_name"],
+                                "hostname": device.name,
                                 "old_status": last_state[device_id],
                                 "new_status": current_status,
                                 "timestamp": datetime.now().isoformat(),
@@ -92,6 +104,8 @@ async def monitor_device_changes(app: FastAPI):
                         )
 
                 last_state[device_id] = current_status
+
+            session.close()
 
             # Broadcast changes to all connected clients
             if changes and app.state.websocket_connections:
@@ -119,7 +133,7 @@ async def monitor_device_changes(app: FastAPI):
 
 @router.websocket("/ws/router-interfaces/{hostid}")
 async def websocket_router_interfaces(websocket: WebSocket, hostid: str):
-    """WebSocket endpoint for live router interface monitoring - No Auth Required"""
+    """WebSocket endpoint for streaming stored interface data."""
     logger.info(f"[WS] Router interface connection request for hostid: {hostid}")
 
     try:
@@ -129,7 +143,12 @@ async def websocket_router_interfaces(websocket: WebSocket, hostid: str):
         logger.info(f"[WS ERROR] Failed to accept WebSocket: {e}")
         return
 
-    zabbix = websocket.app.state.zabbix
+    try:
+        source_uuid = uuid.UUID(hostid)
+    except ValueError:
+        await websocket.send_json({"type": "error", "message": "Invalid device identifier"})
+        await websocket.close()
+        return
 
     try:
         # Send initial connection confirmation
@@ -140,60 +159,59 @@ async def websocket_router_interfaces(websocket: WebSocket, hostid: str):
         # Background task to fetch interface data every 5 seconds
         async def stream_interfaces():
             while True:
+                session = SessionLocal()
                 try:
-                    # Fetch interface data
-                    loop = asyncio.get_event_loop()
-                    interfaces = await loop.run_in_executor(executor, lambda: zabbix.get_router_interfaces(hostid))
+                    topology_entries = (
+                        session.query(NetworkTopology)
+                        .filter(NetworkTopology.source_device_id == source_uuid)
+                        .order_by(NetworkTopology.last_seen.desc())
+                        .all()
+                    )
 
-                    # Ensure interfaces is a dict
-                    if not isinstance(interfaces, dict):
-                        logger.info(f"[WS ERROR] Interfaces is not a dict: {type(interfaces)}")
-                        interfaces = {}
+                    interfaces = {}
+                    for entry in topology_entries:
+                        name = entry.interface_name or "unknown"
+                        interface = interfaces.setdefault(name, {})
+                        interface.update(
+                            {
+                                "status": "up" if entry.is_active else "down",
+                                "target_ip": entry.target_ip,
+                                "target_device_id": str(entry.target_device_id) if entry.target_device_id else None,
+                                "description": entry.connection_type,
+                                "last_seen": entry.last_seen.isoformat() if entry.last_seen else None,
+                            }
+                        )
 
-                    # Calculate summary stats
-                    total_interfaces = len(interfaces)
-                    up_interfaces = sum(1 for iface in interfaces.values() if iface.get("status") == "up")
-                    total_bandwidth_in = sum(iface.get("bandwidth_in", 0) for iface in interfaces.values())
-                    total_bandwidth_out = sum(iface.get("bandwidth_out", 0) for iface in interfaces.values())
-                    total_errors_in = sum(iface.get("errors_in", 0) for iface in interfaces.values())
-                    total_errors_out = sum(iface.get("errors_out", 0) for iface in interfaces.values())
-
-                    # Send update
                     await websocket.send_json(
                         {
                             "type": "interface_update",
                             "hostid": hostid,
                             "timestamp": datetime.now(timezone.utc).isoformat(),
                             "summary": {
-                                "total": total_interfaces,
-                                "up": up_interfaces,
-                                "down": total_interfaces - up_interfaces,
-                                "bandwidth_in_mbps": round(total_bandwidth_in / 1000000, 2),
-                                "bandwidth_out_mbps": round(total_bandwidth_out / 1000000, 2),
-                                "errors_in": total_errors_in,
-                                "errors_out": total_errors_out,
+                                "total": len(interfaces),
+                                "up": sum(1 for data in interfaces.values() if data.get("status") == "up"),
+                                "down": sum(1 for data in interfaces.values() if data.get("status") == "down"),
                             },
                             "interfaces": [
                                 {
                                     "name": name,
                                     "status": data.get("status", "unknown"),
-                                    "bandwidth_in_mbps": round(data.get("bandwidth_in", 0) / 1000000, 2),
-                                    "bandwidth_out_mbps": round(data.get("bandwidth_out", 0) / 1000000, 2),
-                                    "errors_in": data.get("errors_in", 0),
-                                    "errors_out": data.get("errors_out", 0),
+                                    "target_ip": data.get("target_ip"),
+                                    "target_device_id": data.get("target_device_id"),
                                     "description": data.get("description", ""),
+                                    "last_seen": data.get("last_seen"),
                                 }
                                 for name, data in sorted(interfaces.items())
                             ],
                         }
                     )
 
-                    # Wait 5 seconds before next update
                     await asyncio.sleep(5)
-
                 except Exception as e:
                     logger.info(f"Error streaming interfaces for {hostid}: {e}")
                     await asyncio.sleep(5)
+                finally:
+                    session.close()
 
         # Start background task
         task = asyncio.create_task(stream_interfaces())
@@ -220,8 +238,8 @@ async def websocket_router_interfaces(websocket: WebSocket, hostid: str):
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time notifications"""
     await manager.connect(websocket)
-    zabbix = websocket.app.state.zabbix
 
+    task = None
     try:
         # Send initial connection confirmation
         await websocket.send_json(
@@ -232,42 +250,52 @@ async def websocket_endpoint(websocket: WebSocket):
             }
         )
 
+        last_sent: Dict[str, str] = {}
+
         # Background task to check for problems periodically
         async def check_problems():
             while True:
+                session = SessionLocal()
                 try:
-                    # Fetch current problems from Zabbix
-                    problems = await asyncio.to_thread(zabbix.get_problems)
+                    alerts = (
+                        session.query(AlertHistory)
+                        .filter(AlertHistory.resolved_at.is_(None))
+                        .order_by(AlertHistory.triggered_at.desc())
+                        .limit(50)
+                        .all()
+                    )
 
-                    if problems:
-                        for problem in problems:
-                            # Send notification for each problem
-                            severity_map = {
-                                "0": "info",
-                                "1": "info",
-                                "2": "warning",
-                                "3": "warning",
-                                "4": "critical",
-                                "5": "critical",
+                    active_ids = set()
+                    for alert in alerts:
+                        alert_id = str(alert.id)
+                        active_ids.add(alert_id)
+                        fingerprint = f"{alert.severity}:{alert.message}:{alert.triggered_at}"
+                        if last_sent.get(alert_id) == fingerprint:
+                            continue
+
+                        await websocket.send_json(
+                            {
+                                "id": alert_id,
+                                "type": alert.severity.value if hasattr(alert.severity, "value") else str(alert.severity),
+                                "title": alert.message,
+                                "message": f"Device {alert.device_id} reported an alert", 
+                                "timestamp": (alert.triggered_at or datetime.now(timezone.utc)).isoformat(),
+                                "link": f"/devices/{alert.device_id}" if alert.device_id else None,
                             }
+                        )
+                        last_sent[alert_id] = fingerprint
 
-                            await websocket.send_json(
-                                {
-                                    "id": problem.get("eventid"),
-                                    "type": severity_map.get(str(problem.get("severity", 0)), "info"),
-                                    "title": problem.get("name", "Problem Detected"),
-                                    "message": f"{problem.get('hostname', 'Unknown Host')} - {problem.get('description', 'Issue detected')}",
-                                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                                    "link": f"/devices?hostid={problem.get('hostid')}",
-                                }
-                            )
+                    # Remove entries that are no longer active
+                    for alert_id in list(last_sent.keys()):
+                        if alert_id not in active_ids:
+                            del last_sent[alert_id]
 
-                    # Wait 30 seconds before next check
                     await asyncio.sleep(30)
-
                 except Exception as e:
                     logger.info(f"Error checking problems: {e}")
                     await asyncio.sleep(30)
+                finally:
+                    session.close()
 
         # Start background task
         task = asyncio.create_task(check_problems())
@@ -280,12 +308,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        task.cancel()
+        if task:
+            task.cancel()
     except Exception as e:
         logger.info(f"WebSocket error: {e}")
         manager.disconnect(websocket)
-        try:
-            task.cancel()
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Error: {e}")
-            pass
+        if task:
+            try:
+                task.cancel()
+            except Exception as cancel_error:
+                logging.getLogger(__name__).error(f"Error: {cancel_error}")
