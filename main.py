@@ -3,7 +3,7 @@ WARD TECH SOLUTIONS - Network Monitoring Platform
 Modern FastAPI-based Network Management System
 
 Copyright © 2025 WARD Tech Solutions
-Powered by FastAPI, Zabbix API, and modern async architecture
+Powered by FastAPI and modern async architecture
 """
 import logging
 import os
@@ -29,7 +29,6 @@ from typing import Optional, List
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from zabbix_client import ZabbixClient
 import concurrent.futures
 
 # Authentication imports
@@ -63,11 +62,10 @@ from bulk_operations import (
 
 # Import router functions for legacy routes
 from routers.devices import get_device_details
-from routers.zabbix import get_alerts, get_mttr_stats, get_groups, get_templates, create_host, update_host, delete_host
 from routers.reports import get_mttr_extended
 from routers.websockets import monitor_device_changes
 
-# Thread pool for running sync Zabbix client in async context
+# Thread pool for async operations
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
 # ============================================
@@ -167,30 +165,6 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
-    # Startup - use the working synchronous client
-    app.state.zabbix = ZabbixClient()
-
-    # Load Zabbix credentials from database if available
-    try:
-        from database import SessionLocal
-        from models import SystemConfig
-
-        db = SessionLocal()
-        configs = {cfg.key: cfg.value for cfg in db.query(SystemConfig).filter(SystemConfig.key.in_(["zabbix_url", "zabbix_user", "zabbix_password"]))}
-        db.close()
-
-        if all(configs.get(k) for k in ["zabbix_url", "zabbix_user", "zabbix_password"]):
-            os.environ["ZABBIX_URL"] = configs["zabbix_url"]
-            os.environ["ZABBIX_USER"] = configs["zabbix_user"]
-            os.environ["ZABBIX_PASSWORD"] = configs["zabbix_password"]
-            app.state.zabbix.reconfigure(
-                url=configs["zabbix_url"],
-                user=configs["zabbix_user"],
-                password=configs["zabbix_password"],
-            )
-    except Exception as e:
-        logger.info(f"Warning: Unable to load Zabbix settings from database: {e}")
-
     # Initialize WebSocket connections list
     websocket_connections: List[WebSocket] = []
     app.state.websocket_connections = websocket_connections
@@ -212,9 +186,9 @@ app = FastAPI(
 
 ### Features:
 * 🔐 **Secure Authentication** - JWT-based user authentication
-* 📊 **Zabbix Integration** - Real-time monitoring data from Zabbix
+* 📊 **Real-time Monitoring** - Standalone SNMP and ping monitoring
 * 🌐 **Network Diagnostics** - Ping, Traceroute, MTR tools
-* 📈 **Performance Baselines** - Automated performance tracking
+* 📈 **Performance Tracking** - Automated performance baselines
 * 🗺️ **Network Topology** - Visual network mapping
 * 👥 **Multi-user Support** - Role-based access control
 
@@ -256,7 +230,6 @@ from routers import (
     snmp_credentials,
     templates,
     websockets,
-    zabbix,
 )
 
 app.include_router(auth.router)
@@ -269,7 +242,6 @@ app.include_router(templates.router)
 app.include_router(discovery.router)
 app.include_router(reports.router)
 app.include_router(settings.router)
-app.include_router(zabbix.router)
 app.include_router(dashboard.router)
 app.include_router(diagnostics.router)
 app.include_router(websockets.router)
@@ -368,9 +340,8 @@ def _frontend_file(relative_path: str) -> Path:
 
 @app.on_event("startup")
 async def startup_event():
-    # Ensure Zabbix client exists when server starts/reloads
-    if not hasattr(app.state, "zabbix"):
-        app.state.zabbix = ZabbixClient()
+    # Startup event handler
+    pass
 
 
 # Helper function to run sync code in thread pool
@@ -549,28 +520,6 @@ async def api_device_details_legacy(request: Request, hostid: str):
     return await get_device_details(request, hostid)
 
 
-@app.get("/api/alerts")
-async def api_alerts_legacy(request: Request):
-    """Legacy route - redirects to v1"""
-    return await get_alerts(request)
-
-
-@app.get("/api/mttr-stats")
-async def api_mttr_stats_legacy(request: Request):
-    """Legacy route - redirects to v1"""
-    return await get_mttr_stats(request)
-
-
-@app.get("/api/groups")
-async def api_groups_legacy(request: Request):
-    """Legacy route - redirects to v1"""
-    return await get_groups(request)
-
-
-@app.get("/api/templates")
-async def api_templates_legacy(request: Request):
-    """Legacy route - redirects to v1"""
-    return await get_templates(request)
 
 
 @app.get("/api/search")
@@ -824,22 +773,6 @@ async def api_mttr_extended_legacy(request: Request):
     return await get_mttr_extended(request)
 
 
-@app.post("/api/host/create")
-async def api_create_host_legacy(request: Request, host_data: CreateHostRequest):
-    """Legacy route - redirects to v1"""
-    return await create_host(request, host_data)
-
-
-@app.put("/api/host/update/{hostid}")
-async def api_update_host_legacy(request: Request, hostid: str, host_data: UpdateHostRequest):
-    """Legacy route - redirects to v1"""
-    return await update_host(request, hostid, host_data)
-
-
-@app.delete("/api/host/delete/{hostid}")
-async def api_delete_host_legacy(request: Request, hostid: str):
-    """Legacy route - redirects to v1"""
-    return await delete_host(request, hostid)
 
 
 # SSE endpoint for old frontend (dummy response)
@@ -1001,72 +934,6 @@ async def ssh_connect(ssh_request: SSHConnectRequest, current_user: User = Depen
 # Settings page route - MOVED TO routers/pages.py
 
 
-@app.get("/api/v1/settings/zabbix")
-async def get_zabbix_settings(current_user: User = Depends(get_current_active_user)):
-    """Get current Zabbix settings"""
-    try:
-        from database import SessionLocal
-        from models import SystemConfig
-
-        db = SessionLocal()
-        configs = {cfg.key: cfg.value for cfg in db.query(SystemConfig).filter(SystemConfig.key.in_(["zabbix_url", "zabbix_user"]))}
-        db.close()
-        return {
-            "zabbix_url": configs.get("zabbix_url", os.getenv("ZABBIX_URL", "")),
-            "zabbix_user": configs.get("zabbix_user", os.getenv("ZABBIX_USER", "")),
-        }
-    except Exception:
-        return {"zabbix_url": os.getenv("ZABBIX_URL", ""), "zabbix_user": os.getenv("ZABBIX_USER", "")}
-
-
-@app.post("/api/v1/settings/test-zabbix")
-async def test_zabbix_settings(config: dict, current_user: User = Depends(get_current_active_user)):
-    """Test Zabbix connection"""
-    from pyzabbix import ZabbixAPI
-
-    try:
-        zapi = ZabbixAPI(config["url"].replace("/api_jsonrpc.php", ""), timeout=10)
-        zapi.login(config["user"], config["password"])
-        version = zapi.apiinfo.version()
-
-        return {"success": True, "version": version}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-@app.post("/api/v1/settings/zabbix")
-async def save_zabbix_settings(request: Request, config: dict, current_user: User = Depends(get_current_active_user)):
-    """Save Zabbix settings and reconfigure"""
-    import os
-
-    try:
-        from database import SessionLocal
-        from models import SystemConfig
-
-        db = SessionLocal()
-        for key_name in ["zabbix_url", "zabbix_user", "zabbix_password"]:
-            entry = db.query(SystemConfig).filter(SystemConfig.key == key_name).first()
-            if entry:
-                entry.value = config[key_name]
-            else:
-                entry = SystemConfig(key=key_name, value=config[key_name])
-                db.add(entry)
-        db.commit()
-        db.close()
-
-        # Update environment variables
-        os.environ["ZABBIX_URL"] = config["zabbix_url"]
-        os.environ["ZABBIX_USER"] = config["zabbix_user"]
-        os.environ["ZABBIX_PASSWORD"] = config["zabbix_password"]
-
-        # Reconfigure Zabbix client
-        request.app.state.zabbix.reconfigure(
-            url=config["zabbix_url"], user=config["zabbix_user"], password=config["zabbix_password"]
-        )
-
-        return {"success": True, "message": "Settings saved successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
