@@ -6,8 +6,9 @@ import logging
 import io
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 
 from auth import get_current_active_user, require_admin, require_tech_or_admin
 from bulk_operations import (
@@ -22,8 +23,8 @@ from bulk_operations import (
     process_bulk_import,
     validate_bulk_import_data,
 )
-from database import User, UserRole
-from routers.utils import run_in_executor
+from database import User, UserRole, get_db
+from monitoring.models import StandaloneDevice
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +44,12 @@ async def download_bulk_import_template(current_user: User = Depends(require_tec
 
 
 @router.post("/import", response_model=BulkOperationResult)
-async def bulk_import_devices(request: Request, file: UploadFile, current_user: User = Depends(require_tech_or_admin)):
+async def bulk_import_devices(
+    file: UploadFile,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_tech_or_admin),
+):
     """Bulk import devices from CSV/Excel"""
-    zabbix = request.app.state.zabbix
 
     # Parse file
     if file.filename.endswith(".csv"):
@@ -63,45 +67,40 @@ async def bulk_import_devices(request: Request, file: UploadFile, current_user: 
         )
 
     # Process import
-    result = await process_bulk_import(df, zabbix)
+    result = await process_bulk_import(df, db)
     return result
 
 
 @router.post("/update", response_model=BulkOperationResult)
 async def bulk_update(
-    request: Request, host_ids: List[str], update_data: dict, current_user: User = Depends(require_tech_or_admin)
+    host_ids: List[str],
+    update_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_tech_or_admin),
 ):
     """Bulk update multiple devices"""
-    zabbix = request.app.state.zabbix
-    result = await bulk_update_devices(host_ids, update_data, zabbix)
+    result = await bulk_update_devices(host_ids, update_data, db)
     return result
 
 
 @router.post("/delete", response_model=BulkOperationResult)
-async def bulk_delete(request: Request, host_ids: List[str], current_user: User = Depends(require_admin)):
+async def bulk_delete(
+    host_ids: List[str],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     """Bulk delete multiple devices"""
-    zabbix = request.app.state.zabbix
-    result = await bulk_delete_devices(host_ids, zabbix)
+    result = await bulk_delete_devices(host_ids, db)
     return result
 
 
 @router.get("/export/csv")
-async def export_csv(request: Request, current_user: User = Depends(get_current_active_user)):
+async def export_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Export devices to CSV (filtered by user permissions)"""
-    zabbix = request.app.state.zabbix
-    devices = await run_in_executor(zabbix.get_all_hosts)
-
-    # Apply user permission filtering (non-admin users)
-    if current_user.role != UserRole.ADMIN:
-        # Filter by region if user has regional restriction
-        if current_user.region:
-            devices = [d for d in devices if d.get("region") == current_user.region]
-
-        # Filter by branches if user has branch restrictions
-        if current_user.branches:
-            allowed_branches = [b.strip() for b in current_user.branches.split(",")]
-            devices = [d for d in devices if d.get("branch") in allowed_branches]
-
+    devices = _filter_devices_for_user(db, current_user)
     csv_content = export_devices_to_csv(devices)
     return StreamingResponse(
         iter([csv_content]),
@@ -111,25 +110,33 @@ async def export_csv(request: Request, current_user: User = Depends(get_current_
 
 
 @router.get("/export/excel")
-async def export_excel(request: Request, current_user: User = Depends(get_current_active_user)):
+async def export_excel(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Export devices to Excel (filtered by user permissions)"""
-    zabbix = request.app.state.zabbix
-    devices = await run_in_executor(zabbix.get_all_hosts)
-
-    # Apply user permission filtering (non-admin users)
-    if current_user.role != UserRole.ADMIN:
-        # Filter by region if user has regional restriction
-        if current_user.region:
-            devices = [d for d in devices if d.get("region") == current_user.region]
-
-        # Filter by branches if user has branch restrictions
-        if current_user.branches:
-            allowed_branches = [b.strip() for b in current_user.branches.split(",")]
-            devices = [d for d in devices if d.get("branch") in allowed_branches]
-
+    devices = _filter_devices_for_user(db, current_user)
     excel_content = export_devices_to_excel(devices)
     return StreamingResponse(
         io.BytesIO(excel_content),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=devices_export.xlsx"},
     )
+
+
+def _filter_devices_for_user(db: Session, user: User) -> List[StandaloneDevice]:
+    devices = db.query(StandaloneDevice).all()
+    if user.role == UserRole.ADMIN:
+        return devices
+
+    allowed = [b.strip() for b in (user.branches or "").split(",") if b.strip()] if user.branches else []
+
+    filtered: List[StandaloneDevice] = []
+    for device in devices:
+        fields = device.custom_fields or {}
+        if user.region and fields.get("region") != user.region:
+            continue
+        if allowed and fields.get("branch") not in allowed:
+            continue
+        filtered.append(device)
+    return filtered
