@@ -165,10 +165,7 @@ export const devicesAPI = {
     delete: (id: string) => api.delete(`/devices/standalone/${id}`),
   },
 
-  // Create Zabbix device
-  createZabbix: (device: any) => api.post('/hosts', device),
-
-  // Create Standalone device (convenience method)
+  // Create Standalone device
   createStandalone: (device: any) => api.post('/devices/standalone', device),
 }
 
@@ -196,18 +193,6 @@ export const reportsAPI = {
   },
 }
 
-// Zabbix
-export const zabbixAPI = {
-  getGroups: () => api.get('/zabbix/groups'),
-  getTemplates: () => api.get('/zabbix/templates'),
-  createHost: (host: any) => api.post('/zabbix/hosts', host),
-  updateHost: (hostid: string, host: any) => api.put(`/zabbix/hosts/${hostid}`, host),
-  deleteHost: (hostid: string) => api.delete(`/zabbix/hosts/${hostid}`),
-  getAlerts: (params?: any) => {
-    const query = new URLSearchParams(params).toString()
-    return api.get(`/zabbix/alerts${query ? `?${query}` : ''}`)
-  },
-}
 
 // Config
 export const configAPI = {
@@ -216,12 +201,6 @@ export const configAPI = {
   saveMonitoredGroups: (groupIds: string[]) => api.post('/config/monitored-hostgroups', { groupids: groupIds }),
 }
 
-// Settings
-export const settingsAPI = {
-  getZabbix: () => api.get('/settings/zabbix'),
-  saveZabbix: (settings: any) => api.post('/settings/zabbix', settings),
-  testZabbix: (settings: any) => api.post('/settings/test-zabbix', settings),
-}
 
 // Diagnostics
 export const diagnosticsAPI = {

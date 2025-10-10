@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import { LoadingSpinner } from '@/components/ui/Loading'
 import { Modal } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { Server, Bell, Mail, Shield, Database, Users as UsersIcon, Plus, Edit2, Trash2, Search, Eye, EyeOff, Wrench, RefreshCw, Save, MapPin } from 'lucide-react'
+import { Server, Bell, Mail, Shield, Users as UsersIcon, Plus, Edit2, Trash2, Search, Eye, EyeOff, Wrench, Save, MapPin } from 'lucide-react'
 import api, { authAPI } from '@/services/api'
 
 interface User {
@@ -37,13 +37,7 @@ interface City {
 }
 
 export default function Settings() {
-  const [saving, setSaving] = useState(false)
-  const [activeSection, setActiveSection] = useState('zabbix')
-  const [zabbixSettings, setZabbixSettings] = useState({
-    url: '',
-    username: '',
-    password: '',
-  })
+  const [activeSection, setActiveSection] = useState('notifications')
   const [emailSettings, setEmailSettings] = useState({
     smtp_server: '',
     smtp_port: '587',
@@ -58,13 +52,11 @@ export default function Settings() {
   })
 
   // Password visibility toggles
-  const [showZabbixPassword, setShowZabbixPassword] = useState(false)
   const [showEmailPassword, setShowEmailPassword] = useState(false)
 
   // Config state
-  const [loadingGroups, setLoadingGroups] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
-  const [allGroups, setAllGroups] = useState<HostGroup[]>([])
+  const [allGroups] = useState<HostGroup[]>([])
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set())
   const [cities, setCities] = useState<City[]>([])
 
@@ -209,31 +201,6 @@ export default function Settings() {
     }
   }
 
-  const handleSaveZabbix = async () => {
-    setSaving(true)
-    try {
-      await api.post('/settings/zabbix', zabbixSettings)
-      alert('Zabbix settings saved successfully!')
-    } catch (error) {
-      console.error('Failed to save Zabbix settings:', error)
-      alert('Failed to save settings')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleTestZabbix = async () => {
-    try {
-      const response = await api.post('/settings/test-zabbix', zabbixSettings)
-      if (response.data.success) {
-        alert(`Connection successful! Zabbix version: ${response.data.version || 'Unknown'}`)
-      } else {
-        alert(`Connection failed: ${response.data.error || 'Unknown error'}`)
-      }
-    } catch (error: any) {
-      alert(`Connection failed: ${error.message}`)
-    }
-  }
 
   // Config functions
   const loadMonitoredGroups = async () => {
@@ -246,18 +213,6 @@ export default function Settings() {
     }
   }
 
-  const loadZabbixGroups = async () => {
-    setLoadingGroups(true)
-    try {
-      const response = await api.get('/config/zabbix-hostgroups')
-      setAllGroups(response.data.hostgroups || [])
-    } catch (error) {
-      console.error('Failed to load Zabbix host groups:', error)
-      alert('Failed to fetch host groups from Zabbix. Please check your Zabbix configuration.')
-    } finally {
-      setLoadingGroups(false)
-    }
-  }
 
   const loadCities = async () => {
     try {
@@ -312,17 +267,6 @@ export default function Settings() {
       <Card>
         <CardContent className="py-4">
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setActiveSection('zabbix')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeSection === 'zabbix'
-                  ? 'bg-ward-green text-white'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-              }`}
-            >
-              <Server className="h-4 w-4 inline-block mr-2" />
-              Zabbix
-            </button>
             <button
               onClick={() => setActiveSection('notifications')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -382,79 +326,6 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {/* Zabbix Configuration */}
-      {activeSection === 'zabbix' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-ward-green/10 rounded-lg">
-                <Server className="h-6 w-6 text-ward-green" />
-              </div>
-              <div>
-                <CardTitle>Zabbix Configuration</CardTitle>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Configure connection to your Zabbix monitoring server
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Input
-              label="Zabbix API URL"
-              placeholder="http://192.168.200.178:8080/api_jsonrpc.php"
-              value={zabbixSettings.url}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setZabbixSettings({ ...zabbixSettings, url: e.target.value })}
-              helperText="Full URL to Zabbix API endpoint"
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Username"
-                placeholder="admin"
-                value={zabbixSettings.username}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setZabbixSettings({ ...zabbixSettings, username: e.target.value })}
-              />
-
-              <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showZabbixPassword ? 'text' : 'password'}
-                    placeholder="Enter password"
-                    value={zabbixSettings.password}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setZabbixSettings({ ...zabbixSettings, password: e.target.value })}
-                    autoComplete="new-password"
-                    className="w-full px-4 py-2 pr-12 rounded-lg border transition-all duration-200 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowZabbixPassword(!showZabbixPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                  >
-                    {showZabbixPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <Button variant="outline" onClick={handleTestZabbix}>
-                <Database className="h-4 w-4 mr-2" />
-                Test Connection
-              </Button>
-              <Button onClick={handleSaveZabbix} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Configuration'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Notifications */}
       {activeSection === 'notifications' && (
@@ -982,10 +853,6 @@ export default function Settings() {
                     )}
                   </div>
                 </div>
-                <Button onClick={loadZabbixGroups} disabled={loadingGroups}>
-                  <RefreshCw className={`h-4 w-4 mr-2 ${loadingGroups ? 'animate-spin' : ''}`} />
-                  Fetch from Zabbix
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -993,7 +860,7 @@ export default function Settings() {
                 <div className="text-center py-12">
                   <Server className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500 dark:text-gray-400">
-                    Click "Fetch from Zabbix" to load available host groups
+                    No host groups available
                   </p>
                 </div>
               ) : (
