@@ -9,9 +9,11 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from auth import get_current_active_user
-from database import User, UserRole
+from database import User, UserRole, get_db
+from monitoring.models import AlertHistory, MonitoringMode, MonitoringProfile
 from routers.utils import get_monitored_groupids, run_in_executor
 
 # Thread pool executor
@@ -42,11 +44,34 @@ class UpdateHostRequest(BaseModel):
 
 
 @router.get("/alerts")
-async def get_alerts(request: Request):
+async def get_alerts(request: Request, db: Session = Depends(get_db)):
     """Get all active alerts"""
-    zabbix = request.app.state.zabbix
-    alerts = await run_in_executor(zabbix.get_active_alerts)
-    return alerts
+    profile = db.query(MonitoringProfile).filter_by(is_active=True).first()
+    mode = profile.mode if profile else MonitoringMode.STANDALONE
+
+    if mode == MonitoringMode.ZABBIX:
+        zabbix = request.app.state.zabbix
+        return await run_in_executor(zabbix.get_active_alerts)
+
+    alerts = (
+        db.query(AlertHistory)
+        .filter(AlertHistory.resolved_at.is_(None))
+        .order_by(AlertHistory.triggered_at.desc())
+        .limit(100)
+        .all()
+    )
+
+    return [
+        {
+            "id": str(alert.id),
+            "device_id": str(alert.device_id) if alert.device_id else None,
+            "severity": alert.severity.value if hasattr(alert.severity, "value") else alert.severity,
+            "message": alert.message,
+            "value": alert.value,
+            "triggered_at": alert.triggered_at.isoformat() if alert.triggered_at else None,
+        }
+        for alert in alerts
+    ]
 
 
 @router.get("/mttr/stats")

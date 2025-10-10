@@ -4,6 +4,7 @@ Handles device listing and details
 """
 import logging
 import asyncio
+import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -59,7 +60,12 @@ async def get_device_details(
             return details
         return JSONResponse(status_code=404, content={"error": "Device not found"})
 
-    device = db.query(StandaloneDevice).filter_by(id=device_id).first()
+    try:
+        device_uuid = uuid.UUID(device_id)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid device ID"})
+
+    device = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
     if not device:
         return JSONResponse(status_code=404, content={"error": "Device not found"})
 
@@ -117,7 +123,16 @@ async def update_device(
             logger.error(f"Failed to update device {hostid}: {e}")
             return JSONResponse(status_code=500, content={"error": f"Failed to update device: {str(e)}"})
 
-    device = db.query(StandaloneDevice).filter_by(id=hostid).first()
+    try:
+        device_uuid = uuid.UUID(hostid)
+    except ValueError:
+        return {
+            "hostid": hostid,
+            "history": [],
+            "time_range": time_range,
+        }
+
+    device = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
     if not device:
         return JSONResponse(status_code=404, content={"error": "Device not found"})
 
@@ -320,7 +335,12 @@ async def get_device_history(
         history = await loop.run_in_executor(None, lambda: zabbix.get_device_ping_history(hostid, time_from))
         return {"hostid": hostid, "history": history, "time_range": time_range}
 
-    device = db.query(StandaloneDevice).filter_by(id=hostid).first()
+    try:
+        device_uuid = uuid.UUID(hostid)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid device ID"})
+
+    device = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
     if not device:
         return {"hostid": hostid, "history": [], "time_range": time_range}
 
@@ -370,7 +390,12 @@ async def ping_device(
         ip = device.get("ip")
         device_name = device.get("display_name")
     else:
-        standalone = db.query(StandaloneDevice).filter_by(id=device_id).first()
+        try:
+            device_uuid = uuid.UUID(device_id)
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "Invalid device ID"})
+
+        standalone = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
         if not standalone:
             return JSONResponse(status_code=404, content={"error": "Device not found"})
         ip = standalone.ip
