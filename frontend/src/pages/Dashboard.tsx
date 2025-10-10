@@ -59,7 +59,7 @@ export default function DashboardEnhanced() {
 
   const stats = statsResponse?.data
   const devices = devicesResponse?.data || []
-  const alerts = alertsResponse?.data || []
+  const alerts = alertsResponse?.data?.alerts || []
 
   // Calculate regional statistics
   const regionalStats: Record<string, any> = {}

@@ -215,6 +215,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 # Include Modular Routers
 # ============================================
 from routers import (
+    alerts,
     auth,
     bulk,
     config,
@@ -241,6 +242,7 @@ app.include_router(snmp_credentials.router)
 app.include_router(templates.router)
 app.include_router(discovery.router)
 app.include_router(reports.router)
+app.include_router(alerts.router)
 app.include_router(settings.router)
 app.include_router(dashboard.router)
 app.include_router(diagnostics.router)

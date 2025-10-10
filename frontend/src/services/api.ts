@@ -151,10 +151,10 @@ export const devicesAPI = {
   // Dashboard stats
   getStats: () => api.get<Stats>('/dashboard/stats'),
 
-  // Get alerts - TODO: Implement standalone alerts endpoint
+  // Get alerts from standalone monitoring
   getAlerts: (severity?: string) => {
-    // Zabbix removed - return empty alerts for now
-    return Promise.resolve({ data: [] })
+    const params = severity ? `?severity=${severity}&status=active` : '?status=active'
+    return api.get(`/alerts${params}`)
   },
 
   // Standalone devices
