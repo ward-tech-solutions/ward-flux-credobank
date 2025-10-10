@@ -162,34 +162,58 @@ def ping_device(device_id: str, device_ip: str):
         device_id: Device UUID
         device_ip: Device IP address
     """
+    db = None
     try:
         from icmplib import ping
+        from monitoring.models import PingResult
+        from datetime import datetime
 
         # Perform ping
         host = ping(device_ip, count=5, interval=0.2, timeout=2, privileged=False)
 
-        # Write metrics to VictoriaMetrics
-        vm_client = get_victoria_client()
+        # Save to database
+        db = SessionLocal()
+        device = db.query(StandaloneDevice).filter_by(id=device_id).first()
 
-        metrics = [
-            {
-                "metric_name": "ping_rtt_ms",
-                "value": host.avg_rtt,
-                "labels": {"device_id": device_id, "ip": device_ip},
-            },
-            {
-                "metric_name": "ping_packet_loss",
-                "value": host.packet_loss,
-                "labels": {"device_id": device_id, "ip": device_ip},
-            },
-            {
-                "metric_name": "ping_is_alive",
-                "value": 1 if host.is_alive else 0,
-                "labels": {"device_id": device_id, "ip": device_ip},
-            },
-        ]
+        ping_result = PingResult(
+            device_ip=device_ip,
+            device_name=device.name if device else None,
+            packets_sent=host.packets_sent,
+            packets_received=host.packets_received,
+            packet_loss_percent=int(host.packet_loss),
+            min_rtt_ms=int(host.min_rtt) if host.min_rtt else 0,
+            avg_rtt_ms=int(host.avg_rtt) if host.avg_rtt else 0,
+            max_rtt_ms=int(host.max_rtt) if host.max_rtt else 0,
+            is_reachable=host.is_alive,
+            timestamp=datetime.utcnow()
+        )
+        db.add(ping_result)
+        db.commit()
 
-        vm_client.write_metrics_bulk(metrics)
+        # Write metrics to VictoriaMetrics (optional)
+        try:
+            vm_client = get_victoria_client()
+            metrics = [
+                {
+                    "metric_name": "ping_rtt_ms",
+                    "value": host.avg_rtt,
+                    "labels": {"device_id": device_id, "ip": device_ip},
+                },
+                {
+                    "metric_name": "ping_packet_loss",
+                    "value": host.packet_loss,
+                    "labels": {"device_id": device_id, "ip": device_ip},
+                },
+                {
+                    "metric_name": "ping_is_alive",
+                    "value": 1 if host.is_alive else 0,
+                    "labels": {"device_id": device_id, "ip": device_ip},
+                },
+            ]
+            vm_client.write_metrics_bulk(metrics)
+        except Exception as vm_err:
+            logger.debug(f"VictoriaMetrics unavailable (non-critical): {vm_err}")
+
         logger.debug(f"Pinged {device_ip}: RTT={host.avg_rtt}ms, Loss={host.packet_loss}%")
 
         return {
@@ -203,6 +227,9 @@ def ping_device(device_id: str, device_ip: str):
     except Exception as e:
         logger.error(f"Error pinging {device_ip}: {e}")
         raise
+    finally:
+        if db:
+            db.close()
 
 
 @shared_task(name="monitoring.tasks.ping_all_devices")
