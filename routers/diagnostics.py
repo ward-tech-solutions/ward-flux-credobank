@@ -19,17 +19,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth import get_current_active_user
-from database import (
-    MTRResult,
-    PerformanceBaseline,
-    PingResult,
-    TracerouteResult,
-    User,
-    get_db,
-)
+from database import MTRResult, PerformanceBaseline, PingResult, TracerouteResult, User, get_db
 from network_diagnostics import NetworkDiagnostics
 from routers.utils import run_in_executor, extract_city_from_hostname
 from zabbix_client import BRANCH_COORDINATES, REGION_COORDINATES
+from monitoring.models import StandaloneDevice
 
 # Create router
 router = APIRouter(prefix="/api/v1/diagnostics", tags=["diagnostics"])
@@ -56,6 +50,8 @@ def _lookup_city_coordinates(city: str) -> Optional[Dict[str, float]]:
 def _coordinates_for_host(host: Optional[Dict[str, any]]) -> Optional[Dict[str, float]]:
     if not host:
         return None
+    if host.get("latitude") is not None and host.get("longitude") is not None:
+        return {"lat": host["latitude"], "lng": host["longitude"]}
     branch = (host.get("branch") or "").lower()
     if branch:
         coords = BRANCH_COORDINATES.get(branch)
@@ -109,15 +105,9 @@ async def ping_device(
     # Perform ping
     result = await run_in_executor(diag.ping, ip, count)
 
-    # Get device name from Zabbix
-    zabbix = request.app.state.zabbix
-    try:
-        devices = await run_in_executor(zabbix.get_all_hosts)
-        device = next((d for d in devices if d.get("ip") == ip), None)
-        device_name = device.get("display_name") if device else ip
-    except Exception as e:
-        logging.getLogger(__name__).error(f"Error: {e}")
-        device_name = ip
+    # Resolve device name from standalone inventory
+    standalone_device = db.query(StandaloneDevice).filter(StandaloneDevice.ip == ip).first()
+    device_name = standalone_device.name if standalone_device else ip
 
     # Store in database
     def _to_int(value: Optional[float]) -> Optional[int]:
@@ -164,15 +154,8 @@ async def traceroute_device(
     # Perform traceroute
     result = await run_in_executor(diag.traceroute, ip, max_hops)
 
-    # Get device name from Zabbix
-    zabbix = request.app.state.zabbix
-    try:
-        devices = await run_in_executor(zabbix.get_all_hosts)
-        device = next((d for d in devices if d.get("ip") == ip), None)
-        device_name = device.get("display_name") if device else ip
-    except Exception as e:
-        logging.getLogger(__name__).error(f"Error: {e}")
-        device_name = ip
+    standalone_device = db.query(StandaloneDevice).filter(StandaloneDevice.ip == ip).first()
+    device_name = standalone_device.name if standalone_device else ip
 
     # Store each hop in database
     for hop in result.get("hops", []):
@@ -251,12 +234,20 @@ async def get_traceroute_history(
 # ============================================
 
 
-def _build_host_index(hosts: List[Dict]) -> Dict[str, Dict]:
+def _build_host_index(devices: List[StandaloneDevice]) -> Dict[str, Dict]:
     index: Dict[str, Dict] = {}
-    for host in hosts or []:
-        ip = host.get("ip")
-        if ip:
-            index[ip] = host
+    for device in devices or []:
+        ip = device.ip
+        if not ip:
+            continue
+        fields = device.custom_fields or {}
+        index[ip] = {
+            "display_name": device.name,
+            "branch": fields.get("branch"),
+            "region": fields.get("region"),
+            "latitude": fields.get("latitude"),
+            "longitude": fields.get("longitude"),
+        }
     return index
 
 
@@ -268,14 +259,9 @@ async def diagnostics_summary(
 ):
     """Return aggregated diagnostics data for dashboard visualizations."""
 
-    # Fetch host metadata from Zabbix for region/branch mapping
-    host_index: Dict[str, Dict] = {}
-    try:
-        zabbix = request.app.state.zabbix
-        hosts = await run_in_executor(zabbix.get_all_hosts)
-        host_index = _build_host_index(hosts)
-    except Exception as exc:
-        logging.getLogger(__name__).warning(f"Failed to fetch hosts from Zabbix: {exc}")
+    # Fetch host metadata from standalone inventory
+    devices = db.query(StandaloneDevice).all()
+    host_index = _build_host_index(devices)
 
     recent_pings: List[PingResult] = (
         db.query(PingResult).order_by(PingResult.timestamp.desc()).limit(20).all()
@@ -444,15 +430,9 @@ async def traceroute_map(
         .all()
     )
 
-    host_index: Dict[str, Dict] = {}
-    device_host: Optional[Dict] = None
-    try:
-        zabbix = request.app.state.zabbix
-        hosts = await run_in_executor(zabbix.get_all_hosts)
-        host_index = _build_host_index(hosts)
-        device_host = host_index.get(ip)
-    except Exception as exc:
-        logging.getLogger(__name__).warning(f"Failed to fetch hosts from Zabbix: {exc}")
+    devices = db.query(StandaloneDevice).all()
+    host_index = _build_host_index(devices)
+    device_host = host_index.get(ip)
 
     hop_payload = []
     for hop in hops:
