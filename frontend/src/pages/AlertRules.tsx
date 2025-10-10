@@ -38,7 +38,10 @@ export default function AlertRules() {
 
   const { data: rulesData, isLoading } = useQuery({
     queryKey: ['alert-rules'],
-    queryFn: () => alertRulesAPI.getRules(),
+    queryFn: async () => {
+      const response = await alertRulesAPI.getRules()
+      return response.data
+    },
   })
 
   const createMutation = useMutation({
