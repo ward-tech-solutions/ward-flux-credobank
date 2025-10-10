@@ -25,23 +25,23 @@
 
 ---
 
-### 2. Reports Page - Broken (Zabbix Dependency)
+### 2. Reports Page - Broken (Zabbix Dependency) ✅ FIXED
 **Problem:** `/api/v1/reports/downtime` returns 500 error
 
-**Backend Error:**
-```
-AttributeError: 'State' object has no attribute 'zabbix'
-```
+**Solution Implemented:**
+- ✅ Removed all Zabbix dependencies from `routers/reports.py`
+- ✅ Implemented real downtime calculations from ping_results
+- ✅ Calculate device availability from ping success rate over time period
+- ✅ Support daily/weekly/monthly reporting periods
+- ✅ Calculate real MTTR from resolved alerts in alert_history
+- ✅ Find top 10 problem devices by incident count
+- ✅ Apply user role and region permissions
 
-**Solution:**
-- [ ] Remove Zabbix dependency from `routers/reports.py`
-- [ ] Implement standalone downtime calculations using `ping_results` table
-- [ ] Query device uptime from ping history
-- [ ] Calculate MTTR (Mean Time To Repair) from alert history
-
-**Files to Fix:**
-- `routers/reports.py`
-- `frontend/src/pages/Reports.tsx`
+**Changes Made:**
+- Updated `routers/reports.py`:
+  - `/api/v1/reports/downtime` - Real availability, downtime hours, incidents
+  - `/api/v1/reports/mttr-extended` - MTTR from alert resolution times
+  - Use SQLAlchemy queries on standalone_devices, ping_results, alert_history
 
 ---
 
@@ -245,9 +245,9 @@ no such column: discovery_rules.ping_scan
 
 ## 🚀 **IMPLEMENTATION PRIORITY**
 
-### Sprint 1 (Week 1) - Critical Fixes
+### Sprint 1 (Week 1) - Critical Fixes ✅ COMPLETE
 1. ✅ Fix device list API (DONE)
-2. ⬜ Fix Reports page (remove Zabbix)
+2. ✅ Fix Reports page (DONE - real downtime/MTTR from standalone monitoring)
 3. ✅ Fix Device Details real data (DONE - shows real ping metrics, time range selector, calculated uptime)
 4. ✅ Remove Zabbix frontend calls (DONE - stubbed out with empty alerts for now)
 
