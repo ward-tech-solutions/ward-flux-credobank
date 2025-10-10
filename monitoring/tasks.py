@@ -505,3 +505,162 @@ def cleanup_old_discovery_results(self, days: int = 30):
         raise
     finally:
         db.close()
+
+@shared_task(bind=True, name="monitoring.tasks.evaluate_alert_rules")
+def evaluate_alert_rules(self):
+    """
+    PRODUCTION ALERT ENGINE
+    Evaluate all enabled alert rules against current device states
+    Runs every 60 seconds to detect issues immediately
+    """
+    db = SessionLocal()
+    try:
+        from database import PingResult
+        import uuid
+        
+        logger.info("🚨 Starting alert rule evaluation...")
+        
+        # Get all enabled alert rules
+        rules = db.query(AlertRule).filter_by(enabled=True).all()
+        logger.info(f"Found {len(rules)} enabled alert rules")
+        
+        if not rules:
+            logger.warning("No enabled alert rules found!")
+            return {"evaluated": 0, "triggered": 0}
+        
+        # Get all devices
+        devices = db.query(StandaloneDevice).all()
+        logger.info(f"Evaluating alerts for {len(devices)} devices")
+        
+        triggered_count = 0
+        resolved_count = 0
+        
+        for device in devices:
+            for rule in rules:
+                try:
+                    # Evaluate rule for this device
+                    should_trigger = False
+                    alert_message = ""
+                    alert_value = None
+                    
+                    # Get last 10 minutes of ping data
+                    ten_mins_ago = datetime.utcnow() - timedelta(minutes=10)
+                    recent_pings = (
+                        db.query(PingResult)
+                        .filter(
+                            PingResult.device_ip == device.ip,
+                            PingResult.timestamp >= ten_mins_ago
+                        )
+                        .order_by(PingResult.timestamp.desc())
+                        .all()
+                    )
+                    
+                    if not recent_pings:
+                        # No data - trigger "No Data Received" alert
+                        if "no_data" in rule.expression:
+                            should_trigger = True
+                            alert_message = f"No ping data received for {device.name} ({device.ip}) in last 10 minutes"
+                            alert_value = "no_data"
+                    else:
+                        # Check for device down
+                        if "ping_unreachable" in rule.expression:
+                            unreachable_count = sum(1 for p in recent_pings if not p.is_reachable)
+                            minutes_down = unreachable_count  # Rough estimate
+                            
+                            # Extract threshold from expression (e.g., "ping_unreachable >= 5")
+                            threshold = int(rule.expression.split(">=")[-1].strip()) if ">=" in rule.expression else 2
+                            
+                            if minutes_down >= threshold:
+                                should_trigger = True
+                                alert_message = f"Device {device.name} ({device.ip}) is DOWN - unreachable for {minutes_down}+ minutes"
+                                alert_value = f"{minutes_down}_minutes_down"
+                        
+                        # Check for high latency
+                        elif "avg_ping_ms" in rule.expression:
+                            reachable_pings = [p for p in recent_pings if p.is_reachable and p.avg_rtt_ms]
+                            if reachable_pings:
+                                avg_latency = sum(p.avg_rtt_ms for p in reachable_pings) / len(reachable_pings)
+                                
+                                # Extract threshold from expression
+                                threshold = int(rule.expression.split(">")[-1].strip())
+                                
+                                if avg_latency > threshold:
+                                    should_trigger = True
+                                    alert_message = f"High latency on {device.name} ({device.ip}): {avg_latency:.0f}ms (threshold: {threshold}ms)"
+                                    alert_value = f"{avg_latency:.0f}ms"
+                        
+                        # Check for packet loss
+                        elif "packet_loss" in rule.expression:
+                            total = len(recent_pings)
+                            unreachable = sum(1 for p in recent_pings if not p.is_reachable)
+                            packet_loss_pct = (unreachable / total) * 100 if total > 0 else 0
+                            
+                            # Extract threshold
+                            threshold = int(rule.expression.split(">")[-1].strip())
+                            
+                            if packet_loss_pct > threshold:
+                                should_trigger = True
+                                alert_message = f"High packet loss on {device.name} ({device.ip}): {packet_loss_pct:.1f}% (threshold: {threshold}%)"
+                                alert_value = f"{packet_loss_pct:.1f}%"
+                    
+                    # Check if alert already exists
+                    existing_alert = (
+                        db.query(AlertHistory)
+                        .filter(
+                            AlertHistory.device_id == device.id,
+                            AlertHistory.rule_name == rule.name,
+                            AlertHistory.resolved_at.is_(None)
+                        )
+                        .first()
+                    )
+                    
+                    if should_trigger and not existing_alert:
+                        # CREATE NEW ALERT
+                        new_alert = AlertHistory(
+                            id=uuid.uuid4(),
+                            device_id=device.id,
+                            rule_name=rule.name,
+                            severity=rule.severity,
+                            message=alert_message,
+                            value=alert_value,
+                            threshold=rule.expression,
+                            triggered_at=datetime.utcnow(),
+                            acknowledged=False,
+                            notifications_sent=False,
+                        )
+                        db.add(new_alert)
+                        triggered_count += 1
+                        logger.warning(f"🚨 ALERT TRIGGERED: {alert_message}")
+                    
+                    elif not should_trigger and existing_alert:
+                        # AUTO-RESOLVE ALERT
+                        existing_alert.resolved_at = datetime.utcnow()
+                        resolved_count += 1
+                        logger.info(f"✅ ALERT RESOLVED: {existing_alert.message}")
+                
+                except Exception as rule_error:
+                    logger.error(f"Error evaluating rule '{rule.name}' for device {device.name}: {rule_error}")
+                    continue
+        
+        db.commit()
+        
+        result = {
+            "evaluated": len(devices) * len(rules),
+            "triggered": triggered_count,
+            "resolved": resolved_count,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        if triggered_count > 0:
+            logger.warning(f"🚨 Alert evaluation complete: {triggered_count} NEW ALERTS, {resolved_count} resolved")
+        else:
+            logger.info(f"✅ Alert evaluation complete: All systems healthy, {resolved_count} alerts auto-resolved")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ CRITICAL: Alert evaluation failed: {e}", exc_info=True)
+        db.rollback()
+        raise
+    finally:
+        db.close()

@@ -84,6 +84,12 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=2, minute=0),  # Daily at 2:00 AM
         'kwargs': {'days': 30}
     },
+
+    # 🚨 PRODUCTION ALERT ENGINE - Evaluate alert rules every minute
+    'evaluate-alert-rules': {
+        'task': 'monitoring.tasks.evaluate_alert_rules',
+        'schedule': 60.0,  # Every 60 seconds
+    },
 }
 
 if __name__ == '__main__':
