@@ -4,9 +4,11 @@ Handles Zabbix host management, alerts, groups, templates, and search
 """
 import logging
 import asyncio
+import uuid
+from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -69,9 +71,54 @@ async def get_alerts(request: Request, db: Session = Depends(get_db)):
             "message": alert.message,
             "value": alert.value,
             "triggered_at": alert.triggered_at.isoformat() if alert.triggered_at else None,
+            "acknowledged": alert.acknowledged,
+            "acknowledged_at": alert.acknowledged_at.isoformat() if alert.acknowledged_at else None,
         }
         for alert in alerts
     ]
+
+
+@router.post("/alerts/{alert_id}/ack")
+async def acknowledge_alert(
+    alert_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Acknowledge an active alert"""
+    alert = db.query(AlertHistory).filter_by(id=uuid.UUID(alert_id)).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    if alert.resolved_at:
+        return {"status": "already_resolved"}
+
+    alert.acknowledged = True
+    alert.acknowledged_by = current_user.id
+    alert.acknowledged_at = datetime.utcnow()
+    db.commit()
+
+    return {"status": "acknowledged", "alert_id": alert_id}
+
+
+@router.post("/alerts/{alert_id}/resolve")
+async def resolve_alert(
+    alert_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Resolve/dismiss an alert"""
+    alert = db.query(AlertHistory).filter_by(id=uuid.UUID(alert_id)).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    alert.resolved_at = datetime.utcnow()
+    if not alert.acknowledged:
+        alert.acknowledged = True
+        alert.acknowledged_by = current_user.id
+        alert.acknowledged_at = datetime.utcnow()
+    db.commit()
+
+    return {"status": "resolved", "alert_id": alert_id}
 
 
 @router.get("/mttr/stats")
