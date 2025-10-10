@@ -173,7 +173,9 @@ def ping_device(device_id: str, device_ip: str):
 
         # Save to database
         db = SessionLocal()
-        device = db.query(StandaloneDevice).filter_by(id=device_id).first()
+        from uuid import UUID
+        device_uuid = UUID(device_id) if isinstance(device_id, str) else device_id
+        device = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
 
         ping_result = PingResult(
             device_ip=device_ip,
