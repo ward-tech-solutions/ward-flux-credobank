@@ -67,7 +67,7 @@ async def get_downtime_report(
         ping_stats = (
             db.query(
                 func.count(PingResult.id).label("total_pings"),
-                func.sum(func.cast(PingResult.is_reachable, func.INTEGER)).label("successful_pings"),
+                func.sum(func.case((PingResult.is_reachable == True, 1), else_=0)).label("successful_pings"),
             )
             .filter(
                 and_(
@@ -160,29 +160,27 @@ async def get_mttr_extended(
     # Find top problem devices by incident count
     device_alerts = (
         db.query(
-            StandaloneDevice.id,
-            StandaloneDevice.name,
-            StandaloneDevice.region,
+            AlertHistory.device_id,
             func.count(AlertHistory.id).label("incident_count"),
         )
-        .join(AlertHistory, StandaloneDevice.id == AlertHistory.device_id)
         .filter(AlertHistory.triggered_at >= thirty_days_ago)
-        .group_by(StandaloneDevice.id, StandaloneDevice.name, StandaloneDevice.region)
+        .group_by(AlertHistory.device_id)
         .order_by(func.count(AlertHistory.id).desc())
         .limit(10)
         .all()
     )
 
-    top_problem_devices = [
-        {
-            "hostid": str(device.id),
-            "name": device.name,
-            "region": device.region or "Unknown",
-            "incident_count": device.incident_count,
-            "downtime_minutes": round(device.incident_count * 15, 2),  # Estimate 15 min avg per incident
-        }
-        for device in device_alerts
-    ]
+    top_problem_devices = []
+    for alert_stat in device_alerts:
+        device = db.query(StandaloneDevice).filter_by(id=alert_stat.device_id).first()
+        if device:
+            top_problem_devices.append({
+                "hostid": str(device.id),
+                "name": device.name,
+                "region": device.region or "Unknown",
+                "incident_count": alert_stat.incident_count,
+                "downtime_minutes": round(alert_stat.incident_count * 15, 2),  # Estimate 15 min avg per incident
+            })
 
     return {
         "avg_mttr_minutes": avg_mttr_minutes,
