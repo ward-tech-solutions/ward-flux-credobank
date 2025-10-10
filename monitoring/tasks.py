@@ -42,7 +42,7 @@ def poll_device_snmp(self, device_id: str):
 
         # Check if standalone monitoring is enabled
         profile = db.query(MonitoringProfile).filter_by(is_active=True).first()
-        if not profile or profile.mode == MonitoringMode.ZABBIX:
+        if not profile or profile.mode == MonitoringMode.zabbix:
             logger.debug(f"Standalone monitoring not active, skipping device {device_id}")
             db.close()
             return
@@ -131,7 +131,7 @@ def poll_all_devices_snmp():
 
         # Check if standalone monitoring is enabled
         profile = db.query(MonitoringProfile).filter_by(is_active=True).first()
-        if not profile or profile.mode == MonitoringMode.ZABBIX:
+        if not profile or profile.mode == MonitoringMode.zabbix:
             db.close()
             return
 
@@ -215,7 +215,7 @@ def ping_all_devices():
 
         # Check if standalone monitoring is enabled
         profile = db.query(MonitoringProfile).filter_by(is_active=True).first()
-        if not profile or profile.mode == MonitoringMode.ZABBIX:
+        if not profile or profile.mode == MonitoringMode.zabbix:
             db.close()
             return
 

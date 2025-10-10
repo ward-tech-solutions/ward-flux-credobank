@@ -193,7 +193,7 @@ def delete_missing_devices(session: Session, zabbix_ips: set[str], dry_run: bool
 def activate_standalone_profile(session: Session) -> None:
     profile = session.query(MonitoringProfile).filter_by(is_active=True).first()
     if profile:
-        profile.mode = MonitoringMode.STANDALONE
+        profile.mode = MonitoringMode.standalone
         profile.is_active = True
         session.commit()
         logger.info("Activated existing monitoring profile in standalone mode")
@@ -201,13 +201,13 @@ def activate_standalone_profile(session: Session) -> None:
 
     profile = session.query(MonitoringProfile).first()
     if profile:
-        profile.mode = MonitoringMode.STANDALONE
+        profile.mode = MonitoringMode.standalone
         profile.is_active = True
         session.commit()
         logger.info("Enabled monitoring profile '%s' in standalone mode", profile.name)
         return
 
-    profile = MonitoringProfile(name="Standalone Profile", mode=MonitoringMode.STANDALONE, is_active=True)
+    profile = MonitoringProfile(name="Standalone Profile", mode=MonitoringMode.standalone, is_active=True)
     session.add(profile)
     session.commit()
     logger.info("Created new standalone monitoring profile")

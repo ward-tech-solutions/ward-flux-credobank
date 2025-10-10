@@ -37,7 +37,7 @@ class DeviceManager:
         if not active_profile:
             # Default to standalone if no profile is active
             logger.warning("No active monitoring profile found, defaulting to STANDALONE mode")
-            return MonitoringMode.STANDALONE
+            return MonitoringMode.standalone
 
         self._active_mode = active_profile.mode
         return self._active_mode
@@ -54,13 +54,13 @@ class DeviceManager:
         """
         mode = self.get_active_mode()
 
-        if mode == MonitoringMode.STANDALONE:
+        if mode == MonitoringMode.standalone:
             return self._get_standalone_device(device_id)
 
-        elif mode == MonitoringMode.ZABBIX:
+        elif mode == MonitoringMode.zabbix:
             return self._get_zabbix_device(device_id)
 
-        elif mode == MonitoringMode.HYBRID:
+        elif mode == MonitoringMode.hybrid:
             # Try standalone first, fallback to Zabbix
             try:
                 return self._get_standalone_device(device_id)
@@ -81,13 +81,13 @@ class DeviceManager:
         """
         mode = self.get_active_mode()
 
-        if mode == MonitoringMode.STANDALONE:
+        if mode == MonitoringMode.standalone:
             return self._list_standalone_devices(enabled, vendor, device_type)
 
-        elif mode == MonitoringMode.ZABBIX:
+        elif mode == MonitoringMode.zabbix:
             return self._list_zabbix_devices()
 
-        elif mode == MonitoringMode.HYBRID:
+        elif mode == MonitoringMode.hybrid:
             # Merge both sources
             standalone = self._list_standalone_devices(enabled, vendor, device_type)
             zabbix = self._list_zabbix_devices()
@@ -222,17 +222,17 @@ class DeviceManager:
         """
         mode = self.get_active_mode()
 
-        if mode == MonitoringMode.STANDALONE:
+        if mode == MonitoringMode.standalone:
             try:
                 return uuid.UUID(device_id)
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid device UUID")
 
-        elif mode == MonitoringMode.ZABBIX:
+        elif mode == MonitoringMode.zabbix:
             # Create deterministic UUID from Zabbix hostid
             return uuid.uuid5(uuid.NAMESPACE_DNS, f"zabbix-host-{device_id}")
 
-        elif mode == MonitoringMode.HYBRID:
+        elif mode == MonitoringMode.hybrid:
             # Try UUID first (standalone), then hostid (Zabbix)
             try:
                 return uuid.UUID(device_id)

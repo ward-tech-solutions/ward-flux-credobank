@@ -71,13 +71,13 @@ async def get_dashboard_stats(
     manager = DeviceManager(db, request)
     mode = manager.get_active_mode()
 
-    if mode == MonitoringMode.ZABBIX:
+    if mode == MonitoringMode.zabbix:
         return await _get_zabbix_dashboard_stats(request, region, current_user)
 
-    if mode == MonitoringMode.STANDALONE:
+    if mode == MonitoringMode.standalone:
         return _get_standalone_dashboard_stats(db, region, current_user)
 
-    if mode == MonitoringMode.HYBRID:
+    if mode == MonitoringMode.hybrid:
         standalone_stats = _get_standalone_dashboard_stats(db, region, current_user)
         zabbix_stats = await _get_zabbix_dashboard_stats(request, region, current_user)
         return _merge_dashboard_stats(standalone_stats, zabbix_stats)

@@ -37,7 +37,7 @@ async def get_devices(
     manager = DeviceManager(db, request)
     mode = manager.get_active_mode()
 
-    if mode == MonitoringMode.ZABBIX:
+    if mode == MonitoringMode.zabbix:
         return await _get_zabbix_devices(request, region, branch, device_type, current_user)
 
     return _get_standalone_devices(db, region, branch, device_type, current_user)
@@ -54,7 +54,7 @@ async def get_device_details(
     manager = DeviceManager(db, request)
     mode = manager.get_active_mode()
 
-    if mode == MonitoringMode.ZABBIX:
+    if mode == MonitoringMode.zabbix:
         details = await run_in_executor(request.app.state.zabbix.get_host_details, device_id)
         if details:
             return details
@@ -97,7 +97,7 @@ async def update_device(
     manager = DeviceManager(db, request)
     mode = manager.get_active_mode()
 
-    if mode == MonitoringMode.ZABBIX:
+    if mode == MonitoringMode.zabbix:
         zabbix = request.app.state.zabbix
 
         try:
@@ -327,7 +327,7 @@ async def get_device_history(
     manager = DeviceManager(db, request)
     mode = manager.get_active_mode()
 
-    if mode == MonitoringMode.ZABBIX:
+    if mode == MonitoringMode.zabbix:
         zabbix = request.app.state.zabbix
         loop = asyncio.get_event_loop()
         time_map = {"24h": 86400, "7d": 604800, "30d": 2592000}
@@ -381,7 +381,7 @@ async def ping_device(
     manager = DeviceManager(db, request)
     mode = manager.get_active_mode()
 
-    if mode == MonitoringMode.ZABBIX:
+    if mode == MonitoringMode.zabbix:
         zabbix = request.app.state.zabbix
         loop = asyncio.get_event_loop()
         device = await loop.run_in_executor(None, lambda: zabbix.get_host_details(device_id))

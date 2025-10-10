@@ -16,9 +16,9 @@ from database import Base
 
 class MonitoringMode(str, Enum):
     """Monitoring mode selection"""
-    ZABBIX = "ZABBIX"          # Use Zabbix API only
-    STANDALONE = "STANDALONE"   # Use standalone monitoring only
-    HYBRID = "HYBRID"          # Use both sources
+    zabbix = "zabbix"          # Use Zabbix API only
+    standalone = "standalone"  # Use standalone monitoring only
+    hybrid = "hybrid"          # Use both sources
 
 
 class AlertSeverity(str, Enum):

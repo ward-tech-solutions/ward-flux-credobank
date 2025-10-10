@@ -43,6 +43,8 @@ export default function Devices() {
 
   // Add Device modal states
   const [addDeviceModalOpen, setAddDeviceModalOpen] = useState(false)
+  const [addDeviceStep, setAddDeviceStep] = useState(1)
+  const [deviceSource, setDeviceSource] = useState<'zabbix' | 'standalone'>('zabbix')
   const [addDeviceForm, setAddDeviceForm] = useState({
     hostname: '',
     ip: '',
@@ -54,8 +56,11 @@ export default function Devices() {
   const [addingDevice, setAddingDevice] = useState(false)
 
   // Zabbix groups and templates state
+  const [zabbixGroups, setZabbixGroups] = useState<Array<{ groupid: string; name: string }>>([])
+  const [zabbixTemplates, setZabbixTemplates] = useState<Array<{ templateid: string; name: string }>>([])
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
+  const [loadingZabbixData, setLoadingZabbixData] = useState(false)
 
   // Helper function to extract city from hostname
   const extractCityFromHostname = (hostname: string): string => {
@@ -93,6 +98,12 @@ export default function Devices() {
     localStorage.setItem('devices-view-mode', viewMode)
   }, [viewMode])
 
+  // Fetch Zabbix groups and templates when Zabbix is selected
+  useEffect(() => {
+    if (deviceSource === 'zabbix' && addDeviceModalOpen) {
+      fetchZabbixData()
+    }
+  }, [deviceSource, addDeviceModalOpen])
 
   // Auto-extract city/branch from hostname
   useEffect(() => {
@@ -104,6 +115,10 @@ export default function Devices() {
     }
   }, [addDeviceForm.hostname])
 
+  const fetchZabbixData = async () => {
+    // Zabbix removed - keeping function for compatibility
+    setLoadingZabbixData(false)
+  }
 
   // Get unique regions and device types from devices
   const { regions, deviceTypes } = useMemo(() => {
@@ -206,23 +221,42 @@ export default function Devices() {
       return
     }
 
+    // Validate Zabbix-specific requirements
+    if (deviceSource === 'zabbix') {
+      if (selectedGroupIds.length === 0) {
+        alert('Please select at least one host group')
+        return
+      }
+      if (selectedTemplateIds.length === 0) {
+        alert('Please select at least one template')
+        return
+      }
+    }
+
     setAddingDevice(true)
     try {
-      // Call standalone API
-      await devicesAPI.createStandalone({
-        name: addDeviceForm.hostname,
-        ip: addDeviceForm.ip,
-        hostname: addDeviceForm.hostname,
-        location: addDeviceForm.region,
-        custom_fields: {
-          branch: addDeviceForm.branch,
-          snmp_community: addDeviceForm.snmp_community,
-          snmp_version: addDeviceForm.snmp_version,
-        }
-      })
-      alert('Device added successfully!')
+      if (deviceSource === 'standalone') {
+        // Call standalone API
+        await devicesAPI.createStandalone({
+          name: addDeviceForm.hostname,
+          ip: addDeviceForm.ip,
+          hostname: addDeviceForm.hostname,
+          location: addDeviceForm.region,
+          custom_fields: {
+            branch: addDeviceForm.branch,
+            snmp_community: addDeviceForm.snmp_community,
+            snmp_version: addDeviceForm.snmp_version,
+          }
+        })
+        alert('Device added successfully to Standalone!')
+      } else {
+        // Zabbix removed - redirect to standalone
+        alert('Zabbix mode is no longer available. Please use Standalone mode.')
+        return
+      }
 
       setAddDeviceModalOpen(false)
+      setAddDeviceStep(1)
       setAddDeviceForm({
         hostname: '',
         ip: '',
@@ -245,6 +279,8 @@ export default function Devices() {
 
   const handleAddDeviceModalClose = () => {
     setAddDeviceModalOpen(false)
+    setAddDeviceStep(1)
+    setDeviceSource('zabbix')
     setAddDeviceForm({
       hostname: '',
       ip: '',
@@ -670,11 +706,53 @@ export default function Devices() {
         size="md"
       >
         <div className="space-y-6">
-          {/* Device Form */}
-          <div className="max-h-[60vh] overflow-y-auto px-1">
+          {/* Step 1: Choose Source */}
+          {addDeviceStep === 1 && (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Enter device details:
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Choose where to add this device:
+              </p>
+              <div className="space-y-3">
+                <label
+                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    deviceSource === 'zabbix'
+                      ? 'border-ward-green bg-ward-green/5'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-ward-green/50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="device-source"
+                    value="zabbix"
+                    checked={deviceSource === 'zabbix'}
+                    onChange={(e) => setDeviceSource(e.target.value as 'zabbix' | 'standalone')}
+                    className="mt-1 w-5 h-5 text-ward-green focus:ring-ward-green"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-gray-100">Add to Zabbix</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      Full monitoring with Zabbix integration
+                    </p>
+                  </div>
+                </label>
+
+                <label
+                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    deviceSource === 'standalone'
+                      ? 'border-ward-green bg-ward-green/5'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-ward-green/50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="device-source"
+                    value="standalone"
+                    checked={deviceSource === 'standalone'}
+                    onChange={(e) => setDeviceSource(e.target.value as 'zabbix' | 'standalone')}
+                    className="mt-1 w-5 h-5 text-ward-green focus:ring-ward-green"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-gray-100">Add to Standalone</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                       Independent device management without Zabbix
                     </p>
