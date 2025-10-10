@@ -29,7 +29,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from database import SessionLocal, init_db
-from monitoring.models import StandaloneDevice
+from monitoring.models import MonitoringMode, MonitoringProfile, StandaloneDevice
 from zabbix_client import ZabbixClient
 
 logger = logging.getLogger("import_zabbix_to_standalone")
@@ -53,6 +53,11 @@ def parse_args() -> argparse.Namespace:
         "--delete-missing",
         action="store_true",
         help="Remove standalone devices whose IPs are no longer present in Zabbix",
+    )
+    parser.add_argument(
+        "--activate-standalone",
+        action="store_true",
+        help="Set the active monitoring profile to standalone mode after import",
     )
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging output")
     return parser.parse_args()
@@ -185,6 +190,29 @@ def delete_missing_devices(session: Session, zabbix_ips: set[str], dry_run: bool
     return removed
 
 
+def activate_standalone_profile(session: Session) -> None:
+    profile = session.query(MonitoringProfile).filter_by(is_active=True).first()
+    if profile:
+        profile.mode = MonitoringMode.STANDALONE
+        profile.is_active = True
+        session.commit()
+        logger.info("Activated existing monitoring profile in standalone mode")
+        return
+
+    profile = session.query(MonitoringProfile).first()
+    if profile:
+        profile.mode = MonitoringMode.STANDALONE
+        profile.is_active = True
+        session.commit()
+        logger.info("Enabled monitoring profile '%s' in standalone mode", profile.name)
+        return
+
+    profile = MonitoringProfile(name="Standalone Profile", mode=MonitoringMode.STANDALONE, is_active=True)
+    session.add(profile)
+    session.commit()
+    logger.info("Created new standalone monitoring profile")
+
+
 def main() -> None:
     args = parse_args()
     configure_logging(args.verbose)
@@ -230,6 +258,9 @@ def main() -> None:
             zabbix_ips = {host.get("ip") for host in hosts if host.get("ip")}
             removed = delete_missing_devices(session, zabbix_ips, args.dry_run)
             logger.info("Removed %s standalone devices not present in Zabbix", removed)
+
+        if args.activate_standalone and not args.dry_run:
+            activate_standalone_profile(session)
 
         logger.info("Done.")
     finally:

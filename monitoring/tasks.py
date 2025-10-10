@@ -15,7 +15,15 @@ from monitoring.snmp.poller import get_snmp_poller, SNMPCredentialData
 from monitoring.snmp.credentials import decrypt_credential
 from monitoring.snmp.oids import get_vendor_oids
 from monitoring.victoria.client import get_victoria_client
-from monitoring.models import MonitoringItem, SNMPCredential, AlertRule, AlertHistory, MonitoringProfile, MonitoringMode
+from monitoring.models import (
+    MonitoringItem,
+    SNMPCredential,
+    AlertRule,
+    AlertHistory,
+    MonitoringProfile,
+    MonitoringMode,
+    StandaloneDevice,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -211,14 +219,10 @@ def ping_all_devices():
             db.close()
             return
 
-        # Get all devices
-        from models import Device
+        devices = db.query(StandaloneDevice).filter_by(enabled=True).all()
 
-        devices = db.query(Device).filter_by(is_active=True).all()
+        logger.info(f"Pinging {len(devices)} standalone devices")
 
-        logger.info(f"Pinging {len(devices)} devices")
-
-        # Schedule individual ping tasks
         for device in devices:
             if device.ip:
                 ping_device.delay(str(device.id), device.ip)
