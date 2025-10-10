@@ -11,6 +11,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function DeviceDetails() {
   const { id } = useParams()
   const [activeTab, setActiveTab] = useState('overview')
+  const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d'>('24h')
 
   const { data: device, isLoading } = useQuery({
     queryKey: ['device', id],
@@ -18,15 +19,26 @@ export default function DeviceDetails() {
     enabled: !!id,
   })
 
-  // Sample metrics data
-  const metricsData = [
-    { time: '00:00', cpu: 45, memory: 62, bandwidth: 340 },
-    { time: '04:00', cpu: 38, memory: 58, bandwidth: 280 },
-    { time: '08:00', cpu: 65, memory: 72, bandwidth: 520 },
-    { time: '12:00', cpu: 72, memory: 78, bandwidth: 680 },
-    { time: '16:00', cpu: 68, memory: 75, bandwidth: 590 },
-    { time: '20:00', cpu: 52, memory: 65, bandwidth: 420 },
-  ]
+  // Fetch real ping history data
+  const { data: historyData, isLoading: historyLoading } = useQuery({
+    queryKey: ['device-history', id, timeRange],
+    queryFn: () => devicesAPI.getHistory(id!, timeRange),
+    enabled: !!id,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  })
+
+  // Transform real ping data to chart format
+  const metricsData = historyData?.data?.history?.map((point: any) => {
+    const date = new Date(point.clock * 1000)
+    const hours = date.getHours().toString().padStart(2, '0')
+    const minutes = date.getMinutes().toString().padStart(2, '0')
+    return {
+      time: `${hours}:${minutes}`,
+      timestamp: point.clock,
+      ping: point.reachable ? point.value : null,
+      reachable: point.reachable,
+    }
+  }).reverse() || []
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Info },
@@ -145,39 +157,62 @@ export default function DeviceDetails() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Quick Stats</CardTitle>
+              <CardTitle>Quick Stats (24h)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    <span className="text-sm font-medium text-green-900 dark:text-green-100">Uptime</span>
-                  </div>
-                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">99.9%</p>
+              {historyLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <LoadingSpinner text="Loading stats..." />
                 </div>
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Response Time</span>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      <span className="text-sm font-medium text-green-900 dark:text-green-100">Uptime</span>
+                    </div>
+                    <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                      {metricsData.length > 0
+                        ? `${((metricsData.filter((p) => p.reachable).length / metricsData.length) * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </p>
                   </div>
-                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">12ms</p>
-                </div>
-                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wifi className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Bandwidth</span>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Avg Response</span>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                      {metricsData.length > 0 && metricsData.some((p) => p.ping !== null)
+                        ? `${Math.round(
+                            metricsData.filter((p) => p.ping !== null).reduce((sum, p) => sum + (p.ping || 0), 0) /
+                              metricsData.filter((p) => p.ping !== null).length
+                          )}ms`
+                        : 'N/A'}
+                    </p>
                   </div>
-                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">450 Mbps</p>
-                </div>
-                <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                    <span className="text-sm font-medium text-orange-900 dark:text-orange-100">Alerts</span>
+                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Wifi className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Status</span>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                      {deviceData.ping_status || 'Unknown'}
+                    </p>
                   </div>
-                  <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">0</p>
+                  <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      <span className="text-sm font-medium text-orange-900 dark:text-orange-100">Packet Loss</span>
+                    </div>
+                    <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+                      {metricsData.length > 0
+                        ? `${((metricsData.filter((p) => !p.reachable).length / metricsData.length) * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -185,78 +220,141 @@ export default function DeviceDetails() {
 
       {activeTab === 'metrics' && (
         <div className="space-y-6">
+          {/* Time Range Selector */}
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Time Range:</span>
+            <div className="flex gap-2">
+              {(['24h', '7d', '30d'] as const).map((range) => (
+                <button
+                  key={range}
+                  onClick={() => setTimeRange(range)}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    timeRange === range
+                      ? 'bg-ward-green text-white'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {range === '24h' ? 'Last 24 Hours' : range === '7d' ? 'Last 7 Days' : 'Last 30 Days'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>CPU Usage (%)</CardTitle>
+              <CardTitle>Ping Response Time (ms)</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={metricsData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" className="dark:stroke-gray-700" />
-                  <XAxis dataKey="time" stroke="#9ca3af" className="dark:stroke-gray-500" />
-                  <YAxis stroke="#9ca3af" className="dark:stroke-gray-500" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgb(31 41 55)',
-                      border: '1px solid rgb(75 85 99)',
-                      borderRadius: '8px',
-                      color: 'rgb(243 244 246)'
-                    }}
-                    labelStyle={{ color: 'rgb(243 244 246)' }}
-                  />
-                  <Line type="monotone" dataKey="cpu" stroke="#5EBBA8" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
+              {historyLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <LoadingSpinner text="Loading metrics..." />
+                </div>
+              ) : metricsData.length === 0 ? (
+                <div className="text-center py-12">
+                  <Activity className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No metrics data</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mt-1">No ping data available for this time range</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={metricsData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" className="dark:stroke-gray-700" />
+                    <XAxis
+                      dataKey="time"
+                      stroke="#9ca3af"
+                      className="dark:stroke-gray-500"
+                      tick={{ fontSize: 12 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis
+                      stroke="#9ca3af"
+                      className="dark:stroke-gray-500"
+                      label={{ value: 'Response Time (ms)', angle: -90, position: 'insideLeft' }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgb(31 41 55)',
+                        border: '1px solid rgb(75 85 99)',
+                        borderRadius: '8px',
+                        color: 'rgb(243 244 246)'
+                      }}
+                      labelStyle={{ color: 'rgb(243 244 246)' }}
+                      formatter={(value: any, name: string) => {
+                        if (name === 'ping') return [`${value} ms`, 'Ping RTT']
+                        return [value, name]
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="ping"
+                      stroke="#5EBBA8"
+                      strokeWidth={2}
+                      dot={{ fill: '#5EBBA8', r: 2 }}
+                      connectNulls={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Memory Usage (%)</CardTitle>
+              <CardTitle>Device Reachability</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={metricsData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" className="dark:stroke-gray-700" />
-                  <XAxis dataKey="time" stroke="#9ca3af" className="dark:stroke-gray-500" />
-                  <YAxis stroke="#9ca3af" className="dark:stroke-gray-500" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgb(31 41 55)',
-                      border: '1px solid rgb(75 85 99)',
-                      borderRadius: '8px',
-                      color: 'rgb(243 244 246)'
-                    }}
-                    labelStyle={{ color: 'rgb(243 244 246)' }}
-                  />
-                  <Line type="monotone" dataKey="memory" stroke="#3B82F6" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Bandwidth (Mbps)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={metricsData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" className="dark:stroke-gray-700" />
-                  <XAxis dataKey="time" stroke="#9ca3af" className="dark:stroke-gray-500" />
-                  <YAxis stroke="#9ca3af" className="dark:stroke-gray-500" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgb(31 41 55)',
-                      border: '1px solid rgb(75 85 99)',
-                      borderRadius: '8px',
-                      color: 'rgb(243 244 246)'
-                    }}
-                    labelStyle={{ color: 'rgb(243 244 246)' }}
-                  />
-                  <Line type="monotone" dataKey="bandwidth" stroke="#8B5CF6" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
+              {historyLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <LoadingSpinner text="Loading metrics..." />
+                </div>
+              ) : metricsData.length === 0 ? (
+                <div className="text-center py-12">
+                  <Activity className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No metrics data</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mt-1">No reachability data available for this time range</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={metricsData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" className="dark:stroke-gray-700" />
+                    <XAxis
+                      dataKey="time"
+                      stroke="#9ca3af"
+                      className="dark:stroke-gray-500"
+                      tick={{ fontSize: 12 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis
+                      stroke="#9ca3af"
+                      className="dark:stroke-gray-500"
+                      domain={[0, 1]}
+                      ticks={[0, 1]}
+                      tickFormatter={(value) => value === 1 ? 'Up' : 'Down'}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgb(31 41 55)',
+                        border: '1px solid rgb(75 85 99)',
+                        borderRadius: '8px',
+                        color: 'rgb(243 244 246)'
+                      }}
+                      labelStyle={{ color: 'rgb(243 244 246)' }}
+                      formatter={(value: any) => [value ? 'Reachable' : 'Unreachable', 'Status']}
+                    />
+                    <Line
+                      type="stepAfter"
+                      dataKey="reachable"
+                      stroke="#3B82F6"
+                      strokeWidth={2}
+                      dot={{ fill: '#3B82F6', r: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </div>
