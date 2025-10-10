@@ -64,10 +64,12 @@ async def get_downtime_report(
 
     for device in devices:
         # Calculate real availability from ping results
+        from sqlalchemy import case
+
         ping_stats = (
             db.query(
                 func.count(PingResult.id).label("total_pings"),
-                func.sum(func.case((PingResult.is_reachable == True, 1), else_=0)).label("successful_pings"),
+                func.sum(case((PingResult.is_reachable == True, 1), else_=0)).label("successful_pings"),
             )
             .filter(
                 and_(
