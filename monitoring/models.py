@@ -23,11 +23,11 @@ class MonitoringMode(str, Enum):
 
 class AlertSeverity(str, Enum):
     """Alert severity levels"""
-    CRITICAL = "CRITICAL"
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
-    INFO = "INFO"
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFO = "info"
 
 
 # ============================================
@@ -161,16 +161,18 @@ class AlertRule(Base):
     name = Column(String(200), nullable=False)
     description = Column(Text)
     expression = Column(String(500), nullable=False)  # e.g., "cpu_usage > 90"
-    severity = Column(SQLAlchemyEnum(AlertSeverity), nullable=False)
+    severity = Column(String(20), nullable=False)  # Store as string to avoid enum caching issues
 
     # Notification settings
     notification_channels = Column(JSON)  # ["email", "webhook", "sms"]
-    notification_config = Column(JSON)  # Email addresses, webhook URLs, etc.
+    notification_recipients = Column(JSON)  # Email addresses, webhook URLs, etc.
+
+    # Additional fields
+    device_group = Column(String(100))
+    monitoring_item_id = Column(SQLAlchemyUUID(as_uuid=True))
 
     # Rule behavior
     enabled = Column(Boolean, nullable=False, default=True)
-    evaluation_interval = Column(Integer, default=60)  # seconds
-    for_duration = Column(Integer, default=300)  # Alert after condition is true for X seconds
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

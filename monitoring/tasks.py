@@ -165,7 +165,7 @@ def ping_device(device_id: str, device_ip: str):
     db = None
     try:
         from icmplib import ping
-        from monitoring.models import PingResult
+        from database import PingResult
         from datetime import datetime
 
         # Perform ping
