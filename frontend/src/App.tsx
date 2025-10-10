@@ -12,6 +12,7 @@ import Diagnostics from './pages/Diagnostics'
 import Reports from './pages/Reports'
 import Regions from './pages/Regions'
 import Settings from './pages/Settings'
+import AlertRules from './pages/AlertRules'
 import Login from './pages/Login'
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
           <Route path="topology" element={<Topology />} />
           <Route path="diagnostics" element={<Diagnostics />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="alert-rules" element={<AlertRules />} />
           <Route path="regions" element={<Regions />} />
           <Route path="users" element={<Navigate to="/settings" replace />} />
           <Route path="settings" element={<Settings />} />

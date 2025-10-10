@@ -205,67 +205,50 @@ class AlertHistory(Base):
 
 
 class DiscoveryRule(Base):
-    """Network discovery rules - auto-discover devices"""
+    """Network discovery rules - auto-discover devices - matches actual DB schema"""
     __tablename__ = "discovery_rules"
     __table_args__ = {'extend_existing': True}
 
     id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(100), nullable=False, unique=True)
+    name = Column(String(200), nullable=False)
     description = Column(Text)
-
-    # Discovery scope
-    network_range = Column(String(100), nullable=False)  # "192.168.1.0/24" or "10.0.0.1-10.0.0.254"
-
-    # Discovery methods
-    ping_scan = Column(Boolean, default=True)
-    snmp_scan = Column(Boolean, default=True)
-    port_scan = Column(Boolean, default=False)
-    ports = Column(JSON)  # [22, 80, 443]
-
-    # Scheduling
+    network_range = Column(String(100), nullable=False)  # Single range for now
     enabled = Column(Boolean, default=True)
-    schedule = Column(String(100))  # Cron expression: "0 2 * * *"
+    schedule = Column(String(100))  # Cron schedule
+    snmp_discovery = Column(Boolean, default=True)
+    snmp_communities = Column(JSON)  # ["public", "private"]
+    ping_only = Column(Boolean, default=False)
     last_run = Column(DateTime)
-    next_run = Column(DateTime)
-
-    # Auto-add settings
-    auto_add_devices = Column(Boolean, default=False)
-    default_template_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("monitoring_templates.id"))
-
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_devices_found = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class DiscoveryResult(Base):
-    """Discovery results - found devices"""
+    """Discovery results - found devices - matches actual DB schema"""
     __tablename__ = "discovery_results"
     __table_args__ = {'extend_existing': True}
 
     id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    rule_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("discovery_rules.id"), nullable=False)
+    rule_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("discovery_rules.id", ondelete='CASCADE'), nullable=False)
 
-    # Device info
-    ip_address = Column(String(45), nullable=False)
+    # Device Information
+    ip_address = Column(String(45), nullable=False)  # DB uses ip_address not ip
     hostname = Column(String(255))
     mac_address = Column(String(17))
+    vendor = Column(String(100))
+    device_type = Column(String(50))
 
-    # Detection results
-    is_alive = Column(Boolean, default=False)
+    # SNMP Data
     snmp_reachable = Column(Boolean, default=False)
     snmp_version = Column(String(10))
     sys_descr = Column(Text)
     sys_object_id = Column(String(200))
 
-    # Classification
-    detected_vendor = Column(String(100))
-    detected_type = Column(String(100))
-    open_ports = Column(JSON)
-
-    # Status
-    discovered_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    # Metadata
+    discovered_at = Column(DateTime, server_default=func.now())
     added_to_monitoring = Column(Boolean, default=False)
     added_at = Column(DateTime)
-    device_id = Column(SQLAlchemyUUID(as_uuid=True))  # Link to created device
 
 
 class MetricBaseline(Base):

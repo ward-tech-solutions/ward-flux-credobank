@@ -12,12 +12,32 @@ from fastapi import APIRouter, Depends, Query
 
 from auth import get_current_active_user
 from database import User, get_db
-from monitoring.models import AlertHistory, StandaloneDevice
+from monitoring.models import AlertHistory, StandaloneDevice, AlertRule
+from pydantic import BaseModel
+import uuid
 
 logger = logging.getLogger(__name__)
 
-# Create router
+# Create routers
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
+rules_router = APIRouter(prefix="/api/v1/alert-rules", tags=["alert-rules"])
+
+
+# Pydantic models for request/response
+class AlertRuleCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    expression: str  # e.g., "ping_unreachable >= 5" or "avg_ping_ms > 200"
+    severity: str  # critical, high, medium, low, info
+    enabled: bool = True
+    device_id: Optional[str] = None  # Null for global rules
+
+class AlertRuleUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    expression: Optional[str] = None
+    severity: Optional[str] = None
+    enabled: Optional[bool] = None
 
 
 @router.get("")
@@ -178,3 +198,187 @@ async def resolve_alert(
         db.commit()
 
     return {"success": True, "alert_id": alert_id, "resolved_at": alert.resolved_at.isoformat()}
+
+
+# ============================================
+# Alert Rules Management Endpoints
+# ============================================
+
+@rules_router.get("")
+async def get_alert_rules(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Get all alert rules"""
+    rules = db.query(AlertRule).order_by(AlertRule.created_at.desc()).all()
+
+    return {
+        "rules": [
+            {
+                "id": str(rule.id),
+                "name": rule.name,
+                "description": rule.description,
+                "expression": rule.expression,
+                "severity": rule.severity,
+                "enabled": rule.enabled,
+                "device_id": str(rule.device_id) if rule.device_id else None,
+                "created_at": rule.created_at.isoformat() if rule.created_at else None,
+                "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
+            }
+            for rule in rules
+        ]
+    }
+
+
+@rules_router.post("")
+async def create_alert_rule(
+    rule_data: AlertRuleCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Create a new alert rule"""
+
+    # Create new rule
+    new_rule = AlertRule(
+        id=uuid.uuid4(),
+        name=rule_data.name,
+        description=rule_data.description,
+        expression=rule_data.expression,
+        severity=rule_data.severity,
+        enabled=rule_data.enabled,
+        device_id=uuid.UUID(rule_data.device_id) if rule_data.device_id else None,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+
+    db.add(new_rule)
+    db.commit()
+    db.refresh(new_rule)
+
+    logger.info(f"Created alert rule: {new_rule.name} by {current_user.username}")
+
+    return {
+        "success": True,
+        "rule": {
+            "id": str(new_rule.id),
+            "name": new_rule.name,
+            "description": new_rule.description,
+            "expression": new_rule.expression,
+            "severity": new_rule.severity,
+            "enabled": new_rule.enabled,
+        }
+    }
+
+
+@rules_router.get("/{rule_id}")
+async def get_alert_rule(
+    rule_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Get a single alert rule by ID"""
+    rule = db.query(AlertRule).filter_by(id=rule_id).first()
+
+    if not rule:
+        return {"error": "Alert rule not found"}, 404
+
+    return {
+        "id": str(rule.id),
+        "name": rule.name,
+        "description": rule.description,
+        "expression": rule.expression,
+        "severity": rule.severity,
+        "enabled": rule.enabled,
+        "device_id": str(rule.device_id) if rule.device_id else None,
+        "created_at": rule.created_at.isoformat() if rule.created_at else None,
+        "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
+    }
+
+
+@rules_router.put("/{rule_id}")
+async def update_alert_rule(
+    rule_id: str,
+    rule_data: AlertRuleUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Update an existing alert rule"""
+    rule = db.query(AlertRule).filter_by(id=rule_id).first()
+
+    if not rule:
+        return {"error": "Alert rule not found"}, 404
+
+    # Update fields if provided
+    if rule_data.name is not None:
+        rule.name = rule_data.name
+    if rule_data.description is not None:
+        rule.description = rule_data.description
+    if rule_data.expression is not None:
+        rule.expression = rule_data.expression
+    if rule_data.severity is not None:
+        rule.severity = rule_data.severity
+    if rule_data.enabled is not None:
+        rule.enabled = rule_data.enabled
+
+    rule.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(rule)
+
+    logger.info(f"Updated alert rule: {rule.name} by {current_user.username}")
+
+    return {
+        "success": True,
+        "rule": {
+            "id": str(rule.id),
+            "name": rule.name,
+            "description": rule.description,
+            "expression": rule.expression,
+            "severity": rule.severity,
+            "enabled": rule.enabled,
+        }
+    }
+
+
+@rules_router.delete("/{rule_id}")
+async def delete_alert_rule(
+    rule_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Delete an alert rule"""
+    rule = db.query(AlertRule).filter_by(id=rule_id).first()
+
+    if not rule:
+        return {"error": "Alert rule not found"}, 404
+
+    rule_name = rule.name
+    db.delete(rule)
+    db.commit()
+
+    logger.info(f"Deleted alert rule: {rule_name} by {current_user.username}")
+
+    return {"success": True, "message": f"Alert rule '{rule_name}' deleted"}
+
+
+@rules_router.post("/{rule_id}/toggle")
+async def toggle_alert_rule(
+    rule_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Toggle an alert rule enabled/disabled"""
+    rule = db.query(AlertRule).filter_by(id=rule_id).first()
+
+    if not rule:
+        return {"error": "Alert rule not found"}, 404
+
+    rule.enabled = not rule.enabled
+    rule.updated_at = datetime.utcnow()
+
+    db.commit()
+
+    status = "enabled" if rule.enabled else "disabled"
+    logger.info(f"Toggled alert rule: {rule.name} to {status} by {current_user.username}")
+
+    return {"success": True, "enabled": rule.enabled, "rule_name": rule.name}

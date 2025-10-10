@@ -181,6 +181,28 @@ export const discoveryAPI = {
   importDevices: (deviceIds: string[]) => api.post('/discovery/import', { device_ids: deviceIds }),
 }
 
+// Alert Rules
+export const alertRulesAPI = {
+  getRules: () => api.get('/alert-rules'),
+  createRule: (rule: {
+    name: string
+    description?: string
+    expression: string
+    severity: string
+    enabled?: boolean
+    device_id?: string
+  }) => api.post('/alert-rules', rule),
+  updateRule: (id: string, rule: Partial<{
+    name: string
+    description: string
+    expression: string
+    severity: string
+    enabled: boolean
+  }>) => api.put(`/alert-rules/${id}`, rule),
+  deleteRule: (id: string) => api.delete(`/alert-rules/${id}`),
+  toggleRule: (id: string) => api.post(`/alert-rules/${id}/toggle`),
+}
+
 // Reports
 export const reportsAPI = {
   getDowntime: (params?: { period?: string; region?: string }) => {
