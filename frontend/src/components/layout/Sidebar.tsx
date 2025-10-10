@@ -9,6 +9,7 @@ import {
   Stethoscope,
   BarChart3,
   MapPin,
+  Bell,
   Settings
 } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
@@ -23,6 +24,7 @@ const navigation = [
   { name: 'Topology', href: '/topology', icon: Network, roles: ['admin', 'regional_manager', 'technician'] },
   { name: 'Diagnostics', href: '/diagnostics', icon: Stethoscope, roles: ['admin', 'regional_manager', 'technician'] },
   { name: 'Reports', href: '/reports', icon: BarChart3, roles: ['admin', 'regional_manager'] },
+  { name: 'Alert Rules', href: '/alert-rules', icon: Bell, roles: ['admin', 'regional_manager', 'technician'] },
   { name: 'Regions', href: '/regions', icon: MapPin, roles: ['admin', 'regional_manager'] },
   { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin'] },
 ]
