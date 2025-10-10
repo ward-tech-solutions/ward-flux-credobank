@@ -43,8 +43,6 @@ export default function Devices() {
 
   // Add Device modal states
   const [addDeviceModalOpen, setAddDeviceModalOpen] = useState(false)
-  const [addDeviceStep, setAddDeviceStep] = useState(1)
-  const [deviceSource, setDeviceSource] = useState<'zabbix' | 'standalone'>('zabbix')
   const [addDeviceForm, setAddDeviceForm] = useState({
     hostname: '',
     ip: '',
@@ -54,13 +52,6 @@ export default function Devices() {
     snmp_version: '2c',
   })
   const [addingDevice, setAddingDevice] = useState(false)
-
-  // Zabbix groups and templates state
-  const [zabbixGroups, setZabbixGroups] = useState<Array<{ groupid: string; name: string }>>([])
-  const [zabbixTemplates, setZabbixTemplates] = useState<Array<{ templateid: string; name: string }>>([])
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
-  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
-  const [loadingZabbixData, setLoadingZabbixData] = useState(false)
 
   // Helper function to extract city from hostname
   const extractCityFromHostname = (hostname: string): string => {
@@ -98,13 +89,6 @@ export default function Devices() {
     localStorage.setItem('devices-view-mode', viewMode)
   }, [viewMode])
 
-  // Fetch Zabbix groups and templates when Zabbix is selected
-  useEffect(() => {
-    if (deviceSource === 'zabbix' && addDeviceModalOpen) {
-      fetchZabbixData()
-    }
-  }, [deviceSource, addDeviceModalOpen])
-
   // Auto-extract city/branch from hostname
   useEffect(() => {
     if (addDeviceForm.hostname && !addDeviceForm.branch) {
@@ -114,11 +98,6 @@ export default function Devices() {
       }
     }
   }, [addDeviceForm.hostname])
-
-  const fetchZabbixData = async () => {
-    // Zabbix removed - keeping function for compatibility
-    setLoadingZabbixData(false)
-  }
 
   // Get unique regions and device types from devices
   const { regions, deviceTypes } = useMemo(() => {
@@ -221,42 +200,23 @@ export default function Devices() {
       return
     }
 
-    // Validate Zabbix-specific requirements
-    if (deviceSource === 'zabbix') {
-      if (selectedGroupIds.length === 0) {
-        alert('Please select at least one host group')
-        return
-      }
-      if (selectedTemplateIds.length === 0) {
-        alert('Please select at least one template')
-        return
-      }
-    }
-
     setAddingDevice(true)
     try {
-      if (deviceSource === 'standalone') {
-        // Call standalone API
-        await devicesAPI.createStandalone({
-          name: addDeviceForm.hostname,
-          ip: addDeviceForm.ip,
-          hostname: addDeviceForm.hostname,
-          location: addDeviceForm.region,
-          custom_fields: {
-            branch: addDeviceForm.branch,
-            snmp_community: addDeviceForm.snmp_community,
-            snmp_version: addDeviceForm.snmp_version,
-          }
-        })
-        alert('Device added successfully to Standalone!')
-      } else {
-        // Zabbix removed - redirect to standalone
-        alert('Zabbix mode is no longer available. Please use Standalone mode.')
-        return
-      }
+      // Call standalone API
+      await devicesAPI.createStandalone({
+        name: addDeviceForm.hostname,
+        ip: addDeviceForm.ip,
+        hostname: addDeviceForm.hostname,
+        location: addDeviceForm.region,
+        custom_fields: {
+          branch: addDeviceForm.branch,
+          snmp_community: addDeviceForm.snmp_community,
+          snmp_version: addDeviceForm.snmp_version,
+        }
+      })
+      alert('Device added successfully!')
 
       setAddDeviceModalOpen(false)
-      setAddDeviceStep(1)
       setAddDeviceForm({
         hostname: '',
         ip: '',
@@ -265,8 +225,6 @@ export default function Devices() {
         snmp_community: '',
         snmp_version: '2c',
       })
-      setSelectedGroupIds([])
-      setSelectedTemplateIds([])
       // Refresh the devices list
       window.location.reload()
     } catch (error) {
@@ -279,8 +237,6 @@ export default function Devices() {
 
   const handleAddDeviceModalClose = () => {
     setAddDeviceModalOpen(false)
-    setAddDeviceStep(1)
-    setDeviceSource('zabbix')
     setAddDeviceForm({
       hostname: '',
       ip: '',
@@ -289,8 +245,6 @@ export default function Devices() {
       snmp_community: '',
       snmp_version: '2c',
     })
-    setSelectedGroupIds([])
-    setSelectedTemplateIds([])
   }
 
   const hasActiveFilters = searchQuery || statusFilter || typeFilter || regionFilter
@@ -302,7 +256,7 @@ export default function Devices() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Devices</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Zabbix monitored devices ({filteredDevices.length}
+            Standalone Devices ({filteredDevices.length}
             {filteredDevices.length !== devices?.data?.length && ` of ${devices?.data?.length}`} total)
           </p>
         </div>
@@ -408,7 +362,7 @@ export default function Devices() {
               <Wifi className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No devices found</h3>
               <p className="text-gray-500 dark:text-gray-400 mt-1 mb-4">
-                {hasActiveFilters ? 'Try adjusting your filters' : 'No devices available from Zabbix'}
+                {hasActiveFilters ? 'Try adjusting your filters' : 'No devices available'}
               </p>
               {hasActiveFilters && (
                 <Button onClick={handleClearFilters} variant="outline">
@@ -705,260 +659,98 @@ export default function Devices() {
         title="Add New Device"
         size="md"
       >
-        <div className="space-y-6">
-          {/* Step 1: Choose Source */}
-          {addDeviceStep === 1 && (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Choose where to add this device:
-              </p>
-              <div className="space-y-3">
-                <label
-                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    deviceSource === 'zabbix'
-                      ? 'border-ward-green bg-ward-green/5'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-ward-green/50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="device-source"
-                    value="zabbix"
-                    checked={deviceSource === 'zabbix'}
-                    onChange={(e) => setDeviceSource(e.target.value as 'zabbix' | 'standalone')}
-                    className="mt-1 w-5 h-5 text-ward-green focus:ring-ward-green"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 dark:text-gray-100">Add to Zabbix</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      Full monitoring with Zabbix integration
-                    </p>
-                  </div>
-                </label>
+        <div className="flex flex-col" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+          {/* Scrollable Body */}
+          <div className="overflow-y-auto flex-1 pr-2 space-y-4">
+            <Input
+              label="Hostname"
+              value={addDeviceForm.hostname}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, hostname: e.target.value })}
+              placeholder="Enter device hostname"
+              required
+            />
 
-                <label
-                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    deviceSource === 'standalone'
-                      ? 'border-ward-green bg-ward-green/5'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-ward-green/50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="device-source"
-                    value="standalone"
-                    checked={deviceSource === 'standalone'}
-                    onChange={(e) => setDeviceSource(e.target.value as 'zabbix' | 'standalone')}
-                    className="mt-1 w-5 h-5 text-ward-green focus:ring-ward-green"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 dark:text-gray-100">Add to Standalone</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      Independent device management without Zabbix
-                    </p>
-                  </div>
-                </label>
-              </div>
+            <Input
+              label="IP Address"
+              value={addDeviceForm.ip}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, ip: e.target.value })}
+              placeholder="192.168.1.1"
+              required
+            />
 
-              <div className="flex justify-end pt-4">
-                <Button onClick={() => setAddDeviceStep(2)}>
-                  Next
-                </Button>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Region
+              </label>
+              <select
+                value={addDeviceForm.region}
+                onChange={(e) => setAddDeviceForm({ ...addDeviceForm, region: e.target.value })}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
+              >
+                <option value="">Select Region</option>
+                {regions.map((region) => (
+                  <option key={region} value={region}>
+                    {region}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
 
-          {/* Step 2: Device Details Form */}
-          {addDeviceStep === 2 && (
-            <div className="flex flex-col" style={{ maxHeight: 'calc(90vh - 200px)' }}>
-              {/* Fixed Header */}
-              <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Adding to: <span className="font-medium text-ward-green">{deviceSource === 'zabbix' ? 'Zabbix' : 'Standalone'}</span>
+            <div>
+              <Input
+                label="Branch (City)"
+                value={addDeviceForm.branch}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, branch: e.target.value })}
+                placeholder="Enter branch/city name"
+              />
+              {addDeviceForm.hostname && addDeviceForm.branch && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Auto-extracted from hostname
                 </p>
-                <Button variant="outline" size="sm" onClick={() => setAddDeviceStep(1)}>
-                  Change
-                </Button>
-              </div>
-
-              {/* Scrollable Body */}
-              <div className="overflow-y-auto flex-1 pr-2 space-y-4">
-                <Input
-                  label="Hostname"
-                  value={addDeviceForm.hostname}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, hostname: e.target.value })}
-                  placeholder="Enter device hostname"
-                  required
-                />
-
-                <Input
-                  label="IP Address"
-                  value={addDeviceForm.ip}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, ip: e.target.value })}
-                  placeholder="192.168.1.1"
-                  required
-                />
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Region
-                  </label>
-                  <select
-                    value={addDeviceForm.region}
-                    onChange={(e) => setAddDeviceForm({ ...addDeviceForm, region: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-                  >
-                    <option value="">Select Region</option>
-                    {regions.map((region) => (
-                      <option key={region} value={region}>
-                        {region}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <Input
-                    label="Branch (City)"
-                    value={addDeviceForm.branch}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, branch: e.target.value })}
-                    placeholder="Enter branch/city name"
-                  />
-                  {addDeviceForm.hostname && addDeviceForm.branch && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Auto-extracted from hostname
-                    </p>
-                  )}
-                </div>
-
-                <Input
-                  label="SNMP Community"
-                  value={addDeviceForm.snmp_community}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, snmp_community: e.target.value })}
-                  placeholder="public"
-                />
-
-                {deviceSource === 'standalone' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                      SNMP Version
-                    </label>
-                    <select
-                      value={addDeviceForm.snmp_version}
-                      onChange={(e) => setAddDeviceForm({ ...addDeviceForm, snmp_version: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-                    >
-                      <option value="1">SNMPv1</option>
-                      <option value="2c">SNMPv2c</option>
-                      <option value="3">SNMPv3</option>
-                    </select>
-                  </div>
-                )}
-
-                {/* Zabbix-specific fields */}
-                {deviceSource === 'zabbix' && (
-                  <>
-                    {loadingZabbixData ? (
-                      <div className="text-center py-4">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Loading groups and templates...</p>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Host Groups */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Host Groups <span className="text-red-500">*</span>
-                          </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-800">
-                            {zabbixGroups.length === 0 ? (
-                              <p className="text-sm text-gray-500 dark:text-gray-400">No groups available</p>
-                            ) : (
-                              <div className="space-y-2">
-                                {zabbixGroups.map((group) => (
-                                  <label key={group.groupid} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedGroupIds.includes(group.groupid)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setSelectedGroupIds([...selectedGroupIds, group.groupid])
-                                        } else {
-                                          setSelectedGroupIds(selectedGroupIds.filter(id => id !== group.groupid))
-                                        }
-                                      }}
-                                      className="w-4 h-4 text-ward-green focus:ring-ward-green rounded"
-                                    />
-                                    <span className="text-sm text-gray-900 dark:text-gray-100">{group.name}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Selected: {selectedGroupIds.length} group(s)
-                          </p>
-                        </div>
-
-                        {/* Templates */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Templates <span className="text-red-500">*</span>
-                          </label>
-                          <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-800">
-                            {zabbixTemplates.length === 0 ? (
-                              <p className="text-sm text-gray-500 dark:text-gray-400">No templates available</p>
-                            ) : (
-                              <div className="space-y-2">
-                                {zabbixTemplates.map((template) => (
-                                  <label key={template.templateid} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedTemplateIds.includes(template.templateid)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setSelectedTemplateIds([...selectedTemplateIds, template.templateid])
-                                        } else {
-                                          setSelectedTemplateIds(selectedTemplateIds.filter(id => id !== template.templateid))
-                                        }
-                                      }}
-                                      className="w-4 h-4 text-ward-green focus:ring-ward-green rounded"
-                                    />
-                                    <span className="text-sm text-gray-900 dark:text-gray-100">{template.name}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Selected: {selectedTemplateIds.length} template(s)
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Fixed Footer */}
-              <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  onClick={() => setAddDeviceStep(1)}
-                  className="flex-1"
-                  disabled={addingDevice}
-                >
-                  Back
-                </Button>
-                <Button
-                  onClick={handleAddDevice}
-                  disabled={addingDevice}
-                  className="flex-1"
-                >
-                  {addingDevice ? 'Adding...' : 'Add Device'}
-                </Button>
-              </div>
+              )}
             </div>
-          )}
+
+            <Input
+              label="SNMP Community"
+              value={addDeviceForm.snmp_community}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, snmp_community: e.target.value })}
+              placeholder="public"
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                SNMP Version
+              </label>
+              <select
+                value={addDeviceForm.snmp_version}
+                onChange={(e) => setAddDeviceForm({ ...addDeviceForm, snmp_version: e.target.value })}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
+              >
+                <option value="1">SNMPv1</option>
+                <option value="2c">SNMPv2c</option>
+                <option value="3">SNMPv3</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Fixed Footer */}
+          <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={handleAddDeviceModalClose}
+              className="flex-1"
+              disabled={addingDevice}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddDevice}
+              disabled={addingDevice}
+              className="flex-1"
+            >
+              {addingDevice ? 'Adding...' : 'Add Device'}
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

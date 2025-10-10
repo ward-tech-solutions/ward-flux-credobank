@@ -1,6 +1,6 @@
 /**
  * API Client for WARD FLUX
- * Uses the proven old backend logic for Zabbix integration
+ * Standalone monitoring system API
  */
 
 import axios from 'axios'
@@ -121,7 +121,7 @@ export const authAPI = {
 
 // Devices - USE OLD WORKING ZABBIX API
 export const devicesAPI = {
-  // Main devices endpoint - returns ALL Zabbix devices
+  // Main devices endpoint - returns ALL devices
   getAll: () => api.get<Device[]>('/devices'),
 
   // Get devices by region filter
@@ -157,7 +157,7 @@ export const devicesAPI = {
     return api.get(`/zabbix/alerts${params}`)
   },
 
-  // Standalone devices (separate from Zabbix)
+  // Standalone devices
   standalone: {
     list: () => api.get('/devices/standalone/list'),
     create: (device: any) => api.post('/devices/standalone', device),

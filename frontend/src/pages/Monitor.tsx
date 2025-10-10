@@ -220,7 +220,7 @@ const fetchHistoricalData = async (device: Device, timeRange: '24h' | '7d' | '30
       return []
     }
 
-    // Transform Zabbix history to chart format
+    // Transform history data to chart format
     return history.map((point: any) => {
       const date = new Date(point.timestamp)
       let timeLabel = ''
