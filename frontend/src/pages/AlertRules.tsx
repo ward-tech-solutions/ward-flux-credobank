@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tantml:invoke>
-<parameter name="Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { LoadingSpinner } from '@/components/ui/Loading'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
