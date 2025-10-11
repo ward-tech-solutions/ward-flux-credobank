@@ -40,8 +40,8 @@ Update `.env.prod` before deployment:
 
 ```bash
 docker login registry.example.com
-docker pull registry.example.com/wardops/app:credobank-latest
-docker pull registry.example.com/wardops/postgres-seeded:credobank-latest
+docker pull ward_flux/wardops-app:credobank-latest
+docker pull ward_flux/wardops-postgres-seeded:credobank-latest
 ```
 
 ## 4. Launch the Stack

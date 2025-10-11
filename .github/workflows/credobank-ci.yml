@@ -95,7 +95,7 @@ jobs:
 
       - name: Build application image
         run: |
-          docker build -t registry.example.com/wardops/app:${{ github.sha }} .
+          docker build -t ward_flux/wardops-app:${{ github.sha }} .
 
       - name: Generate PostgreSQL backup
         run: |
@@ -108,7 +108,7 @@ jobs:
           COPY seed.backup /docker-entrypoint-initdb.d/seed.backup
           EOF
           docker build -f Dockerfile.seeddb \
-            -t registry.example.com/wardops/postgres-seeded:${{ github.sha }} .
+            -t ward_flux/wardops-postgres-seeded:${{ github.sha }} .
 
       - name: Push images
         if: secrets.REGISTRY_USERNAME && secrets.REGISTRY_PASSWORD
@@ -116,13 +116,13 @@ jobs:
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: |
-          echo "$REGISTRY_PASSWORD" | docker login registry.example.com --username "$REGISTRY_USERNAME" --password-stdin
-          docker push registry.example.com/wardops/app:${{ github.sha }}
-          docker push registry.example.com/wardops/postgres-seeded:${{ github.sha }}
-          docker tag registry.example.com/wardops/app:${{ github.sha }} registry.example.com/wardops/app:credobank-latest
-          docker tag registry.example.com/wardops/postgres-seeded:${{ github.sha }} registry.example.com/wardops/postgres-seeded:credobank-latest
-          docker push registry.example.com/wardops/app:credobank-latest
-          docker push registry.example.com/wardops/postgres-seeded:credobank-latest
+          echo "$REGISTRY_PASSWORD" | docker login --username "$REGISTRY_USERNAME" --password-stdin
+          docker push ward_flux/wardops-app:${{ github.sha }}
+          docker push ward_flux/wardops-postgres-seeded:${{ github.sha }}
+          docker tag ward_flux/wardops-app:${{ github.sha }} ward_flux/wardops-app:credobank-latest
+          docker tag ward_flux/wardops-postgres-seeded:${{ github.sha }} ward_flux/wardops-postgres-seeded:credobank-latest
+          docker push ward_flux/wardops-app:credobank-latest
+          docker push ward_flux/wardops-postgres-seeded:credobank-latest
 
       - name: Upload deployment bundle
         uses: actions/upload-artifact@v4

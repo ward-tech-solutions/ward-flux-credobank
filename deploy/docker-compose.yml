@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   db:
-    image: registry.example.com/wardops/postgres-seeded:credobank-latest
+    image: ward_flux/wardops-postgres-seeded:credobank-latest
     container_name: wardops-db
     environment:
       POSTGRES_USER: fluxdb
@@ -21,7 +21,7 @@ services:
       - db
 
   api:
-    image: registry.example.com/wardops/app:credobank-latest
+    image: ward_flux/wardops-app:credobank-latest
     container_name: wardops-api
     env_file: .env.prod
     depends_on:
@@ -32,7 +32,7 @@ services:
     command: ["./scripts/start_api.sh"]
 
   celery-worker:
-    image: registry.example.com/wardops/app:credobank-latest
+    image: ward_flux/wardops-app:credobank-latest
     container_name: wardops-worker
     env_file: .env.prod
     depends_on:
@@ -41,7 +41,7 @@ services:
     command: ["celery", "-A", "celery_app", "worker", "--loglevel=info", "--pool=solo"]
 
   celery-beat:
-    image: registry.example.com/wardops/app:credobank-latest
+    image: ward_flux/wardops-app:credobank-latest
     container_name: wardops-beat
     env_file: .env.prod
     depends_on:
@@ -50,7 +50,7 @@ services:
     command: ["celery", "-A", "celery_app", "beat", "--loglevel=info"]
 
   frontend:
-    image: registry.example.com/wardops/app:credobank-latest
+    image: ward_flux/wardops-app:credobank-latest
     container_name: wardops-frontend
     env_file: .env.prod
     depends_on:
