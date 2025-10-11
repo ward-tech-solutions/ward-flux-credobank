@@ -111,7 +111,6 @@ jobs:
             -t ward_flux/wardops-postgres-seeded:${{ github.sha }} .
 
       - name: Push images
-        if: ${{ secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != '' }}
         env:
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
