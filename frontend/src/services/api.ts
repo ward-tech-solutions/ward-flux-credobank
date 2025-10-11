@@ -55,6 +55,11 @@ export interface Device {
   vendor?: string
   model?: string
   created_at?: string
+  description?: string
+  location?: string
+  ssh_port?: number
+  ssh_username?: string
+  ssh_enabled?: boolean
 }
 
 export interface User {
@@ -201,6 +206,34 @@ export const alertRulesAPI = {
   }>) => api.put(`/alert-rules/${id}`, rule),
   deleteRule: (id: string) => api.delete(`/alert-rules/${id}`),
   toggleRule: (id: string) => api.post(`/alert-rules/${id}/toggle`),
+}
+
+// Branches
+export const branchesAPI = {
+  getAll: (params?: { region?: string; is_active?: boolean; search?: string }) => {
+    const query = new URLSearchParams(params as any).toString()
+    return api.get(`/branches${query ? `?${query}` : ''}`)
+  },
+  getById: (id: string) => api.get(`/branches/${id}`),
+  getDevices: (id: string) => api.get(`/branches/${id}/devices`),
+  getStats: () => api.get('/branches/stats'),
+  create: (data: {
+    name: string
+    display_name: string
+    region?: string
+    branch_code?: string
+    address?: string
+    is_active?: boolean
+  }) => api.post('/branches', data),
+  update: (id: string, data: Partial<{
+    name: string
+    display_name: string
+    region: string
+    branch_code: string
+    address: string
+    is_active: boolean
+  }>) => api.put(`/branches/${id}`, data),
+  delete: (id: string, force?: boolean) => api.delete(`/branches/${id}${force ? '?force=true' : ''}`),
 }
 
 // Reports

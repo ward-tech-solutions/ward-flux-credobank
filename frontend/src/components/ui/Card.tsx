@@ -14,7 +14,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
       bordered: 'bg-white dark:bg-gray-800 rounded-xl border-2 border-gray-200 dark:border-gray-700',
     }
 
-    const hoverEffect = hover ? 'transition-all duration-200 hover:shadow-ward-xl hover:scale-[1.02]' : ''
+    const hoverEffect = hover ? 'transition-all duration-200 hover:shadow-ward-lg hover:-translate-y-0.5' : ''
 
     return (
       <div

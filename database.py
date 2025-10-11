@@ -19,30 +19,39 @@ load_dotenv()
 # Database Configuration
 # ============================================
 
-# Check if PostgreSQL should be used
-USE_POSTGRES = os.getenv("USE_POSTGRES", "false").lower() == "true"
+# PostgreSQL is now the default/required backend.
 DATABASE_URL = os.getenv("DATABASE_URL")
+ALLOW_SQLITE_FALLBACK = os.getenv("ALLOW_SQLITE_FALLBACK", "false").lower() == "true"
 
 if not DATABASE_URL:
-    # Default to SQLite for development
-    data_dir = os.path.join(os.path.dirname(__file__), "data")
-    os.makedirs(data_dir, exist_ok=True)
-    DATABASE_URL = f"sqlite:///{data_dir}/ward_ops.db"
-    USE_POSTGRES = False
+    if ALLOW_SQLITE_FALLBACK:
+        data_dir = os.path.join(os.path.dirname(__file__), "data")
+        os.makedirs(data_dir, exist_ok=True)
+        DATABASE_URL = f"sqlite:///{data_dir}/ward_ops.db"
+    else:
+        raise RuntimeError(
+            "DATABASE_URL is not set. Configure a PostgreSQL connection string or set ALLOW_SQLITE_FALLBACK=true for legacy dev usage."
+        )
+
+USE_POSTGRES = DATABASE_URL.startswith("postgresql")
+
+if not USE_POSTGRES:
+    if not ALLOW_SQLITE_FALLBACK:
+        raise RuntimeError(
+            "SQLite fallback is disabled. Provide a PostgreSQL DATABASE_URL or explicitly opt-in by setting ALLOW_SQLITE_FALLBACK=true."
+        )
 
 # Create engine with appropriate configuration
-if USE_POSTGRES or DATABASE_URL.startswith("postgresql"):
-    # PostgreSQL configuration
+if USE_POSTGRES:
     engine = create_engine(
         DATABASE_URL,
-        pool_size=20,  # Connection pool size
-        max_overflow=40,  # Max connections beyond pool_size
-        pool_pre_ping=True,  # Verify connections before using
-        pool_recycle=3600,  # Recycle connections after 1 hour
-        echo=False,  # Set to True for SQL query logging
+        pool_size=20,
+        max_overflow=40,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        echo=False,
     )
 else:
-    # SQLite configuration
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}, echo=False)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

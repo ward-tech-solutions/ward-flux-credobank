@@ -28,17 +28,32 @@ export default function DeviceDetails() {
   })
 
   // Transform real ping data to chart format
-  const metricsData = historyData?.data?.history?.map((point: any) => {
-    const date = new Date(point.clock * 1000)
-    const hours = date.getHours().toString().padStart(2, '0')
-    const minutes = date.getMinutes().toString().padStart(2, '0')
-    return {
-      time: `${hours}:${minutes}`,
-      timestamp: point.clock,
-      ping: point.reachable ? point.value : null,
-      reachable: point.reachable,
-    }
-  }).reverse() || []
+  type PingHistoryPoint = {
+    clock: number
+    reachable: boolean
+    value: number | null
+  }
+
+  type MetricsPoint = {
+    time: string
+    timestamp: number
+    ping: number | null
+    reachable: boolean
+  }
+
+  const metricsData: MetricsPoint[] = ((historyData?.data?.history ?? []) as PingHistoryPoint[])
+    .map((point) => {
+      const date = new Date(point.clock * 1000)
+      const hours = date.getHours().toString().padStart(2, '0')
+      const minutes = date.getMinutes().toString().padStart(2, '0')
+      return {
+        time: `${hours}:${minutes}`,
+        timestamp: point.clock,
+        ping: point.reachable ? point.value : null,
+        reachable: point.reachable,
+      }
+    })
+    .reverse()
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Info },

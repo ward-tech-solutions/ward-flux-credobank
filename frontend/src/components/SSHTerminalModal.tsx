@@ -15,6 +15,7 @@ interface SSHTerminalModalProps {
 export default function SSHTerminalModal({ open, onClose, deviceName, deviceIP }: SSHTerminalModalProps) {
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('')
+  const [port, setPort] = useState(22)
   const [output, setOutput] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
@@ -35,7 +36,7 @@ export default function SSHTerminalModal({ open, onClose, deviceName, deviceIP }
         host: deviceIP,
         username,
         password,
-        port: 22,
+        port: port,
       })
 
       if (response.data.success) {
@@ -61,6 +62,7 @@ export default function SSHTerminalModal({ open, onClose, deviceName, deviceIP }
   const handleClose = () => {
     setUsername('admin')
     setPassword('')
+    setPort(22)
     setOutput(null)
     setError(null)
     setIsConnected(false)
@@ -109,14 +111,13 @@ ssh ${username}@${deviceIP}
 
         {/* Credentials Form */}
         <div className="p-4 bg-gray-100 border-t border-gray-300">
-          <div className="flex items-center gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
             <Input
               type="text"
               placeholder="Username (default: admin)"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={isConnecting || isConnected}
-              className="flex-1"
             />
             <Input
               type="password"
@@ -125,7 +126,15 @@ ssh ${username}@${deviceIP}
               onChange={(e) => setPassword(e.target.value)}
               onKeyPress={handleKeyPress}
               disabled={isConnecting || isConnected}
-              className="flex-1"
+            />
+            <Input
+              type="number"
+              placeholder="Port (default: 22)"
+              value={port}
+              onChange={(e) => setPort(parseInt(e.target.value) || 22)}
+              disabled={isConnecting || isConnected}
+              min={1}
+              max={65535}
             />
             <Button
               onClick={handleConnect}
@@ -150,7 +159,7 @@ ssh ${username}@${deviceIP}
               )}
             </Button>
           </div>
-          <p className="text-xs text-gray-600 mt-2">
+          <p className="text-xs text-gray-600">
             <AlertTriangle className="h-3 w-3 inline mr-1" />
             Enter credentials and click Connect to access the device terminal
           </p>

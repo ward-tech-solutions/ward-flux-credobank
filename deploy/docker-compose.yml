@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  db:
+    image: registry.example.com/wardops/postgres-seeded:credobank-latest
+    container_name: wardops-db
+    environment:
+      POSTGRES_USER: fluxdb
+      POSTGRES_PASSWORD: FluxDB
+      POSTGRES_DB: ward_ops
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: wardops-redis
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      - db
+
+  api:
+    image: registry.example.com/wardops/app:credobank-latest
+    container_name: wardops-api
+    env_file: .env.prod
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "5001:5001"
+    command: ["./scripts/start_api.sh"]
+
+  celery-worker:
+    image: registry.example.com/wardops/app:credobank-latest
+    container_name: wardops-worker
+    env_file: .env.prod
+    depends_on:
+      - db
+      - redis
+    command: ["celery", "-A", "celery_app", "worker", "--loglevel=info", "--pool=solo"]
+
+  celery-beat:
+    image: registry.example.com/wardops/app:credobank-latest
+    container_name: wardops-beat
+    env_file: .env.prod
+    depends_on:
+      - db
+      - redis
+    command: ["celery", "-A", "celery_app", "beat", "--loglevel=info"]
+
+  frontend:
+    image: registry.example.com/wardops/app:credobank-latest
+    container_name: wardops-frontend
+    env_file: .env.prod
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+    command: ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
+
+volumes:
+  db-data:

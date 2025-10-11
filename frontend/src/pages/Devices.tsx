@@ -36,8 +36,19 @@ export default function Devices() {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingDevice, setEditingDevice] = useState<any>(null)
   const [editForm, setEditForm] = useState({
+    name: '',
+    ip: '',
+    hostname: '',
+    vendor: '',
+    device_type: '',
+    model: '',
+    location: '',
+    description: '',
     region: '',
     branch: '',
+    ssh_port: 22,
+    ssh_username: '',
+    ssh_enabled: true,
   })
   const [savingDevice, setSavingDevice] = useState(false)
 
@@ -158,8 +169,19 @@ export default function Devices() {
   const handleEditDevice = (device: any) => {
     setEditingDevice(device)
     setEditForm({
+      name: device.display_name || device.name || '',
+      ip: device.ip || '',
+      hostname: device.hostname || '',
+      vendor: device.vendor || '',
+      device_type: device.device_type || '',
+      model: device.model || '',
+      location: device.location || '',
+      description: device.description || '',
       region: device.region || '',
       branch: device.branch || '',
+      ssh_port: device.ssh_port || 22,
+      ssh_username: device.ssh_username || '',
+      ssh_enabled: device.ssh_enabled !== false,
     })
     setEditModalOpen(true)
   }
@@ -169,10 +191,7 @@ export default function Devices() {
 
     setSavingDevice(true)
     try {
-      await devicesAPI.updateDevice(editingDevice.hostid, {
-        region: editForm.region,
-        branch: editForm.branch,
-      })
+      await devicesAPI.updateDevice(editingDevice.hostid, editForm)
       alert('Device updated successfully!')
       setEditModalOpen(false)
       setEditingDevice(null)
@@ -271,44 +290,46 @@ export default function Devices() {
         <CardContent className="p-4">
           <div className="space-y-4">
             {/* Top row: Search and View Toggle */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 max-w-md">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="w-full md:max-w-md">
                 <Input
+                  label="Search"
                   placeholder="Search devices by name, IP, or branch..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   icon={<Search className="h-5 w-5" />}
                 />
               </div>
-              <div className="flex items-center gap-2 border border-gray-200 dark:border-gray-700 rounded-lg p-1">
-                <button
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={viewMode === 'grid' ? 'primary' : 'ghost'}
+                  size="sm"
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-ward-green text-white'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-ward-green'
-                  }`}
+                  aria-pressed={viewMode === 'grid'}
                   title="Grid View"
+                  className="px-3 py-1.5"
+                  icon={<LayoutGrid className="h-4 w-4" />}
                 >
-                  <LayoutGrid className="h-5 w-5" />
-                </button>
-                <button
+                  <span className="hidden sm:inline">Grid</span>
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'primary' : 'ghost'}
+                  size="sm"
                   onClick={() => setViewMode('list')}
-                  className={`p-2 rounded transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-ward-green text-white'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-ward-green'
-                  }`}
+                  aria-pressed={viewMode === 'list'}
                   title="Table View"
+                  className="px-3 py-1.5"
+                  icon={<List className="h-4 w-4" />}
                 >
-                  <List className="h-5 w-5" />
-                </button>
+                  <span className="hidden sm:inline">Table</span>
+                </Button>
               </div>
             </div>
 
             {/* Bottom row: Filter dropdowns */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <Select
+                label="Status"
                 value={statusFilter}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value)}
                 options={[
@@ -317,22 +338,27 @@ export default function Devices() {
                   { value: 'Down', label: 'Offline' },
                   { value: 'Unknown', label: 'Unknown' },
                 ]}
+                fullWidth
               />
               <Select
+                label="Type"
                 value={typeFilter}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}
                 options={[
                   { value: '', label: 'All Types' },
                   ...deviceTypes.map(type => ({ value: type, label: type })),
                 ]}
+                fullWidth
               />
               <Select
+                label="Region"
                 value={regionFilter}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRegionFilter(e.target.value)}
                 options={[
                   { value: '', label: 'All Regions' },
                   ...regions.map(region => ({ value: region, label: region })),
                 ]}
+                fullWidth
               />
               {hasActiveFilters && (
                 <Button
@@ -565,67 +591,170 @@ export default function Devices() {
           setEditingDevice(null)
         }}
         title="Edit Device"
-        size="md"
+        size="lg"
       >
         {editingDevice && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Device Name
-              </label>
-              <Input
-                value={editingDevice.display_name}
-                disabled
-                className="bg-gray-50 dark:bg-gray-900"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Read-only</p>
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Device Name
+                </label>
+                <Input
+                  value={editForm.name}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  IP Address
+                </label>
+                <Input
+                  value={editForm.ip}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, ip: e.target.value })}
+                  className="font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Hostname
+                </label>
+                <Input
+                  value={editForm.hostname}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, hostname: e.target.value })}
+                  placeholder="Enter hostname"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Vendor
+                </label>
+                <Input
+                  value={editForm.vendor}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, vendor: e.target.value })}
+                  placeholder="e.g., Cisco, Fortinet"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Device Type
+                </label>
+                <Input
+                  value={editForm.device_type}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, device_type: e.target.value })}
+                  placeholder="e.g., Switch, Router, Paybox"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Model
+                </label>
+                <Input
+                  value={editForm.model}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, model: e.target.value })}
+                  placeholder="Device model"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Location
+                </label>
+                <Input
+                  value={editForm.location}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, location: e.target.value })}
+                  placeholder="Physical location"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Region
+                </label>
+                <select
+                  value={editForm.region}
+                  onChange={(e) => setEditForm({ ...editForm, region: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
+                >
+                  <option value="">Select Region</option>
+                  {regions.map((region) => (
+                    <option key={region} value={region}>
+                      {region}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Branch (City)
+                </label>
+                <Input
+                  value={editForm.branch}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, branch: e.target.value })}
+                  placeholder="Enter branch/city name"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
+                  rows={3}
+                  placeholder="Device description"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                IP Address
-              </label>
-              <Input
-                value={editingDevice.ip}
-                disabled
-                className="bg-gray-50 dark:bg-gray-900 font-mono"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Read-only</p>
-            </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+              <h4 className="text-md font-semibold mb-3 text-gray-900 dark:text-gray-100">SSH Configuration</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    SSH Port
+                  </label>
+                  <Input
+                    type="number"
+                    value={editForm.ssh_port}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, ssh_port: parseInt(e.target.value) || 22 })}
+                    placeholder="22"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Region
-              </label>
-              <select
-                value={editForm.region}
-                onChange={(e) => setEditForm({ ...editForm, region: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-              >
-                <option value="">Select Region</option>
-                {regions.map((region) => (
-                  <option key={region} value={region}>
-                    {region}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Assign device to a region
-              </p>
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    SSH Username
+                  </label>
+                  <Input
+                    value={editForm.ssh_username}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, ssh_username: e.target.value })}
+                    placeholder="admin"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Branch (City)
-              </label>
-              <Input
-                value={editForm.branch}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, branch: e.target.value })}
-                placeholder="Enter branch/city name"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Branch or city where the device is located
-              </p>
+                <div className="flex items-end pb-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editForm.ssh_enabled}
+                      onChange={(e) => setEditForm({ ...editForm, ssh_enabled: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-ward-green focus:ring-ward-green"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      SSH Enabled
+                    </span>
+                  </label>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">

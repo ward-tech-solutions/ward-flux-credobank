@@ -165,10 +165,6 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
-    # Initialize WebSocket connections list
-    websocket_connections: List[WebSocket] = []
-    app.state.websocket_connections = websocket_connections
-
     # Start background task for real-time updates
     app.state.monitor_task = asyncio.create_task(monitor_device_changes(app))
 
@@ -217,6 +213,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 from routers import (
     alerts,
     auth,
+    branches,
     bulk,
     config,
     dashboard,
@@ -244,6 +241,7 @@ app.include_router(discovery.router)
 app.include_router(reports.router)
 app.include_router(alerts.router)
 app.include_router(alerts.rules_router)
+app.include_router(branches.router)
 app.include_router(settings.router)
 app.include_router(dashboard.router)
 app.include_router(diagnostics.router)
@@ -935,7 +933,6 @@ async def ssh_connect(ssh_request: SSHConnectRequest, current_user: User = Depen
 # ============================================
 
 # Settings page route - MOVED TO routers/pages.py
-
 
 
 

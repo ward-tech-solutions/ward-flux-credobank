@@ -1,16 +1,19 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ChangeEvent } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { LoadingSpinner } from '@/components/ui/Loading'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
+import Select from '@/components/ui/Select'
+import MultiSelect from '@/components/ui/MultiSelect'
+import Switch from '@/components/ui/Switch'
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { alertRulesAPI, devicesAPI } from '@/services/api'
+import { alertRulesAPI, devicesAPI, branchesAPI } from '@/services/api'
 import {
-  Bell, Plus, Edit, Trash2, Power, AlertTriangle, Search, Filter,
-  AlertCircle, AlertOctagon, Info, Zap, Activity, Clock
+  Bell, Plus, Edit, Trash2, Power, AlertTriangle, Search,
+  AlertCircle, AlertOctagon, Info, Zap, Activity, Clock, MapPin, Building2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
@@ -23,6 +26,7 @@ interface AlertRule {
   severity: string
   enabled: boolean
   device_id?: string
+  branch_id?: string
   created_at: string
   updated_at: string
 }
@@ -62,6 +66,8 @@ export default function AlertRules() {
     severity: 'warning',
     enabled: true,
     device_id: '',
+    branch_id: '',
+    scope: 'global', // 'global', 'branch', or 'device'
   })
 
   const { data: rulesData, isLoading } = useQuery({
@@ -76,6 +82,14 @@ export default function AlertRules() {
     queryKey: ['devices'],
     queryFn: async () => {
       const response = await devicesAPI.getAll()
+      return response.data
+    },
+  })
+
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches'],
+    queryFn: async () => {
+      const response = await branchesAPI.getAll()
       return response.data
     },
   })
@@ -137,6 +151,8 @@ export default function AlertRules() {
       severity: 'warning',
       enabled: true,
       device_id: '',
+      branch_id: '',
+      scope: 'global',
     })
     setSelectedTemplate('ping_unreachable >= 3')
   }
@@ -148,6 +164,9 @@ export default function AlertRules() {
   }
 
   const openEditModal = (rule: AlertRule) => {
+    // Determine scope from rule
+    const scope = rule.branch_id ? 'branch' : rule.device_id ? 'device' : 'global'
+
     setRuleForm({
       name: rule.name,
       description: rule.description || '',
@@ -155,6 +174,8 @@ export default function AlertRules() {
       severity: rule.severity,
       enabled: rule.enabled,
       device_id: rule.device_id || '',
+      branch_id: rule.branch_id || '',
+      scope: scope,
     })
     setSelectedTemplate('custom')
     setEditingRule(rule)
@@ -162,10 +183,32 @@ export default function AlertRules() {
   }
 
   const handleSubmit = () => {
-    if (editingRule) {
-      updateMutation.mutate({ id: editingRule.id, ...ruleForm })
+    // Prepare data based on scope
+    const submitData: any = {
+      name: ruleForm.name,
+      description: ruleForm.description,
+      expression: ruleForm.expression,
+      severity: ruleForm.severity,
+      enabled: ruleForm.enabled,
+    }
+
+    // Set device_id or branch_id based on scope
+    if (ruleForm.scope === 'device') {
+      submitData.device_id = ruleForm.device_id || null
+      submitData.branch_id = null
+    } else if (ruleForm.scope === 'branch') {
+      submitData.branch_id = ruleForm.branch_id || null
+      submitData.device_id = null
     } else {
-      createMutation.mutate(ruleForm)
+      // Global rule
+      submitData.device_id = null
+      submitData.branch_id = null
+    }
+
+    if (editingRule) {
+      updateMutation.mutate({ id: editingRule.id, ...submitData })
+    } else {
+      createMutation.mutate(submitData)
     }
   }
 
@@ -202,6 +245,25 @@ export default function AlertRules() {
 
   const rules = rulesData?.rules || []
   const devices = devicesData || []
+  const branches = branchesData?.branches || []
+
+  const branchOptions = useMemo(
+    () =>
+      branches.map((branch: any) => ({
+        value: branch.id,
+        label: `${branch.display_name}${branch.region ? ` (${branch.region})` : ''}`,
+      })),
+    [branches],
+  )
+
+  const deviceOptions = useMemo(
+    () =>
+      devices.map((device: any) => ({
+        value: device.hostid,
+        label: `${device.display_name || device.hostname || device.name || 'Device'} (${device.ip})`,
+      })),
+    [devices],
+  )
 
   // Filter and search rules
   const filteredRules = useMemo(() => {
@@ -246,7 +308,7 @@ export default function AlertRules() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <Card variant="glass" hover>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -257,7 +319,7 @@ export default function AlertRules() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card variant="glass" hover>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -268,7 +330,7 @@ export default function AlertRules() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card variant="glass" hover>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -279,7 +341,7 @@ export default function AlertRules() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card variant="glass" hover>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -293,7 +355,7 @@ export default function AlertRules() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card variant="glass">
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
@@ -307,33 +369,33 @@ export default function AlertRules() {
                 />
               </div>
             </div>
-            <select
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            <Select
               value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value)}
-            >
-              <option value="all">All Severities</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="warning">Warning</option>
-              <option value="low">Low</option>
-              <option value="info">Info</option>
-            </select>
-            <select
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setSeverityFilter(e.target.value)}
+              options={[
+                { value: 'all', label: 'All Severities' },
+                { value: 'critical', label: 'Critical' },
+                { value: 'high', label: 'High' },
+                { value: 'warning', label: 'Warning' },
+                { value: 'low', label: 'Low' },
+                { value: 'info', label: 'Info' },
+              ]}
+            />
+            <Select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">All Status</option>
-              <option value="enabled">Enabled</option>
-              <option value="disabled">Disabled</option>
-            </select>
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value)}
+              options={[
+                { value: 'all', label: 'All Status' },
+                { value: 'enabled', label: 'Enabled' },
+                { value: 'disabled', label: 'Disabled' },
+              ]}
+            />
           </div>
         </CardContent>
       </Card>
 
       {/* Alert Rules Table */}
-      <Card>
+      <Card variant="glass">
         <CardHeader>
           <CardTitle>
             Alert Rules ({filteredRules.length}{filteredRules.length !== rules.length && ` of ${rules.length}`})
@@ -369,6 +431,7 @@ export default function AlertRules() {
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead>Scope/Target</TableHead>
                     <TableHead>Expression</TableHead>
                     <TableHead>Severity</TableHead>
                     <TableHead>Status</TableHead>
@@ -380,6 +443,10 @@ export default function AlertRules() {
                   {filteredRules.map((rule: AlertRule) => {
                     const SeverityIcon = getSeverityIcon(rule.severity)
                     const severityConfig = SEVERITY_CONFIG[rule.severity.toLowerCase() as keyof typeof SEVERITY_CONFIG]
+
+                    // Determine scope and target
+                    const branch = rule.branch_id ? branches.find((b: any) => b.id === rule.branch_id) : null
+                    const device = rule.device_id ? devices.find((d: any) => d.hostid === rule.device_id) : null
 
                     return (
                       <TableRow key={rule.id}>
@@ -399,6 +466,34 @@ export default function AlertRules() {
                           </div>
                         </TableCell>
                         <TableCell>
+                          <div className="flex items-center gap-2">
+                            {rule.branch_id ? (
+                              <>
+                                <MapPin className="h-4 w-4 text-blue-600" />
+                                <div>
+                                  <div className="text-sm font-medium">{branch?.display_name || 'Branch'}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {branch?.device_count || 0} devices
+                                  </div>
+                                </div>
+                              </>
+                            ) : rule.device_id ? (
+                              <>
+                                <Building2 className="h-4 w-4 text-purple-600" />
+                                <div>
+                                  <div className="text-sm font-medium">{device?.name || 'Device'}</div>
+                                  <div className="text-xs text-muted-foreground">{device?.ip}</div>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <Activity className="h-4 w-4 text-gray-600" />
+                                <div className="text-sm font-medium text-muted-foreground">Global (All Devices)</div>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
                           <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
                             {rule.expression}
                           </code>
@@ -409,7 +504,7 @@ export default function AlertRules() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={rule.enabled ? 'success' : 'secondary'}>
+                          <Badge variant={rule.enabled ? 'success' : 'default'}>
                             {rule.enabled ? 'Enabled' : 'Disabled'}
                           </Badge>
                         </TableCell>
@@ -461,8 +556,8 @@ export default function AlertRules() {
       </Card>
 
       {/* Create/Edit Modal */}
-      <Modal open={modalOpen} onOpenChange={setModalOpen}>
-        <ModalHeader>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
+        <ModalHeader onClose={() => setModalOpen(false)}>
           <ModalTitle>
             {editingRule ? 'Edit Alert Rule' : 'Create Alert Rule'}
           </ModalTitle>
@@ -487,20 +582,13 @@ export default function AlertRules() {
               />
             </div>
 
-            <div>
-              <label className="text-sm font-medium block mb-2">Expression Template</label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={selectedTemplate}
-                onChange={(e) => handleTemplateChange(e.target.value)}
-              >
-                {EXPRESSION_TEMPLATES.map((template) => (
-                  <option key={template.value} value={template.value}>
-                    {template.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label="Expression Template"
+              value={selectedTemplate}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => handleTemplateChange(e.target.value)}
+              options={EXPRESSION_TEMPLATES}
+              fullWidth
+            />
 
             <div>
               <label className="text-sm font-medium block mb-2">Expression *</label>
@@ -515,52 +603,81 @@ export default function AlertRules() {
               </p>
             </div>
 
-            <div>
-              <label className="text-sm font-medium block mb-2">Severity *</label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={ruleForm.severity}
-                onChange={(e) => setRuleForm({ ...ruleForm, severity: e.target.value })}
-              >
-                <option value="info">Info - Informational messages</option>
-                <option value="low">Low - Minor issues</option>
-                <option value="warning">Warning - Potential problems</option>
-                <option value="high">High - Serious issues</option>
-                <option value="critical">Critical - Urgent attention needed</option>
-              </select>
-            </div>
+            <Select
+              label="Severity *"
+              value={ruleForm.severity}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setRuleForm({ ...ruleForm, severity: e.target.value })}
+              options={[
+                { value: 'info', label: 'Info - Informational messages' },
+                { value: 'low', label: 'Low - Minor issues' },
+                { value: 'warning', label: 'Warning - Potential problems' },
+                { value: 'high', label: 'High - Serious issues' },
+                { value: 'critical', label: 'Critical - Urgent attention needed' },
+              ]}
+              fullWidth
+            />
 
-            <div>
-              <label className="text-sm font-medium block mb-2">Device (Optional)</label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={ruleForm.device_id}
-                onChange={(e) => setRuleForm({ ...ruleForm, device_id: e.target.value })}
-              >
-                <option value="">All Devices (Global Rule)</option>
-                {devices.map((device: any) => (
-                  <option key={device.hostid} value={device.hostid}>
-                    {device.name || device.hostname}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Leave empty to apply this rule to all devices
-              </p>
-            </div>
+            <Select
+              label="Alert Scope *"
+              value={ruleForm.scope}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                setRuleForm({ ...ruleForm, scope: e.target.value, device_id: '', branch_id: '' })
+              }
+              options={[
+                { value: 'global', label: 'Global - All Devices' },
+                { value: 'branch', label: 'Branch - Devices in a Branch' },
+                { value: 'device', label: 'Device - Specific Device' },
+              ]}
+              helperText={
+                ruleForm.scope === 'global'
+                  ? 'This rule will apply to all devices in the system.'
+                  : ruleForm.scope === 'branch'
+                  ? 'Applies to every device assigned to the selected branch.'
+                  : 'Applies only to the device you select below.'
+              }
+              fullWidth
+            />
 
-            <div className="flex items-center gap-2 pt-2">
-              <input
-                type="checkbox"
-                id="enabled"
-                checked={ruleForm.enabled}
-                onChange={(e) => setRuleForm({ ...ruleForm, enabled: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              <label htmlFor="enabled" className="text-sm font-medium">
-                Enable rule immediately
-              </label>
-            </div>
+            {ruleForm.scope === 'branch' && (
+              <div>
+                <label className="text-sm font-medium block mb-2 flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Select Branch *
+                </label>
+                <MultiSelect
+                  options={branchOptions}
+                  selected={ruleForm.branch_id ? [ruleForm.branch_id] : []}
+                  onChange={(values) => setRuleForm({ ...ruleForm, branch_id: values[0] ?? '' })}
+                  placeholder="Select a branch..."
+                  helperText="Choose the branch whose devices should inherit this rule."
+                  maxSelected={1}
+                />
+              </div>
+            )}
+
+            {ruleForm.scope === 'device' && (
+              <div>
+                <label className="text-sm font-medium block mb-2 flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Select Device *
+                </label>
+                <MultiSelect
+                  options={deviceOptions}
+                  selected={ruleForm.device_id ? [ruleForm.device_id] : []}
+                  onChange={(values) => setRuleForm({ ...ruleForm, device_id: values[0] ?? '' })}
+                  placeholder="Select a device..."
+                  helperText="Pick the device that should trigger this rule."
+                  maxSelected={1}
+                />
+              </div>
+            )}
+
+            <Switch
+              checked={ruleForm.enabled}
+              onClick={() => setRuleForm(prev => ({ ...prev, enabled: !prev.enabled }))}
+              label="Enable rule immediately"
+              helperText="Enabled rules start evaluating as soon as you save."
+            />
           </div>
         </ModalContent>
         <ModalFooter>
@@ -569,7 +686,12 @@ export default function AlertRules() {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!ruleForm.name || !ruleForm.expression}
+            disabled={
+              !ruleForm.name ||
+              !ruleForm.expression ||
+              (ruleForm.scope === 'branch' && !ruleForm.branch_id) ||
+              (ruleForm.scope === 'device' && !ruleForm.device_id)
+            }
             className="bg-ward-green hover:bg-ward-green/90"
           >
             {editingRule ? 'Update' : 'Create'} Rule

@@ -1,13 +1,17 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import type { ChangeEvent } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Loading'
 import Badge from '@/components/ui/Badge'
 import Select from '@/components/ui/Select'
+import MultiSelect from '@/components/ui/MultiSelect'
 import { Button } from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
 import { Modal, ModalHeader, ModalTitle, ModalContent } from '@/components/ui/Modal'
 import { devicesAPI, type Device } from '@/services/api'
 import { useAuth } from '@/contexts/AuthContext'
+import { useResilientWebSocket } from '@/hooks/useResilientWebSocket'
 import { toast } from 'sonner'
 import {
   Server,
@@ -292,13 +296,40 @@ export default function Monitor() {
   const [pingLoading, setPingLoading] = useState<Set<string>>(new Set())
 
   // WebSocket state
-  const wsRef = useRef<WebSocket | null>(null)
-
-  // Filter states
-  const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all')
-  const [regionFilter, setRegionFilter] = useState<string>('all')
-  const [typeFilter, setTypeFilter] = useState<string>('all')
+  // Filter states with localStorage persistence
+  const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>(() => {
+    return (localStorage.getItem('monitor_statusFilter') as any) || 'all'
+  })
+  const [regionFilters, setRegionFilters] = useState<string[]>(() => {
+    const saved = localStorage.getItem('monitor_regionFilters')
+    return saved ? JSON.parse(saved) : []
+  })
+  const [branchFilters, setBranchFilters] = useState<string[]>(() => {
+    const saved = localStorage.getItem('monitor_branchFilters')
+    return saved ? JSON.parse(saved) : []
+  })
+  const [typeFilters, setTypeFilters] = useState<string[]>(() => {
+    const saved = localStorage.getItem('monitor_typeFilters')
+    return saved ? JSON.parse(saved) : []
+  })
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('monitor_statusFilter', statusFilter)
+  }, [statusFilter])
+
+  useEffect(() => {
+    localStorage.setItem('monitor_regionFilters', JSON.stringify(regionFilters))
+  }, [regionFilters])
+
+  useEffect(() => {
+    localStorage.setItem('monitor_branchFilters', JSON.stringify(branchFilters))
+  }, [branchFilters])
+
+  useEffect(() => {
+    localStorage.setItem('monitor_typeFilters', JSON.stringify(typeFilters))
+  }, [typeFilters])
 
   const { data: devices, isLoading, refetch } = useQuery({
     queryKey: ['devices'],
@@ -340,54 +371,40 @@ export default function Monitor() {
     pingMutation.mutate(hostid)
   }
 
-  // WebSocket connection for real-time updates
-  useEffect(() => {
+  const wsUrl = useMemo(() => {
+    if (typeof window === 'undefined') return null
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws/updates`
+    return `${protocol}//${window.location.host}/ws/updates`
+  }, [])
 
-    const connectWebSocket = () => {
-      try {
-        const ws = new WebSocket(wsUrl)
-        wsRef.current = ws
-
-        ws.onopen = () => {
-          // WebSocket connected for real-time updates
-        }
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            if (data.type === 'device_status_update') {
-              // Refetch devices to get latest status
-              queryClient.invalidateQueries({ queryKey: ['devices'] })
-              toast.info(`Device Update: ${data.device_name} status changed`)
-            }
-          } catch (error) {
-            console.error('Failed to parse WebSocket message:', error)
-          }
-        }
-
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error)
-        }
-
-        ws.onclose = () => {
-          // WebSocket disconnected, will attempt reconnection
-          setTimeout(connectWebSocket, 5000)
-        }
-      } catch (error) {
-        console.error('Failed to connect WebSocket:', error)
+  const handleWsMessage = useCallback((event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data)
+      if (data?.type === 'heartbeat') {
+        return
       }
-    }
-
-    connectWebSocket()
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close()
+      if (data?.type === 'device_status_update') {
+        queryClient.invalidateQueries({ queryKey: ['devices'] })
+        toast.info(`Device Update: ${data.device_name} status changed`)
       }
+    } catch (error) {
+      console.error('Failed to parse WebSocket message:', error)
     }
   }, [queryClient])
+
+  const handleWsError = useCallback((event: Event) => {
+    console.error('WebSocket error:', event)
+  }, [])
+
+  const websocketOptions = useMemo(
+    () => ({
+      onMessage: handleWsMessage,
+      onError: handleWsError,
+    }),
+    [handleWsMessage, handleWsError],
+  )
+
+  const { state: socketState, reconnectAttempts } = useResilientWebSocket(wsUrl, websocketOptions)
 
   // Load historical data when device is selected
   useEffect(() => {
@@ -423,30 +440,98 @@ export default function Monitor() {
     return () => clearInterval(timer)
   }, [])
 
-  // Get unique regions and types for filters
-  const { regions, deviceTypes } = useMemo(() => {
-    if (!devices?.data) return { regions: [], deviceTypes: [] }
-
-    const regionsSet = new Set<string>()
-    const typesSet = new Set<string>()
-
+  // Extract unique values for multi-select filters
+  const uniqueRegions = useMemo(() => {
+    if (!devices?.data) return []
+    const regions = new Set<string>()
     devices.data.forEach((d: Device) => {
-      regionsSet.add(getRegionFromBranch(d.branch))
-      typesSet.add(d.device_type)
+      const region = getRegionFromBranch(d.branch) || d.region
+      if (region) regions.add(region)
     })
 
-    return {
-      regions: Array.from(regionsSet).sort(),
-      deviceTypes: Array.from(typesSet).sort()
+    const sorted = Array.from(regions).sort()
+    if (isRegionalManager && userRegion) {
+      return sorted.filter(region => region === userRegion)
     }
-  }, [devices])
+    return sorted
+  }, [devices, isRegionalManager, userRegion])
+
+  const uniqueBranches = useMemo(() => {
+    if (!devices?.data) return []
+    const selectedRegions = regionFilters.length > 0 ? new Set(regionFilters) : null
+    const branches = new Set<string>()
+
+    devices.data.forEach((d: Device) => {
+      const region = getRegionFromBranch(d.branch) || d.region
+      if (isRegionalManager && userRegion && region !== userRegion) return
+      if (selectedRegions && (!region || !selectedRegions.has(region))) return
+      if (d.branch) branches.add(d.branch)
+    })
+    return Array.from(branches).sort()
+  }, [devices, regionFilters, isRegionalManager, userRegion])
+
+  const uniqueTypes = useMemo(() => {
+    if (!devices?.data) return []
+    const selectedRegions = regionFilters.length > 0 ? new Set(regionFilters) : null
+    const selectedBranches = branchFilters.length > 0 ? new Set(branchFilters) : null
+    const types = new Set<string>()
+
+    devices.data.forEach((d: Device) => {
+      const region = getRegionFromBranch(d.branch) || d.region
+      if (isRegionalManager && userRegion && region !== userRegion) return
+      if (selectedRegions && (!region || !selectedRegions.has(region))) return
+      if (selectedBranches && (!d.branch || !selectedBranches.has(d.branch))) return
+      if (d.device_type) types.add(d.device_type)
+    })
+    return Array.from(types).sort()
+  }, [devices, regionFilters, branchFilters, isRegionalManager, userRegion])
 
   // Initialize expanded regions
   useEffect(() => {
-    if (regions.length > 0 && expandedRegions.size === 0) {
-      setExpandedRegions(new Set(regions))
+    if (uniqueRegions.length === 0) return
+    setExpandedRegions(prev => {
+      if (prev.size > 0) return prev
+      return new Set(uniqueRegions)
+    })
+  }, [uniqueRegions])
+
+  useEffect(() => {
+    if (uniqueRegions.length === 0) return
+    setRegionFilters(prev => {
+      if (prev.length === 0) return prev
+      const allowed = new Set(uniqueRegions)
+      const next = prev.filter(region => allowed.has(region))
+      return next.length === prev.length ? prev : next
+    })
+  }, [uniqueRegions])
+
+  useEffect(() => {
+    if (uniqueBranches.length === 0) {
+      if (branchFilters.length === 0) return
+      setBranchFilters([])
+      return
     }
-  }, [regions])
+    setBranchFilters(prev => {
+      if (prev.length === 0) return prev
+      const allowed = new Set(uniqueBranches)
+      const next = prev.filter(branch => allowed.has(branch))
+      return next.length === prev.length ? prev : next
+    })
+  }, [uniqueBranches, branchFilters.length])
+
+  useEffect(() => {
+    if (uniqueTypes.length === 0) {
+      if (typeFilters.length === 0) return
+      setTypeFilters([])
+      return
+    }
+    setTypeFilters(prev => {
+      if (prev.length === 0) return prev
+      const allowed = new Set(uniqueTypes)
+      const next = prev.filter(type => allowed.has(type))
+      return next.length === prev.length ? prev : next
+    })
+  }, [uniqueTypes, typeFilters.length])
 
   // Filter and sort devices with priority for recently down
   const filteredDevices = useMemo(() => {
@@ -468,16 +553,25 @@ export default function Monitor() {
       filtered = filtered.filter((d: Device) => d.ping_status === 'Down')
     }
 
-    // Region filter (only for non-regional managers)
-    if (!isRegionalManager && regionFilter !== 'all') {
+    // Multi-select region filter
+    if (regionFilters.length > 0) {
       filtered = filtered.filter((d: Device) =>
-        getRegionFromBranch(d.branch) === regionFilter
+        regionFilters.includes(getRegionFromBranch(d.branch) || d.region || '')
       )
     }
 
-    // Type filter
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter((d: Device) => d.device_type === typeFilter)
+    // Multi-select branch filter
+    if (branchFilters.length > 0) {
+      filtered = filtered.filter((d: Device) =>
+        branchFilters.includes(d.branch || '')
+      )
+    }
+
+    // Multi-select type filter
+    if (typeFilters.length > 0) {
+      filtered = filtered.filter((d: Device) =>
+        typeFilters.includes(d.device_type || '')
+      )
     }
 
     // Search filter
@@ -522,7 +616,7 @@ export default function Monitor() {
       // Final: Alphabetical
       return a.display_name.localeCompare(b.display_name)
     })
-  }, [devices, isRegionalManager, userRegion, statusFilter, regionFilter, typeFilter, searchQuery])
+  }, [devices, isRegionalManager, userRegion, statusFilter, regionFilters, branchFilters, typeFilters, searchQuery])
 
   // Group devices by region
   const devicesByRegion = useMemo(() => {
@@ -697,6 +791,23 @@ export default function Monitor() {
         </div>
       </div>
 
+      {socketState !== 'open' && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+          <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+          <div>
+            <p className="font-medium">
+              Live updates {socketState === 'connecting' ? 'connecting…' : socketState === 'reconnecting' ? 'reconnecting…' : 'temporarily paused'}
+            </p>
+            {socketState === 'reconnecting' && reconnectAttempts > 0 && (
+              <p className="text-sm opacity-80">Retry attempt {reconnectAttempts}</p>
+            )}
+            {socketState === 'error' && (
+              <p className="text-sm opacity-80">We&apos;ll retry automatically; manual refresh remains available.</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Stats Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="transition-all hover:shadow-lg">
@@ -758,72 +869,78 @@ export default function Monitor() {
 
       {/* Filters Bar */}
       <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search devices..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-              />
-            </div>
+        <CardContent className="p-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Search"
+              placeholder="Search devices..."
+              value={searchQuery}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+              icon={<Search className="h-5 w-5" />}
+            />
 
-            {/* Status Filter */}
             <Select
+              label="Status"
               value={statusFilter}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value as 'all' | 'online' | 'offline')}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setStatusFilter(e.target.value as 'all' | 'online' | 'offline')
+              }
               options={[
                 { value: 'all', label: 'All Status' },
                 { value: 'online', label: 'Online Only' },
                 { value: 'offline', label: 'Offline Only' },
               ]}
+              fullWidth
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <MultiSelect
+              label="Regions"
+              options={uniqueRegions}
+              selected={regionFilters}
+              onChange={setRegionFilters}
+              placeholder="All regions"
             />
 
-            {/* Region Filter - Only show for non-regional managers */}
-            {!isRegionalManager && (
-              <Select
-                value={regionFilter}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRegionFilter(e.target.value)}
-                options={[
-                  { value: 'all', label: 'All Regions' },
-                  ...regions.map(region => ({ value: region, label: region }))
-                ]}
-              />
-            )}
+            <MultiSelect
+              label="Branches"
+              options={uniqueBranches}
+              selected={branchFilters}
+              onChange={setBranchFilters}
+              placeholder="All branches"
+            />
 
-            {/* Device Type Filter */}
-            <Select
-              value={typeFilter}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}
-              options={[
-                { value: 'all', label: 'All Types' },
-                ...deviceTypes.map(type => ({ value: type, label: type }))
-              ]}
+            <MultiSelect
+              label="Device Types"
+              options={uniqueTypes}
+              selected={typeFilters}
+              onChange={setTypeFilters}
+              placeholder="All types"
             />
           </div>
 
           {/* Active Filters Summary */}
-          {(statusFilter !== 'all' || regionFilter !== 'all' || typeFilter !== 'all' || searchQuery) && (
-            <div className="mt-3 flex items-center gap-2">
+          {(statusFilter !== 'all' || regionFilters.length > 0 || branchFilters.length > 0 || typeFilters.length > 0 || searchQuery) && (
+            <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-gray-400" />
               <span className="text-sm text-gray-600 dark:text-gray-400">
                 Showing {filteredDevices.length} of {devices?.data.length || 0} devices
               </span>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setStatusFilter('all')
-                  setRegionFilter('all')
-                  setTypeFilter('all')
+                  setRegionFilters([])
+                  setBranchFilters([])
+                  setTypeFilters([])
                   setSearchQuery('')
                 }}
-                className="ml-auto text-sm text-ward-green hover:underline"
+                className="ml-auto"
               >
                 Clear all filters
-              </button>
+              </Button>
             </div>
           )}
         </CardContent>
@@ -831,39 +948,30 @@ export default function Monitor() {
 
       {/* View Mode Toggle */}
       <div className="flex gap-2">
-        <button
+        <Button
+          variant={viewMode === 'grid' ? 'primary' : 'ghost'}
+          size="sm"
           onClick={() => setViewMode('grid')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-            viewMode === 'grid'
-              ? 'bg-ward-green text-white'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-          }`}
+          icon={<Grid3x3 className="h-4 w-4" />}
         >
-          <Grid3x3 className="h-4 w-4" />
           Grid
-        </button>
-        <button
+        </Button>
+        <Button
+          variant={viewMode === 'regions' ? 'primary' : 'ghost'}
+          size="sm"
           onClick={() => setViewMode('regions')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-            viewMode === 'regions'
-              ? 'bg-ward-green text-white'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-          }`}
+          icon={<List className="h-4 w-4" />}
         >
-          <List className="h-4 w-4" />
           Regions
-        </button>
-        <button
+        </Button>
+        <Button
+          variant={viewMode === 'table' ? 'primary' : 'ghost'}
+          size="sm"
           onClick={() => setViewMode('table')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-            viewMode === 'table'
-              ? 'bg-ward-green text-white'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-          }`}
+          icon={<TableIcon className="h-4 w-4" />}
         >
-          <TableIcon className="h-4 w-4" />
           Table
-        </button>
+        </Button>
       </div>
 
       {/* Devices Grid/Regions/Table View */}
@@ -890,8 +998,9 @@ export default function Monitor() {
               <Button
                 onClick={() => {
                   setStatusFilter('all')
-                  setRegionFilter('all')
-                  setTypeFilter('all')
+                  setRegionFilters([])
+                  setBranchFilters([])
+                  setTypeFilters([])
                   setSearchQuery('')
                 }}
                 className="mt-2"

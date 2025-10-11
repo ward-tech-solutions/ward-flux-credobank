@@ -198,6 +198,30 @@ class NetworkTopology(Base):
     first_discovered = Column(DateTime, server_default=func.now())
 
 
+# ============================================
+# Branch Management Models
+# ============================================
+
+class Branch(Base):
+    """Branch/Location organization for devices"""
+
+    __tablename__ = "branches"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(String(36), primary_key=True)  # UUID as string
+    name = Column(String(200), nullable=False, unique=True, index=True)
+    display_name = Column(String(200), nullable=False)
+    region = Column(String(100), index=True)
+    branch_code = Column(String(10))
+    address = Column(Text)
+    is_active = Column(Boolean, default=True, index=True)
+    device_count = Column(Integer, default=0)
+
+    # Timestamps
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 class DiscoveryCredential(Base):
     """Credentials for device discovery"""
 

@@ -5,10 +5,11 @@ Migrate data from SQLite to PostgreSQL
 import logging
 import os
 import sys
-from sqlalchemy import create_engine, MetaData, Table
+from sqlalchemy import MetaData, Table, create_engine, String, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -26,6 +27,11 @@ def migrate_sqlite_to_postgres(sqlite_path: str, postgres_url: str):
 
     # Create engines
     sqlite_engine = create_engine(f"sqlite:///{sqlite_path}")
+    # Ensure custom SQLite column affinities (UUID/JSON) map to text so we don't coerce values to numerics
+    for key in ("uuid", "UUID"):
+        sqlite_engine.dialect.ischema_names.setdefault(key, String)
+    for key in ("json", "JSON"):
+        sqlite_engine.dialect.ischema_names.setdefault(key, String)
     postgres_engine = create_engine(postgres_url)
 
     # Create sessions
@@ -58,22 +64,30 @@ def migrate_sqlite_to_postgres(sqlite_path: str, postgres_url: str):
     tables_migrated = 0
     total_rows = 0
 
-    for table_name in metadata.tables:
+    priority_order = [
+        "georgian_regions",
+        "georgian_cities",
+        "branches",
+        "standalone_devices",
+    ]
+    table_names = list(metadata.tables.keys())
+    ordered_tables = []
+    for name in priority_order:
+        if name in metadata.tables:
+            ordered_tables.append(name)
+    for name in table_names:
+        if name not in ordered_tables:
+            ordered_tables.append(name)
+
+    for table_name in ordered_tables:
         logger.info(f"📦 Migrating table: {table_name}...")
 
         table = Table(table_name, metadata, autoload_with=sqlite_engine)
 
-        # Read all rows from SQLite
         sqlite_rows = sqlite_session.execute(table.select()).fetchall()
 
         if sqlite_rows:
-            # Convert to dictionaries
-            rows_data = []
-            for row in sqlite_rows:
-                row_dict = dict(row._mapping)
-                rows_data.append(row_dict)
-
-            # Insert into PostgreSQL
+            rows_data = [dict(row._mapping) for row in sqlite_rows]
             try:
                 postgres_session.execute(table.insert(), rows_data)
                 postgres_session.commit()
@@ -84,7 +98,33 @@ def migrate_sqlite_to_postgres(sqlite_path: str, postgres_url: str):
                 logger.info(f"   ⚠️  Error migrating {table_name}: {e}")
                 postgres_session.rollback()
         else:
-            logger.info(f"   ℹ️  No data to migrate")
+                logger.info(f"   ℹ️  No data to migrate")
+
+    # Reset sequences for serial columns to avoid duplicate key issues
+    sequence_resets = [
+        ("users_id_seq", "users"),
+        ("georgian_regions_id_seq", "georgian_regions"),
+        ("georgian_cities_id_seq", "georgian_cities"),
+        ("monitored_hostgroups_id_seq", "monitored_hostgroups"),
+        ("mtr_results_id_seq", "mtr_results"),
+        ("performance_baselines_id_seq", "performance_baselines"),
+        ("ping_results_id_seq", "ping_results"),
+        ("setup_wizard_state_id_seq", "setup_wizard_state"),
+        ("system_config_id_seq", "system_config"),
+        ("traceroute_results_id_seq", "traceroute_results"),
+        ("organizations_id_seq", "organizations"),
+    ]
+
+    for seq_name, table in sequence_resets:
+        postgres_session.execute(
+            text(
+                "SELECT setval(:seq, COALESCE((SELECT MAX(id) FROM "
+                + table
+                + "), 0) + 1, false)"
+            ),
+            {"seq": seq_name},
+        )
+    postgres_session.commit()
 
     sqlite_session.close()
     postgres_session.close()

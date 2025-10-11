@@ -78,6 +78,13 @@ app.conf.beat_schedule = {
         'schedule': crontab(minute=0),  # Every hour at :00
     },
 
+    # Cleanup ping telemetry daily
+    'cleanup-ping-results': {
+        'task': 'maintenance.cleanup_old_ping_results',
+        'schedule': crontab(hour=3, minute=0),
+        'kwargs': {'days': 90},
+    },
+
     # Cleanup old discovery results daily
     'cleanup-discovery-results': {
         'task': 'monitoring.tasks.cleanup_old_discovery_results',

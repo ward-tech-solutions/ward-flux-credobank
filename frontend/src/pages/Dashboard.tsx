@@ -23,8 +23,9 @@ import {
   Fingerprint,
   Shield,
   Package,
+  type LucideIcon,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 // Device type icons mapping
 const deviceIcons: Record<string, any> = {
@@ -39,7 +40,10 @@ const deviceIcons: Record<string, any> = {
   'Disaster Recovery': Shield,
 }
 
+type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info'
+
 export default function DashboardEnhanced() {
+  const navigate = useNavigate()
   const [selectedSeverity, setSelectedSeverity] = useState('')
 
   const { data: statsResponse, isLoading: statsLoading } = useQuery({
@@ -91,48 +95,42 @@ export default function DashboardEnhanced() {
     }
   })
 
-  const statsCards = [
+  const statsCards: Array<{ title: string; value: number | string; icon: LucideIcon; badgeVariant: BadgeVariant }> = [
     {
       title: 'Total Devices',
       value: stats?.total_devices || 0,
       icon: Server,
-      color: 'text-ward-green',
-      bgColor: 'bg-ward-green/10',
+      badgeVariant: 'info' as const,
     },
     {
       title: 'Online',
       value: stats?.online_devices || 0,
       icon: CheckCircle,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      badgeVariant: 'success' as const,
     },
     {
       title: 'Offline',
       value: stats?.offline_devices || 0,
       icon: XCircle,
-      color: 'text-red-600',
-      bgColor: 'bg-red-100',
+      badgeVariant: 'danger' as const,
     },
     {
       title: 'System Uptime',
       value: `${stats?.uptime_percentage || 0}%`,
       icon: TrendingUp,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      badgeVariant: 'info' as const,
     },
     {
       title: 'Active Alerts',
       value: stats?.active_alerts || 0,
       icon: AlertTriangle,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
+      badgeVariant: 'warning' as const,
     },
     {
       title: 'Critical Issues',
       value: stats?.critical_alerts || 0,
       icon: AlertTriangle,
-      color: 'text-red-600',
-      bgColor: 'bg-red-100',
+      badgeVariant: 'danger' as const,
     },
   ]
 
@@ -189,17 +187,15 @@ export default function DashboardEnhanced() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {statsCards.map((stat, index) => (
-          <Card key={index} hover className="relative overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.title}</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-2">{stat.value}</p>
-                </div>
-                <div className={`p-3 rounded-xl ${stat.bgColor} dark:bg-opacity-20`}>
-                  <stat.icon className={`h-8 w-8 ${stat.color}`} />
-                </div>
+          <Card key={index} variant="glass" hover>
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.title}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-2">{stat.value}</p>
               </div>
+              <Badge variant={stat.badgeVariant} className="px-3 py-2 rounded-lg">
+                <stat.icon className="h-5 w-5" />
+              </Badge>
             </CardContent>
           </Card>
         ))}
@@ -221,6 +217,7 @@ export default function DashboardEnhanced() {
                   return (
                     <div
                       key={region}
+                      onClick={() => navigate(`/devices?region=${encodeURIComponent(region)}`)}
                       className="p-4 bg-gradient-to-br from-ward-green/5 to-ward-green/10 dark:from-ward-green/10 dark:to-ward-green/20 rounded-lg border border-ward-green/20 dark:border-ward-green/30 hover:shadow-md transition-shadow cursor-pointer"
                     >
                       <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">{region}</h4>
@@ -263,6 +260,7 @@ export default function DashboardEnhanced() {
               return (
                 <div
                   key={type}
+                  onClick={() => navigate(`/devices?device_type=${encodeURIComponent(type)}`)}
                   className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
                 >
                   <div className="flex items-center gap-2 mb-3">
@@ -302,11 +300,14 @@ export default function DashboardEnhanced() {
             <CardTitle>Active Alerts</CardTitle>
             <div className="flex items-center gap-3">
               <Select
+                label="Severity"
                 value={selectedSeverity}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedSeverity(e.target.value)}
                 options={severityOptions}
               />
-              <Badge variant="default">{alerts.length}</Badge>
+              <Badge variant="default" className="h-8 px-3 flex items-center justify-center">
+                {alerts.length}
+              </Badge>
             </div>
           </div>
         </CardHeader>

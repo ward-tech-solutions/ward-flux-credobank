@@ -6,8 +6,9 @@ import logging
 import asyncio
 import uuid
 import json
+import contextlib
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Dict
 
 from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
 
@@ -17,33 +18,51 @@ from models import NetworkTopology
 
 # Create router
 router = APIRouter(tags=["websockets"])
+logger = logging.getLogger(__name__)
+
+HEARTBEAT_INTERVAL_SECONDS = 15
+HEARTBEAT_TIMEOUT_SECONDS = 45
+UPDATES_ENDPOINT_LABEL = "updates"
+MAX_MESSAGE_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
 
 
 class ConnectionManager:
     """Manage WebSocket connections for real-time notifications"""
 
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: Dict[WebSocket, str] = {}
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, endpoint: str):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        self.active_connections[websocket] = endpoint
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        endpoint = self.active_connections.pop(websocket, None)
+        if endpoint:
+            pass
 
-    async def broadcast(self, message: dict):
-        """Send message to all connected clients"""
-        for connection in self.active_connections:
+    async def broadcast(self, message: dict, endpoint: str):
+        payload = json.dumps(message)
+        payload_size = len(payload.encode("utf-8"))
+        if payload_size > MAX_MESSAGE_SIZE_BYTES:
+            logging.getLogger(__name__).warning(
+                "Skipping broadcast; payload size %s exceeds limit for endpoint %s",
+                payload_size,
+                endpoint,
+            )
+            return
+        for connection, label in list(self.active_connections.items()):
+            if label != endpoint:
+                continue
             try:
-                await connection.send_json(message)
-            except Exception as e:
-                # Remove dead connections
-                logging.getLogger(__name__).warning(f"Failed to send message to client: {e}")
-                try:
-                    self.disconnect(connection)
-                except Exception as disconnect_error:
-                    logging.getLogger(__name__).error(f"Error disconnecting client: {disconnect_error}")
+                await connection.send_text(payload)
+            except Exception as exc:
+                logging.getLogger(__name__).warning(f"Failed to send message to client: {exc}")
+                self.disconnect(connection)
+
+    def _update_gauge(self, endpoint: str):
+        # Left for future extension if metrics are reintroduced
+        return
 
 
 manager = ConnectionManager()
@@ -52,76 +71,96 @@ manager = ConnectionManager()
 @router.websocket("/ws/updates")
 async def websocket_updates(websocket: WebSocket):
     """WebSocket endpoint for real-time device status updates"""
-    await websocket.accept()
-    websocket.app.state.websocket_connections.append(websocket)
+    await manager.connect(websocket, UPDATES_ENDPOINT_LABEL)
+
+    async def heartbeat_sender():
+        while True:
+            try:
+                await websocket.send_json(
+                    {
+                        "type": "heartbeat",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+                ws_messages_total.labels(endpoint=UPDATES_ENDPOINT_LABEL, type="heartbeat").inc()
+                await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
+            except Exception:
+                break
+
+    heartbeat_task = asyncio.create_task(heartbeat_sender())
 
     try:
         while True:
-            # Keep connection alive
-            await asyncio.sleep(1)
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=HEARTBEAT_TIMEOUT_SECONDS)
+                if not data:
+                    continue
+                try:
+                    payload = json.loads(data)
+                    if payload.get("type") == "pong":
+                        continue
+                except json.JSONDecodeError:
+                    continue
+            except asyncio.TimeoutError:
+                await websocket.close()
+                break
     except WebSocketDisconnect:
-        websocket.app.state.websocket_connections.remove(websocket)
+        pass
+    finally:
+        heartbeat_task.cancel()
+        with contextlib.suppress(Exception):
+            await heartbeat_task
+        manager.disconnect(websocket)
 
 
-async def monitor_device_changes(app: FastAPI):
+async def monitor_device_changes(_app: FastAPI):
     """Background task to monitor device changes and broadcast via WebSocket"""
     last_state = {}
 
     while True:
         try:
             session = SessionLocal()
-            devices = session.query(StandaloneDevice).all()
+            try:
+                devices = session.query(StandaloneDevice).all()
 
-            ping_lookup: Dict[str, PingResult] = {}
-            for ping in (
-                session.query(PingResult)
-                .order_by(PingResult.device_ip, PingResult.timestamp.desc())
-                .all()
-            ):
-                if ping.device_ip not in ping_lookup:
-                    ping_lookup[ping.device_ip] = ping
+                ping_lookup: Dict[str, PingResult] = {}
+                for ping in (
+                    session.query(PingResult)
+                    .order_by(PingResult.device_ip, PingResult.timestamp.desc())
+                    .all()
+                ):
+                    if ping.device_ip not in ping_lookup:
+                        ping_lookup[ping.device_ip] = ping
 
-            changes = []
+                changes = []
 
-            for device in devices:
-                device_id = str(device.id)
-                ping = ping_lookup.get(device.ip)
-                if ping:
-                    current_status = "Up" if ping.is_reachable else "Down"
-                else:
-                    current_status = (device.custom_fields or {}).get("ping_status", "Unknown")
+                for device in devices:
+                    device_id = str(device.id)
+                    ping = ping_lookup.get(device.ip)
+                    if ping:
+                        current_status = "Up" if ping.is_reachable else "Down"
+                    else:
+                        current_status = (device.custom_fields or {}).get("ping_status", "Unknown")
 
-                if device_id in last_state:
-                    if last_state[device_id] != current_status:
-                        changes.append(
-                            {
-                                "hostid": device_id,
-                                "hostname": device.name,
-                                "old_status": last_state[device_id],
-                                "new_status": current_status,
-                                "timestamp": datetime.now().isoformat(),
-                            }
-                        )
+                    if device_id in last_state:
+                        if last_state[device_id] != current_status:
+                            changes.append(
+                                {
+                                    "hostid": device_id,
+                                    "hostname": device.name,
+                                    "old_status": last_state[device_id],
+                                    "new_status": current_status,
+                                    "timestamp": datetime.now().isoformat(),
+                                }
+                            )
 
-                last_state[device_id] = current_status
-
-            session.close()
+                    last_state[device_id] = current_status
+            finally:
+                session.close()
 
             # Broadcast changes to all connected clients
-            if changes and app.state.websocket_connections:
-                message = json.dumps({"type": "status_change", "changes": changes})
-
-                disconnected = []
-                for websocket in app.state.websocket_connections:
-                    try:
-                        await websocket.send_text(message)
-                    except Exception as e:
-                        logging.getLogger(__name__).error(f"Error: {e}")
-                        disconnected.append(websocket)
-
-                # Remove disconnected clients
-                for ws in disconnected:
-                    app.state.websocket_connections.remove(ws)
+            if changes:
+                await manager.broadcast({"type": "status_change", "changes": changes}, endpoint=UPDATES_ENDPOINT_LABEL)
 
             await asyncio.sleep(30)
         except asyncio.CancelledError:

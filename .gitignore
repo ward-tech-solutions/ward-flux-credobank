@@ -194,3 +194,6 @@ frontend/dist/
 frontend/node_modules/
 frontend/.vite/
 static_new/
+
+*storybook.log
+storybook-static

@@ -31,6 +31,7 @@ class AlertRuleCreate(BaseModel):
     severity: str  # critical, high, medium, low, info
     enabled: bool = True
     device_id: Optional[str] = None  # Null for global rules
+    branch_id: Optional[str] = None  # Branch-level alert - applies to all devices in branch
 
 class AlertRuleUpdate(BaseModel):
     name: Optional[str] = None
@@ -38,6 +39,8 @@ class AlertRuleUpdate(BaseModel):
     expression: Optional[str] = None
     severity: Optional[str] = None
     enabled: Optional[bool] = None
+    device_id: Optional[str] = None
+    branch_id: Optional[str] = None
 
 
 @router.get("")
@@ -64,7 +67,7 @@ async def get_alerts(
 
     # Filter by severity
     if severity:
-        query = query.filter(AlertHistory.severity == severity.lower())
+        query = query.filter(AlertHistory.severity == severity.upper())
 
     # Order by most recent first
     query = query.order_by(desc(AlertHistory.triggered_at))
@@ -112,7 +115,7 @@ async def get_alerts(
     elif status == "active":
         count_query = count_query.filter(AlertHistory.resolved_at.is_(None))
     if severity:
-        count_query = count_query.filter(AlertHistory.severity == severity.lower())
+        count_query = count_query.filter(AlertHistory.severity == severity.upper())
 
     total = count_query.count()
 
@@ -134,9 +137,9 @@ async def get_alert_stats(
     # Get counts by severity for active alerts
     active_alerts = db.query(AlertHistory).filter(AlertHistory.resolved_at.is_(None)).all()
 
-    critical_count = sum(1 for a in active_alerts if a.severity == "critical")
-    warning_count = sum(1 for a in active_alerts if a.severity == "warning")
-    info_count = sum(1 for a in active_alerts if a.severity == "info")
+    critical_count = sum(1 for a in active_alerts if a.severity.upper() == "CRITICAL")
+    warning_count = sum(1 for a in active_alerts if a.severity.upper() in {"WARNING", "MEDIUM", "HIGH"})
+    info_count = sum(1 for a in active_alerts if a.severity.upper() == "INFO")
 
     # Get recent resolved count (last 24h)
     yesterday = datetime.utcnow() - timedelta(hours=24)
@@ -222,6 +225,7 @@ async def get_alert_rules(
                 "severity": rule.severity,
                 "enabled": rule.enabled,
                 "device_id": str(rule.device_id) if rule.device_id else None,
+                "branch_id": rule.branch_id if rule.branch_id else None,
                 "created_at": rule.created_at.isoformat() if rule.created_at else None,
                 "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
             }
@@ -247,6 +251,7 @@ async def create_alert_rule(
         severity=rule_data.severity,
         enabled=rule_data.enabled,
         device_id=uuid.UUID(rule_data.device_id) if rule_data.device_id else None,
+        branch_id=rule_data.branch_id if rule_data.branch_id else None,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -290,6 +295,7 @@ async def get_alert_rule(
         "severity": rule.severity,
         "enabled": rule.enabled,
         "device_id": str(rule.device_id) if rule.device_id else None,
+        "branch_id": rule.branch_id if rule.branch_id else None,
         "created_at": rule.created_at.isoformat() if rule.created_at else None,
         "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
     }
@@ -319,6 +325,10 @@ async def update_alert_rule(
         rule.severity = rule_data.severity
     if rule_data.enabled is not None:
         rule.enabled = rule_data.enabled
+    if rule_data.device_id is not None:
+        rule.device_id = uuid.UUID(rule_data.device_id) if rule_data.device_id else None
+    if rule_data.branch_id is not None:
+        rule.branch_id = rule_data.branch_id
 
     rule.updated_at = datetime.utcnow()
 

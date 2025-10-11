@@ -70,6 +70,19 @@ class StandaloneDevice(Base):
     tags = Column(JSON)  # ["production", "core", "datacenter-1"]
     custom_fields = Column(JSON)  # Flexible key-value storage
 
+    # Branch relationship and normalized naming
+    branch_id = Column(String(36))  # Foreign key to branches table
+    normalized_name = Column(String(200))  # Clean device name without PING-, IPs, etc.
+    device_subtype = Column(String(100))  # More specific categorization
+    floor_info = Column(String(50))  # Floor information if applicable
+    unit_number = Column(Integer)  # Unit/instance number
+    original_name = Column(String(200))  # Preserve original name
+
+    # SSH Configuration
+    ssh_port = Column(Integer, default=22)  # SSH port number
+    ssh_username = Column(String(100))  # SSH username
+    ssh_enabled = Column(Boolean, default=True)  # Whether SSH is available on this device
+
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -156,6 +169,7 @@ class AlertRule(Base):
 
     id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     device_id = Column(SQLAlchemyUUID(as_uuid=True), index=True)  # Nullable for global rules
+    branch_id = Column(String(36), index=True)  # Branch-level alerts - affects all devices in branch
 
     # Rule definition
     name = Column(String(200), nullable=False)
@@ -185,11 +199,13 @@ class AlertHistory(Base):
     id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     rule_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("alert_rules.id"), nullable=False)
     device_id = Column(SQLAlchemyUUID(as_uuid=True), index=True)
+    rule_name = Column(String(200))
 
     # Alert details
     severity = Column(SQLAlchemyEnum(AlertSeverity), nullable=False)
     message = Column(Text, nullable=False)
     value = Column(String(100))  # Value that triggered the alert
+    threshold = Column(String(500))
 
     # Alert lifecycle
     triggered_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -199,7 +215,7 @@ class AlertHistory(Base):
     resolved_at = Column(DateTime)
 
     # Notification tracking
-    notifications_sent = Column(JSON)  # [{"channel": "email", "sent_at": "..."}]
+    notifications_sent = Column(JSON, default=list)  # [{"channel": "email", "sent_at": "..."}]
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 

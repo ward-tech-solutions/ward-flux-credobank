@@ -52,6 +52,11 @@ class StandaloneDeviceUpdate(BaseModel):
     enabled: Optional[bool] = None
     tags: Optional[List[str]] = None
     custom_fields: Optional[dict] = None
+    branch_id: Optional[str] = None
+    normalized_name: Optional[str] = None
+    ssh_port: Optional[int] = Field(None, ge=1, le=65535)
+    ssh_username: Optional[str] = Field(None, max_length=100)
+    ssh_enabled: Optional[bool] = None
 
 
 class StandaloneDeviceResponse(BaseModel):
@@ -73,6 +78,7 @@ class StandaloneDeviceResponse(BaseModel):
     updated_at: datetime
     region: Optional[str] = None
     branch: Optional[str] = None
+    branch_id: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     available: Optional[str] = None
@@ -80,13 +86,30 @@ class StandaloneDeviceResponse(BaseModel):
     ping_response_time: Optional[float] = None
     last_ping_timestamp: Optional[str] = None
     problems: int = 0
+    ssh_port: Optional[int] = 22
+    ssh_username: Optional[str] = None
+    ssh_enabled: Optional[bool] = True
 
     @classmethod
-    def from_model(cls, obj: StandaloneDevice, ping_result: Optional[PingResult] = None):
+    def from_model(cls, obj: StandaloneDevice, ping_result: Optional[PingResult] = None, db: Session = None):
         """Convert ORM object to Pydantic model, converting UUID to string"""
+        from models import Branch
+
+        # Get branch info from branches table
+        branch_name = ""
+        region = ""
+        if obj.branch_id and db:
+            branch_obj = db.query(Branch).filter(Branch.id == obj.branch_id).first()
+            if branch_obj:
+                branch_name = branch_obj.display_name
+                region = branch_obj.region or ""
+
+        # Fallback to custom_fields
         fields = obj.custom_fields or {}
-        branch = fields.get("branch")
-        region = fields.get("region")
+        if not branch_name:
+            branch_name = fields.get("branch", "")
+        if not region:
+            region = fields.get("region", "")
         latitude = fields.get("latitude")
         longitude = fields.get("longitude")
         problems = fields.get("problems") or 0
@@ -104,7 +127,9 @@ class StandaloneDeviceResponse(BaseModel):
 
         data = {
             'id': str(obj.id),
-            'name': obj.name,
+            'name': obj.normalized_name or obj.name,
+            'display_name': obj.normalized_name or obj.name,
+            'original_name': obj.original_name or obj.name,
             'ip': obj.ip,
             'hostname': obj.hostname,
             'vendor': obj.vendor,
@@ -120,7 +145,8 @@ class StandaloneDeviceResponse(BaseModel):
             'created_at': obj.created_at,
             'updated_at': obj.updated_at,
             'region': region,
-            'branch': branch,
+            'branch': branch_name,
+            'branch_id': obj.branch_id,
             'latitude': latitude,
             'longitude': longitude,
             'available': available or ("Available" if obj.enabled else "Unavailable"),
@@ -128,6 +154,9 @@ class StandaloneDeviceResponse(BaseModel):
             'ping_response_time': ping_response_time,
             'last_ping_timestamp': last_ping_timestamp,
             'problems': problems,
+            'ssh_port': obj.ssh_port or 22,
+            'ssh_username': obj.ssh_username,
+            'ssh_enabled': obj.ssh_enabled if obj.ssh_enabled is not None else True,
         }
         return cls(**data)
 
@@ -204,7 +233,7 @@ def list_devices(
     ping_lookup = _latest_ping_lookup(db, [d.ip for d in paginated_devices if d.ip])
 
     logger.info(f"Retrieved {len(paginated_devices)} standalone devices")
-    return [StandaloneDeviceResponse.from_model(d, ping_lookup.get(d.ip)) for d in paginated_devices]
+    return [StandaloneDeviceResponse.from_model(d, ping_lookup.get(d.ip), db) for d in paginated_devices]
 
 
 @router.post("", response_model=StandaloneDeviceResponse, status_code=status.HTTP_201_CREATED)
@@ -245,7 +274,7 @@ def create_device(
 
     logger.info(f"Created standalone device: {new_device.name} ({new_device.ip})")
     ping_lookup = _latest_ping_lookup(db, [new_device.ip])
-    return StandaloneDeviceResponse.from_model(new_device, ping_lookup.get(new_device.ip))
+    return StandaloneDeviceResponse.from_model(new_device, ping_lookup.get(new_device.ip), db)
 
 
 @router.get("/{device_id}", response_model=StandaloneDeviceResponse)
@@ -260,7 +289,7 @@ def get_device(
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
     ping_lookup = _latest_ping_lookup(db, [device.ip])
-    return StandaloneDeviceResponse.from_model(device, ping_lookup.get(device.ip))
+    return StandaloneDeviceResponse.from_model(device, ping_lookup.get(device.ip), db)
 
 
 @router.put("/{device_id}", response_model=StandaloneDeviceResponse)
@@ -296,7 +325,7 @@ def update_device(
 
     logger.info(f"Updated standalone device: {device.name} ({device.ip})")
     ping_lookup = _latest_ping_lookup(db, [device.ip])
-    return StandaloneDeviceResponse.from_model(device, ping_lookup.get(device.ip))
+    return StandaloneDeviceResponse.from_model(device, ping_lookup.get(device.ip), db)
 
 
 @router.delete("/{device_id}")
@@ -378,7 +407,7 @@ def bulk_create_devices(
 
     ping_lookup = _latest_ping_lookup(db, [d.ip for d in created_devices if d.ip])
 
-    return [StandaloneDeviceResponse.from_model(d, ping_lookup.get(d.ip)) for d in created_devices]
+    return [StandaloneDeviceResponse.from_model(d, ping_lookup.get(d.ip), db) for d in created_devices]
 
 
 @router.post("/bulk/enable")

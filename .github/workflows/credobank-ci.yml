@@ -1,0 +1,139 @@
+name: CredoBank CI
+
+on:
+  push:
+    branches:
+      - client/credo-bank
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    env:
+      DATABASE_URL: postgresql://ward_admin:ward_admin_password@127.0.0.1:5432/ward_ops
+      REDIS_URL: redis://:redispass@127.0.0.1:6379/0
+      DEFAULT_ADMIN_PASSWORD: admin123
+      NODE_ENV: production
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ward_admin
+          POSTGRES_PASSWORD: ward_admin_password
+          POSTGRES_DB: ward_ops
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ward_admin"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install Python dependencies
+        run: |
+          python -m venv venv
+          ./venv/bin/pip install --upgrade pip
+          ./venv/bin/pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Migrate seed data into PostgreSQL
+        run: |
+          ./venv/bin/python migrate_to_postgres.py
+
+      - name: Apply SQL migrations
+        run: |
+          ./venv/bin/python scripts/run_sql_migrations.py
+
+      - name: Backend tests
+        run: |
+          ./venv/bin/python -m pytest
+
+      - name: Frontend build & typecheck
+        run: |
+          cd frontend
+          npm run build
+          npm run typecheck
+
+      - name: Celery smoke test
+        env:
+          ALLOW_SMOKE_ON_REAL_DB: "1"
+        run: |
+          ./venv/bin/python scripts/celery_smoke_test.py
+
+      - name: Build application image
+        run: |
+          docker build -t registry.example.com/wardops/app:${{ github.sha }} .
+
+      - name: Generate PostgreSQL backup
+        run: |
+          pg_dump --format=custom --file=seed.backup "$DATABASE_URL"
+
+      - name: Build seeded PostgreSQL image
+        run: |
+          cat <<'EOF' > Dockerfile.seeddb
+          FROM postgres:15-alpine
+          COPY seed.backup /docker-entrypoint-initdb.d/seed.backup
+          EOF
+          docker build -f Dockerfile.seeddb \
+            -t registry.example.com/wardops/postgres-seeded:${{ github.sha }} .
+
+      - name: Push images
+        if: secrets.REGISTRY_USERNAME && secrets.REGISTRY_PASSWORD
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          echo "$REGISTRY_PASSWORD" | docker login registry.example.com --username "$REGISTRY_USERNAME" --password-stdin
+          docker push registry.example.com/wardops/app:${{ github.sha }}
+          docker push registry.example.com/wardops/postgres-seeded:${{ github.sha }}
+          docker tag registry.example.com/wardops/app:${{ github.sha }} registry.example.com/wardops/app:credobank-latest
+          docker tag registry.example.com/wardops/postgres-seeded:${{ github.sha }} registry.example.com/wardops/postgres-seeded:credobank-latest
+          docker push registry.example.com/wardops/app:credobank-latest
+          docker push registry.example.com/wardops/postgres-seeded:credobank-latest
+
+      - name: Upload deployment bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: credobank-deployment
+          path: |
+            deploy/docker-compose.yml
+            deploy/.env.prod.example
+            deploy/DEPLOYMENT.md
+
+      - name: Cleanup temporary build files
+        if: always()
+        run: |
+          rm -f seed.backup Dockerfile.seeddb || true

@@ -217,6 +217,8 @@ def _get_standalone_devices(
 
 
 def _standalone_device_to_payload(db: Session, device: StandaloneDevice) -> Dict:
+    from models import Branch
+
     fields = device.custom_fields or {}
     ping = (
         db.query(PingResult)
@@ -230,6 +232,15 @@ def _standalone_device_to_payload(db: Session, device: StandaloneDevice) -> Dict
         .filter(AlertHistory.device_id == device.id, AlertHistory.resolved_at.is_(None))
         .count()
     )
+
+    # Get branch information from branches table
+    branch_name = ""
+    region_name = ""
+    if device.branch_id:
+        branch = db.query(Branch).filter(Branch.id == device.branch_id).first()
+        if branch:
+            branch_name = branch.display_name
+            region_name = branch.region or ""
 
     ping_status = "Unknown"
     ping_response_time = None
@@ -254,10 +265,11 @@ def _standalone_device_to_payload(db: Session, device: StandaloneDevice) -> Dict
     return {
         "hostid": str(device.id),
         "hostname": device.hostname or device.name,
-        "display_name": device.name,
-        "name": device.name,
-        "branch": fields.get("branch", ""),
-        "region": fields.get("region", ""),
+        "display_name": device.normalized_name or device.name,
+        "name": device.normalized_name or device.name,
+        "original_name": device.original_name or device.name,
+        "branch": branch_name or fields.get("branch", ""),
+        "region": region_name or fields.get("region", ""),
         "ip": device.ip,
         "device_type": device.device_type or fields.get("device_type", ""),
         "status": "Enabled" if device.enabled else "Disabled",

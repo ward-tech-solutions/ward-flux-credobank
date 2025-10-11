@@ -8,6 +8,7 @@ import logging
 import asyncio
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
+from sqlalchemy import text
 from celery import shared_task
 
 from database import SessionLocal
@@ -608,7 +609,7 @@ def evaluate_alert_rules(self):
                         db.query(AlertHistory)
                         .filter(
                             AlertHistory.device_id == device.id,
-                            AlertHistory.rule_name == rule.name,
+                            AlertHistory.rule_id == rule.id,
                             AlertHistory.resolved_at.is_(None)
                         )
                         .first()
@@ -618,6 +619,7 @@ def evaluate_alert_rules(self):
                         # CREATE NEW ALERT
                         new_alert = AlertHistory(
                             id=uuid.uuid4(),
+                            rule_id=rule.id,
                             device_id=device.id,
                             rule_name=rule.name,
                             severity=rule.severity,
@@ -626,7 +628,7 @@ def evaluate_alert_rules(self):
                             threshold=rule.expression,
                             triggered_at=datetime.utcnow(),
                             acknowledged=False,
-                            notifications_sent=False,
+                            notifications_sent=[],
                         )
                         db.add(new_alert)
                         triggered_count += 1
@@ -655,11 +657,34 @@ def evaluate_alert_rules(self):
             logger.warning(f"🚨 Alert evaluation complete: {triggered_count} NEW ALERTS, {resolved_count} resolved")
         else:
             logger.info(f"✅ Alert evaluation complete: All systems healthy, {resolved_count} alerts auto-resolved")
-        
+
         return result
+
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Error evaluating alert rules: {exc}", exc_info=True)
+        raise
+    finally:
+        db.close()
+
+
+@shared_task(name="maintenance.cleanup_old_ping_results")
+def cleanup_old_ping_results(days: int = 90):
+    """Delete ping_results entries older than the provided number of days."""
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    try:
+        db = SessionLocal()
+        deleted = db.execute(
+            text("DELETE FROM ping_results WHERE timestamp < :cutoff"),
+            {"cutoff": cutoff},
+        )
+        db.commit()
+        count = deleted.rowcount if deleted.rowcount is not None else 0
+        logger.info(f"🧹 Removed {count} ping_results rows older than {days} days")
+        return {"deleted": count, "cutoff": cutoff.isoformat()}
         
-    except Exception as e:
-        logger.error(f"❌ CRITICAL: Alert evaluation failed: {e}", exc_info=True)
+    except Exception as exc:
+        logger.error(f"Error cleaning old ping results: {exc}", exc_info=True)
         db.rollback()
         raise
     finally:
