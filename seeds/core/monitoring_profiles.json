@@ -1,14 +1,8 @@
 [
   {
-    "name": "Primary Monitoring",
-    "mode": "HYBRID",
-    "description": "Baseline hybrid monitoring profile combining Zabbix and standalone polling.",
+    "name": "CredoBank Standalone",
+    "mode": "standalone",
+    "description": "Standalone monitoring for CredoBank network using internal SNMP polling.",
     "is_active": true
-  },
-  {
-    "name": "Standalone Fallback",
-    "mode": "STANDALONE",
-    "description": "Fallback profile for sites that rely on the internal polling engine.",
-    "is_active": false
   }
 ]
