@@ -65,16 +65,34 @@ def main() -> None:
         for migration in migration_files:
             name = migration.name
 
-            # mark baseline migrations as applied without executing them
+            # Check if baseline schema needs to be applied
+            # (skip marking without execution only if tables already exist)
             if name in BASELINE_SKIP:
-                conn.execute(
+                # Check if core tables exist (indicates schema was migrated from SQLite)
+                tables_exist = conn.execute(
                     text(
-                        "INSERT INTO schema_migrations (name) VALUES (:name) "
-                        "ON CONFLICT (name) DO NOTHING"
-                    ),
-                    {"name": name},
-                )
-                continue
+                        "SELECT EXISTS ("
+                        "SELECT FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_name = 'users'"
+                        ")"
+                    )
+                ).scalar()
+
+                if tables_exist:
+                    # Tables exist, just mark as applied
+                    conn.execute(
+                        text(
+                            "INSERT INTO schema_migrations (name) VALUES (:name) "
+                            "ON CONFLICT (name) DO NOTHING"
+                        ),
+                        {"name": name},
+                    )
+                    print(f"[migrate] {name} tables already exist, marking as applied.")
+                    continue
+                else:
+                    # Tables don't exist, need to run the migration
+                    print(f"[migrate] {name} tables missing, applying baseline schema...")
+                    # Fall through to normal execution
 
             applied = conn.execute(
                 text("SELECT 1 FROM schema_migrations WHERE name = :name"),
