@@ -1,0 +1,822 @@
+[
+  {
+    "id": 1,
+    "name_en": "Batumi",
+    "name_ka": "\u10d1\u10d0\u10d7\u10e3\u10db\u10d8",
+    "region_id": 2,
+    "latitude": 41.6168,
+    "longitude": 41.6367,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 2,
+    "name_en": "Kobuleti",
+    "name_ka": "\u10e5\u10dd\u10d1\u10e3\u10da\u10d4\u10d7\u10d8",
+    "region_id": 2,
+    "latitude": 41.8167,
+    "longitude": 41.7833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 3,
+    "name_en": "Khelvachauri",
+    "name_ka": "\u10ee\u10d4\u10da\u10d5\u10d0\u10e9\u10d0\u10e3\u10e0\u10d8",
+    "region_id": 2,
+    "latitude": 41.5833,
+    "longitude": 41.65,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 4,
+    "name_en": "Khulo",
+    "name_ka": "\u10ee\u10e3\u10da\u10dd",
+    "region_id": 2,
+    "latitude": 41.65,
+    "longitude": 42.3,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 5,
+    "name_en": "Keda",
+    "name_ka": "\u10e5\u10d4\u10d3\u10d0",
+    "region_id": 2,
+    "latitude": 41.5667,
+    "longitude": 42.1,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 6,
+    "name_en": "Ozurgeti",
+    "name_ka": "\u10dd\u10d6\u10e3\u10e0\u10d2\u10d4\u10d7\u10d8",
+    "region_id": 3,
+    "latitude": 41.9233,
+    "longitude": 42.0047,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 7,
+    "name_en": "Lanchkhuti",
+    "name_ka": "\u10da\u10d0\u10dc\u10e9\u10ee\u10e3\u10d7\u10d8",
+    "region_id": 3,
+    "latitude": 42.0833,
+    "longitude": 42.0833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 8,
+    "name_en": "Chokhatauri",
+    "name_ka": "\u10e9\u10dd\u10ee\u10d0\u10e2\u10d0\u10e3\u10e0\u10d8",
+    "region_id": 3,
+    "latitude": 41.9667,
+    "longitude": 42.1167,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 9,
+    "name_en": "Kutaisi",
+    "name_ka": "\u10e5\u10e3\u10d7\u10d0\u10d8\u10e1\u10d8",
+    "region_id": 4,
+    "latitude": 42.25,
+    "longitude": 42.7,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 10,
+    "name_en": "Baghdati",
+    "name_ka": "\u10d1\u10d0\u10e6\u10d3\u10d0\u10d7\u10d8",
+    "region_id": 4,
+    "latitude": 42.0833,
+    "longitude": 42.8167,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 11,
+    "name_en": "Vani",
+    "name_ka": "\u10d5\u10d0\u10dc\u10d8",
+    "region_id": 4,
+    "latitude": 42.0833,
+    "longitude": 42.5167,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 12,
+    "name_en": "Zestaponi",
+    "name_ka": "\u10d6\u10d4\u10e1\u10e2\u10d0\u10e4\u10dd\u10dc\u10d8",
+    "region_id": 4,
+    "latitude": 42.1167,
+    "longitude": 43.05,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 13,
+    "name_en": "Terjola",
+    "name_ka": "\u10d7\u10d4\u10e0\u10ef\u10dd\u10da\u10d0",
+    "region_id": 4,
+    "latitude": 42.1667,
+    "longitude": 42.9833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 14,
+    "name_en": "Samtredia",
+    "name_ka": "\u10e1\u10d0\u10db\u10e2\u10e0\u10d4\u10d3\u10d8\u10d0",
+    "region_id": 4,
+    "latitude": 42.15,
+    "longitude": 42.3333,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 15,
+    "name_en": "Sachkhere",
+    "name_ka": "\u10e1\u10d0\u10e9\u10ee\u10d4\u10e0\u10d4",
+    "region_id": 4,
+    "latitude": 42.3333,
+    "longitude": 43.4,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 16,
+    "name_en": "Tkibuli",
+    "name_ka": "\u10e2\u10e7\u10d8\u10d1\u10e3\u10da\u10d8",
+    "region_id": 4,
+    "latitude": 42.3333,
+    "longitude": 42.9833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 17,
+    "name_en": "Chiatura",
+    "name_ka": "\u10ed\u10d8\u10d0\u10d7\u10e3\u10e0\u10d0",
+    "region_id": 4,
+    "latitude": 42.2833,
+    "longitude": 43.3,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 18,
+    "name_en": "Tskaltubo",
+    "name_ka": "\u10ec\u10e7\u10d0\u10da\u10e2\u10e3\u10d1\u10dd",
+    "region_id": 4,
+    "latitude": 42.3333,
+    "longitude": 42.6,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 19,
+    "name_en": "Khoni",
+    "name_ka": "\u10ee\u10dd\u10dc\u10d8",
+    "region_id": 4,
+    "latitude": 42.3167,
+    "longitude": 42.4333,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 20,
+    "name_en": "Kharagauli",
+    "name_ka": "\u10ee\u10d0\u10e0\u10d0\u10d2\u10d0\u10e3\u10da\u10d8",
+    "region_id": 4,
+    "latitude": 42.0167,
+    "longitude": 43.1833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 21,
+    "name_en": "Telavi",
+    "name_ka": "\u10d7\u10d4\u10da\u10d0\u10d5\u10d8",
+    "region_id": 5,
+    "latitude": 41.9167,
+    "longitude": 45.4833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 22,
+    "name_en": "Gurjaani",
+    "name_ka": "\u10d2\u10e3\u10e0\u10ef\u10d0\u10d0\u10dc\u10d8",
+    "region_id": 5,
+    "latitude": 41.7333,
+    "longitude": 45.8,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 23,
+    "name_en": "Sagarejo",
+    "name_ka": "\u10e1\u10d0\u10d2\u10d0\u10e0\u10d4\u10ef\u10dd",
+    "region_id": 5,
+    "latitude": 41.7333,
+    "longitude": 45.3333,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 24,
+    "name_en": "Dedoplistskaro",
+    "name_ka": "\u10d3\u10d4\u10d3\u10dd\u10e4\u10da\u10d8\u10e1\u10ec\u10e7\u10d0\u10e0\u10dd",
+    "region_id": 5,
+    "latitude": 41.45,
+    "longitude": 46.1167,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 25,
+    "name_en": "Signagi",
+    "name_ka": "\u10e1\u10d8\u10e6\u10dc\u10d0\u10e6\u10d8",
+    "region_id": 5,
+    "latitude": 41.6333,
+    "longitude": 45.9167,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 26,
+    "name_en": "Lagodekhi",
+    "name_ka": "\u10da\u10d0\u10d2\u10dd\u10d3\u10d4\u10ee\u10d8",
+    "region_id": 5,
+    "latitude": 41.8333,
+    "longitude": 46.2833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 27,
+    "name_en": "Kvareli",
+    "name_ka": "\u10e7\u10d5\u10d0\u10e0\u10d4\u10da\u10d8",
+    "region_id": 5,
+    "latitude": 41.95,
+    "longitude": 45.8167,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 28,
+    "name_en": "Akhmeta",
+    "name_ka": "\u10d0\u10ee\u10db\u10d4\u10e2\u10d0",
+    "region_id": 5,
+    "latitude": 42.0333,
+    "longitude": 45.2167,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 29,
+    "name_en": "Rustavi",
+    "name_ka": "\u10e0\u10e3\u10e1\u10d7\u10d0\u10d5\u10d8",
+    "region_id": 6,
+    "latitude": 41.5489,
+    "longitude": 44.9958,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 30,
+    "name_en": "Bolnisi",
+    "name_ka": "\u10d1\u10dd\u10da\u10dc\u10d8\u10e1\u10d8",
+    "region_id": 6,
+    "latitude": 41.45,
+    "longitude": 44.5333,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 31,
+    "name_en": "Gardabani",
+    "name_ka": "\u10d2\u10d0\u10e0\u10d3\u10d0\u10d1\u10d0\u10dc\u10d8",
+    "region_id": 6,
+    "latitude": 41.4667,
+    "longitude": 45.0833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 32,
+    "name_en": "Marneuli",
+    "name_ka": "\u10db\u10d0\u10e0\u10dc\u10d4\u10e3\u10da\u10d8",
+    "region_id": 6,
+    "latitude": 41.4667,
+    "longitude": 44.8,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 33,
+    "name_en": "Dmanisi",
+    "name_ka": "\u10d3\u10db\u10d0\u10dc\u10d8\u10e1\u10d8",
+    "region_id": 6,
+    "latitude": 41.3333,
+    "longitude": 44.3333,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 34,
+    "name_en": "Tsalka",
+    "name_ka": "\u10ec\u10d0\u10da\u10d9\u10d0",
+    "region_id": 6,
+    "latitude": 41.5833,
+    "longitude": 44.0833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 35,
+    "name_en": "Tetritskaro",
+    "name_ka": "\u10d7\u10d4\u10d7\u10e0\u10d8\u10ec\u10e7\u10d0\u10e0\u10dd",
+    "region_id": 6,
+    "latitude": 41.5833,
+    "longitude": 44.4667,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 36,
+    "name_en": "Mtskheta",
+    "name_ka": "\u10db\u10ea\u10ee\u10d4\u10d7\u10d0",
+    "region_id": 7,
+    "latitude": 41.8464,
+    "longitude": 44.7211,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 37,
+    "name_en": "Dusheti",
+    "name_ka": "\u10d3\u10e3\u10e8\u10d4\u10d7\u10d8",
+    "region_id": 7,
+    "latitude": 42.0833,
+    "longitude": 44.7,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 38,
+    "name_en": "Tianeti",
+    "name_ka": "\u10d7\u10d8\u10d0\u10dc\u10d4\u10d7\u10d8",
+    "region_id": 7,
+    "latitude": 42.1167,
+    "longitude": 44.9667,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 39,
+    "name_en": "Kazbegi",
+    "name_ka": "\u10e7\u10d0\u10d6\u10d1\u10d4\u10d2\u10d8",
+    "region_id": 7,
+    "latitude": 42.6667,
+    "longitude": 44.6333,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 40,
+    "name_en": "Ambrolauri",
+    "name_ka": "\u10d0\u10db\u10d1\u10e0\u10dd\u10da\u10d0\u10e3\u10e0\u10d8",
+    "region_id": 8,
+    "latitude": 42.5167,
+    "longitude": 43.15,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 41,
+    "name_en": "Oni",
+    "name_ka": "\u10dd\u10dc\u10d8",
+    "region_id": 8,
+    "latitude": 42.5833,
+    "longitude": 43.45,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 42,
+    "name_en": "Tsageri",
+    "name_ka": "\u10ea\u10d0\u10d2\u10d4\u10e0\u10d8",
+    "region_id": 8,
+    "latitude": 42.65,
+    "longitude": 42.7833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 43,
+    "name_en": "Zugdidi",
+    "name_ka": "\u10d6\u10e3\u10d2\u10d3\u10d8\u10d3\u10d8",
+    "region_id": 9,
+    "latitude": 42.5089,
+    "longitude": 41.8708,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 44,
+    "name_en": "Poti",
+    "name_ka": "\u10e4\u10dd\u10d7\u10d8",
+    "region_id": 9,
+    "latitude": 42.15,
+    "longitude": 41.6667,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 45,
+    "name_en": "Senaki",
+    "name_ka": "\u10e1\u10d4\u10dc\u10d0\u10d9\u10d8",
+    "region_id": 9,
+    "latitude": 42.2667,
+    "longitude": 42.0667,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 46,
+    "name_en": "Abasha",
+    "name_ka": "\u10d0\u10d1\u10d0\u10e8\u10d0",
+    "region_id": 9,
+    "latitude": 42.2,
+    "longitude": 42.2,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 47,
+    "name_en": "Martvili",
+    "name_ka": "\u10db\u10d0\u10e0\u10e2\u10d5\u10d8\u10da\u10d8",
+    "region_id": 9,
+    "latitude": 42.4167,
+    "longitude": 42.3833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 48,
+    "name_en": "Mestia",
+    "name_ka": "\u10db\u10d4\u10e1\u10e2\u10d8\u10d0",
+    "region_id": 9,
+    "latitude": 43.05,
+    "longitude": 42.7333,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 49,
+    "name_en": "Chkhorotsku",
+    "name_ka": "\u10e9\u10ee\u10dd\u10e0\u10dd\u10ec\u10e7\u10e3",
+    "region_id": 9,
+    "latitude": 42.5333,
+    "longitude": 42.0333,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 50,
+    "name_en": "Khobi",
+    "name_ka": "\u10ee\u10dd\u10d1\u10d8",
+    "region_id": 9,
+    "latitude": 42.3167,
+    "longitude": 41.9,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 51,
+    "name_en": "Akhaltsikhe",
+    "name_ka": "\u10d0\u10ee\u10d0\u10da\u10ea\u10d8\u10ee\u10d4",
+    "region_id": 10,
+    "latitude": 41.6333,
+    "longitude": 42.9833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 52,
+    "name_en": "Borjomi",
+    "name_ka": "\u10d1\u10dd\u10e0\u10ef\u10dd\u10db\u10d8",
+    "region_id": 10,
+    "latitude": 41.8333,
+    "longitude": 43.3833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 53,
+    "name_en": "Ninotsminda",
+    "name_ka": "\u10dc\u10d8\u10dc\u10dd\u10ec\u10db\u10d8\u10dc\u10d3\u10d0",
+    "region_id": 10,
+    "latitude": 41.2833,
+    "longitude": 43.6,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 54,
+    "name_en": "Akhalkalaki",
+    "name_ka": "\u10d0\u10ee\u10d0\u10da\u10e5\u10d0\u10da\u10d0\u10e5\u10d8",
+    "region_id": 10,
+    "latitude": 41.4,
+    "longitude": 43.4833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 55,
+    "name_en": "Adigeni",
+    "name_ka": "\u10d0\u10d3\u10d8\u10d2\u10d4\u10dc\u10d8",
+    "region_id": 10,
+    "latitude": 41.6833,
+    "longitude": 42.7,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 56,
+    "name_en": "Aspindza",
+    "name_ka": "\u10d0\u10e1\u10de\u10d8\u10dc\u10eb\u10d0",
+    "region_id": 10,
+    "latitude": 41.5667,
+    "longitude": 43.25,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 57,
+    "name_en": "Bakuriani",
+    "name_ka": "\u10d1\u10d0\u10d9\u10e3\u10e0\u10d8\u10d0\u10dc\u10d8",
+    "region_id": 10,
+    "latitude": 41.75,
+    "longitude": 43.5333,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 58,
+    "name_en": "Gori",
+    "name_ka": "\u10d2\u10dd\u10e0\u10d8",
+    "region_id": 11,
+    "latitude": 41.9833,
+    "longitude": 44.1167,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 59,
+    "name_en": "Kaspi",
+    "name_ka": "\u10d9\u10d0\u10e1\u10de\u10d8",
+    "region_id": 11,
+    "latitude": 41.9167,
+    "longitude": 44.4167,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 60,
+    "name_en": "Kareli",
+    "name_ka": "\u10e5\u10d0\u10e0\u10d4\u10da\u10d8",
+    "region_id": 11,
+    "latitude": 42.0167,
+    "longitude": 44.0667,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 61,
+    "name_en": "Khashuri",
+    "name_ka": "\u10ee\u10d0\u10e8\u10e3\u10e0\u10d8",
+    "region_id": 11,
+    "latitude": 41.9833,
+    "longitude": 43.6,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 62,
+    "name_en": "Java",
+    "name_ka": "\u10ef\u10d0\u10d5\u10d0",
+    "region_id": 11,
+    "latitude": 42.5667,
+    "longitude": 43.9833,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 63,
+    "name_en": "Didube",
+    "name_ka": "\u10d3\u10d8\u10d3\u10e3\u10d1\u10d4",
+    "region_id": 1,
+    "latitude": 41.744,
+    "longitude": 44.76,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 64,
+    "name_en": "Saburtalo",
+    "name_ka": "\u10e1\u10d0\u10d1\u10e3\u10e0\u10d7\u10d0\u10da\u10dd",
+    "region_id": 1,
+    "latitude": 41.7244,
+    "longitude": 44.7467,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 65,
+    "name_en": "Vake",
+    "name_ka": "\u10d5\u10d0\u10d9\u10d4",
+    "region_id": 1,
+    "latitude": 41.6977,
+    "longitude": 44.7614,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 66,
+    "name_en": "Gldani",
+    "name_ka": "\u10d2\u10da\u10d3\u10d0\u10dc\u10d8",
+    "region_id": 1,
+    "latitude": 41.7838,
+    "longitude": 44.7353,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 67,
+    "name_en": "Isani",
+    "name_ka": "\u10d8\u10e1\u10d0\u10dc\u10d8",
+    "region_id": 1,
+    "latitude": 41.6911,
+    "longitude": 44.8194,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 68,
+    "name_en": "Samgori",
+    "name_ka": "\u10e1\u10d0\u10db\u10d2\u10dd\u10e0\u10d8",
+    "region_id": 1,
+    "latitude": 41.7172,
+    "longitude": 44.8506,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 69,
+    "name_en": "Chughureti",
+    "name_ka": "\u10e9\u10e3\u10e6\u10e3\u10e0\u10d4\u10d7\u10d8",
+    "region_id": 1,
+    "latitude": 41.6958,
+    "longitude": 44.8031,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 70,
+    "name_en": "Nadzaladevi",
+    "name_ka": "\u10dc\u10d0\u10eb\u10d0\u10da\u10d0\u10d3\u10d4\u10d5\u10d8",
+    "region_id": 1,
+    "latitude": 41.7256,
+    "longitude": 44.7661,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 71,
+    "name_en": "Mtatsminda",
+    "name_ka": "\u10db\u10d7\u10d0\u10ec\u10db\u10d8\u10dc\u10d3\u10d0",
+    "region_id": 1,
+    "latitude": 41.6903,
+    "longitude": 44.7961,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 72,
+    "name_en": "Krtsanisi",
+    "name_ka": "\u10d9\u10e0\u10ec\u10d0\u10dc\u10d8\u10e1\u10d8",
+    "region_id": 1,
+    "latitude": 41.6644,
+    "longitude": 44.8281,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 73,
+    "name_en": "Varketili",
+    "name_ka": "\u10d5\u10d0\u10e0\u10d9\u10d4\u10d7\u10d8\u10da\u10d8",
+    "region_id": 1,
+    "latitude": 41.7244,
+    "longitude": 44.8642,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 74,
+    "name_en": "Digomi",
+    "name_ka": "\u10d3\u10d8\u10e6\u10dd\u10db\u10d8",
+    "region_id": 1,
+    "latitude": 41.7647,
+    "longitude": 44.7328,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 75,
+    "name_en": "Dighomi",
+    "name_ka": "\u10d3\u10d8\u10e6\u10dd\u10db\u10d8",
+    "region_id": 1,
+    "latitude": 41.7647,
+    "longitude": 44.7328,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 76,
+    "name_en": "Lilo",
+    "name_ka": "\u10da\u10d8\u10da\u10dd",
+    "region_id": 1,
+    "latitude": 41.6944,
+    "longitude": 44.8931,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 77,
+    "name_en": "Temka",
+    "name_ka": "\u10d7\u10d4\u10db\u10e5\u10d0",
+    "region_id": 1,
+    "latitude": 41.7322,
+    "longitude": 44.8158,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 78,
+    "name_en": "Vazisubani",
+    "name_ka": "\u10d5\u10d0\u10d6\u10d8\u10e1\u10e3\u10d1\u10d0\u10dc\u10d8",
+    "region_id": 1,
+    "latitude": 41.7311,
+    "longitude": 44.8194,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 79,
+    "name_en": "Marjanishvili",
+    "name_ka": "\u10db\u10d0\u10e0\u10ef\u10d0\u10dc\u10d8\u10e8\u10d5\u10d8\u10da\u10d8",
+    "region_id": 1,
+    "latitude": 41.7092,
+    "longitude": 44.795,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 80,
+    "name_en": "Aghmashenebeli",
+    "name_ka": "\u10d0\u10e6\u10db\u10d0\u10e8\u10d4\u10dc\u10d4\u10d1\u10d4\u10da\u10d8",
+    "region_id": 1,
+    "latitude": 41.7144,
+    "longitude": 44.8114,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 81,
+    "name_en": "Mitskevichi",
+    "name_ka": "\u10db\u10d8\u10ea\u10d9\u10d4\u10d5\u10d8\u10e9\u10d8",
+    "region_id": 1,
+    "latitude": 41.6911,
+    "longitude": 44.8072,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 82,
+    "name_en": "Avlabari",
+    "name_ka": "\u10d0\u10d5\u10da\u10d0\u10d1\u10d0\u10e0\u10d8",
+    "region_id": 1,
+    "latitude": 41.6922,
+    "longitude": 44.8139,
+    "is_active": true,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  }
+]

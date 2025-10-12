@@ -32,6 +32,14 @@ fi
 cd /app
 DATABASE_URL=${DATABASE_URL:-"sqlite:////data/ward_flux.db"}
 echo "[entrypoint] Seeding database at ${DATABASE_URL}"
-PYTHONPATH=/app python3 /app/scripts/seed_core.py --database-url "${DATABASE_URL}"
+
+# Seed core data (users, system config, monitoring profiles)
+PYTHONPATH=/app python3 /app/scripts/seed_core.py --database-url "${DATABASE_URL}" --seeds-dir "seeds/core"
+
+# Seed CredoBank data (875 devices, 128 branches, alert rules, Georgian regions/cities)
+if [[ -d "/app/seeds/credobank" ]]; then
+  echo "[entrypoint] Seeding CredoBank data (875 devices, 128 branches, alerts, Georgian regions/cities)"
+  PYTHONPATH=/app python3 /app/scripts/seed_credobank.py --database-url "${DATABASE_URL}" --seeds-dir "seeds/credobank"
+fi
 
 exec "$@"
