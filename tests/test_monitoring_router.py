@@ -205,7 +205,7 @@ def test_create_and_list_monitoring_profiles(test_context):
 
     response = client.post(
         "/api/v1/monitoring/profiles",
-        json={"name": "Primary Monitoring", "mode": "ZABBIX", "description": "Main profile"},
+        json={"name": "Primary Monitoring", "mode": "zabbix", "description": "Main profile"},
     )
     assert response.status_code == 201
     profile_id = response.json()["id"]
@@ -221,8 +221,8 @@ def test_create_and_list_monitoring_profiles(test_context):
 def test_activate_monitoring_profile(test_context):
     client = test_context["client"]
 
-    response_a = client.post("/api/v1/monitoring/profiles", json={"name": "Standalone", "mode": "STANDALONE"})
-    response_b = client.post("/api/v1/monitoring/profiles", json={"name": "Hybrid", "mode": "HYBRID"})
+    response_a = client.post("/api/v1/monitoring/profiles", json={"name": "Standalone", "mode": "standalone"})
+    response_b = client.post("/api/v1/monitoring/profiles", json={"name": "Hybrid", "mode": "hybrid"})
     profile_a = response_a.json()["id"]
     profile_b = response_b.json()["id"]
 
@@ -231,7 +231,7 @@ def test_activate_monitoring_profile(test_context):
     payload = activate.json()
     assert payload["success"] is True
     assert payload["active_profile"] == "Hybrid"
-    assert payload["mode"] == "HYBRID"
+    assert payload["mode"] == "hybrid"
 
     # Only the second profile should be active
     profiles = client.get("/api/v1/monitoring/profiles").json()

@@ -3,24 +3,55 @@ from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from passlib.context import CryptContext
 
 from main import app
-from database import SessionLocal, init_db, PingResult, TracerouteResult
+from database import SessionLocal, init_db, PingResult, TracerouteResult, User, UserRole
 
 
 @pytest.fixture(autouse=True)
 def setup_database_fixture():
     # Ensure tables exist
     init_db()
+
+    # Create test user for authentication
+    session = SessionLocal()
+    try:
+        pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+        test_user = User(
+            username="testuser",
+            email="test@wardops.tech",
+            full_name="Test User",
+            hashed_password=pwd_context.hash("TestPass123!"),
+            role=UserRole.ADMIN,
+            is_active=True,
+            is_superuser=True,
+        )
+        session.add(test_user)
+        session.commit()
+    finally:
+        session.close()
+
     yield
+
     # Clean up inserted diagnostics records to avoid cross-test contamination
     session = SessionLocal()
     try:
         session.query(PingResult).delete()
         session.query(TracerouteResult).delete()
+        session.query(User).filter(User.username == "testuser").delete()
         session.commit()
     finally:
         session.close()
+
+
+@pytest.fixture
+def auth_headers():
+    """Get authentication headers for API requests"""
+    client = TestClient(app)
+    response = client.post("/api/v1/auth/login", data={"username": "testuser", "password": "TestPass123!"})
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
 
 
 def insert_sample_diagnostics():
@@ -83,11 +114,11 @@ def insert_sample_diagnostics():
         session.close()
 
 
-def test_diagnostics_summary_returns_aggregated_data():
+def test_diagnostics_summary_returns_aggregated_data(auth_headers):
     insert_sample_diagnostics()
     client = TestClient(app)
 
-    response = client.get("/api/v1/diagnostics/dashboard/summary")
+    response = client.get("/api/v1/diagnostics/dashboard/summary", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
 
@@ -97,11 +128,11 @@ def test_diagnostics_summary_returns_aggregated_data():
     assert data["timeline"]
 
 
-def test_traceroute_map_returns_coordinates():
+def test_traceroute_map_returns_coordinates(auth_headers):
     insert_sample_diagnostics()
     client = TestClient(app)
 
-    response = client.get("/api/v1/diagnostics/traceroute/map", params={"ip": "192.0.2.10"})
+    response = client.get("/api/v1/diagnostics/traceroute/map", params={"ip": "192.0.2.10"}, headers=auth_headers)
     assert response.status_code == 200
     payload = response.json()
 
