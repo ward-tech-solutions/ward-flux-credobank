@@ -71,7 +71,11 @@ jobs:
 
       - name: Migrate seed data into PostgreSQL
         run: |
-          ./venv/bin/python migrate_to_postgres.py
+          if [ -f data/ward_ops.db ]; then
+            ./venv/bin/python migrate_to_postgres.py
+          else
+            echo "[ci] data/ward_ops.db not present; skipping migrate_to_postgres.py"
+          fi
 
       - name: Apply SQL migrations
         run: |
