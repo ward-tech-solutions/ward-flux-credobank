@@ -10,7 +10,7 @@ WORKDIR /frontend
 COPY frontend/package*.json ./
 
 # Install frontend dependencies
-RUN npm ci --prefer-offline --no-audit
+RUN npm ci --prefer-offline --no-audit --legacy-peer-deps
 
 # Copy frontend source
 COPY frontend/ ./
