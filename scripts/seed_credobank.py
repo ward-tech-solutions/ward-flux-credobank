@@ -178,24 +178,16 @@ def seed_alert_rules(session, alert_rules_path: Path) -> None:
 def seed_georgian_regions(session, regions_path: Path) -> None:
     from sqlalchemy import text
 
+    count = 0
     for record in load_json(regions_path):
         region_id = record.get("id")
 
-        # Check if exists using raw SQL
-        existing = session.execute(
-            text("SELECT id FROM georgian_regions WHERE id = :id"),
-            {"id": region_id}
-        ).fetchone()
-
-        if existing:
-            logger.debug("Region %s already present – skipping", record.get("name_en"))
-            continue
-
-        # Insert using raw SQL
-        session.execute(
+        # Insert using ON CONFLICT DO NOTHING for idempotency
+        result = session.execute(
             text("""
                 INSERT INTO georgian_regions (id, name_en, name_ka, latitude, longitude, created_at)
                 VALUES (:id, :name_en, :name_ka, :latitude, :longitude, :created_at)
+                ON CONFLICT (id) DO NOTHING
             """),
             {
                 "id": region_id,
@@ -206,7 +198,14 @@ def seed_georgian_regions(session, regions_path: Path) -> None:
                 "created_at": convert_value(record.get("created_at"))
             }
         )
-        logger.info("Seeded region %s", record["name_en"])
+        if result.rowcount > 0:
+            logger.info("Seeded region %s", record["name_en"])
+            count += 1
+        else:
+            logger.debug("Region %s already present – skipping", record.get("name_en"))
+
+    if count > 0:
+        logger.info("Seeded %d Georgian regions", count)
 
 
 def seed_georgian_cities(session, cities_path: Path) -> None:
@@ -216,21 +215,12 @@ def seed_georgian_cities(session, cities_path: Path) -> None:
     for record in load_json(cities_path):
         city_id = record.get("id")
 
-        # Check if exists using raw SQL
-        existing = session.execute(
-            text("SELECT id FROM georgian_cities WHERE id = :id"),
-            {"id": city_id}
-        ).fetchone()
-
-        if existing:
-            logger.debug("City %s already present – skipping", record.get("name_en"))
-            continue
-
-        # Insert using raw SQL
-        session.execute(
+        # Insert using ON CONFLICT DO NOTHING for idempotency
+        result = session.execute(
             text("""
                 INSERT INTO georgian_cities (id, name_en, name_ka, region_id, latitude, longitude, is_active, created_at)
                 VALUES (:id, :name_en, :name_ka, :region_id, :latitude, :longitude, :is_active, :created_at)
+                ON CONFLICT (id) DO NOTHING
             """),
             {
                 "id": city_id,
@@ -243,8 +233,9 @@ def seed_georgian_cities(session, cities_path: Path) -> None:
                 "created_at": convert_value(record.get("created_at"))
             }
         )
-        logger.debug("Seeded city %s", record["name_en"])
-        count += 1
+        if result.rowcount > 0:
+            logger.debug("Seeded city %s", record["name_en"])
+            count += 1
 
     if count > 0:
         logger.info("Seeded %d Georgian cities", count)
