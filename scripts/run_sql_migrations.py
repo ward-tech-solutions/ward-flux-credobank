@@ -22,6 +22,7 @@ BASELINE_SKIP = {"001_core_schema.sql"}  # schema created via bootstrap/migratio
 
 
 def split_statements(sql: str) -> list[str]:
+    """Split SQL into individual statements and filter out comment-only blocks."""
     statements: list[str] = []
     buffer: list[str] = []
     for line in sql.splitlines():
@@ -32,7 +33,23 @@ def split_statements(sql: str) -> list[str]:
             buffer.clear()
     if buffer:
         statements.append("\n".join(buffer).strip())
-    return [stmt for stmt in statements if stmt]
+
+    # Filter out empty statements and comment-only blocks
+    result = []
+    for stmt in statements:
+        if not stmt:
+            continue
+        # Check if statement has any non-comment content
+        has_sql = False
+        for line in stmt.splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith("--"):
+                has_sql = True
+                break
+        if has_sql:
+            result.append(stmt)
+
+    return result
 
 
 def main() -> None:
