@@ -67,8 +67,13 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: |
-          npm ci --legacy-peer-deps
-          npx vite --version
+          echo "Installing frontend dependencies..."
+          npm install --legacy-peer-deps
+          echo "Verifying vite installation..."
+          ls -la node_modules/.bin/vite || echo "vite binary not found!"
+          npx vite --version || echo "npx vite failed!"
+          echo "node_modules size:"
+          du -sh node_modules 2>/dev/null || echo "node_modules not found!"
 
       - name: Migrate seed data into PostgreSQL
         run: |
