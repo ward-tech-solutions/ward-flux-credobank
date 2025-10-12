@@ -142,7 +142,7 @@ def seed_devices(session, devices_path: Path) -> None:
 
 
 def seed_alert_rules(session, alert_rules_path: Path) -> None:
-    from monitoring.models import AlertRule, AlertSeverity
+    from monitoring.models import AlertRule
 
     for record in load_json(alert_rules_path):
         rule_id = record.get("id")
@@ -157,15 +157,19 @@ def seed_alert_rules(session, alert_rules_path: Path) -> None:
 
         rule = AlertRule(
             id=uuid.UUID(rule_id) if rule_id else uuid.uuid4(),
+            device_id=uuid.UUID(record["device_id"]) if record.get("device_id") else None,
+            branch_id=record.get("branch_id"),
             name=record["name"],
             description=record.get("description"),
-            metric=record["metric"],
-            condition=record["condition"],
-            threshold=float(record["threshold"]) if record.get("threshold") else None,
-            duration_seconds=record.get("duration_seconds"),
-            severity=AlertSeverity(record["severity"]) if record.get("severity") else AlertSeverity.WARNING,
-            enabled=record.get("enabled", True),
+            expression=record["expression"],
+            severity=record["severity"],
             notification_channels=record.get("notification_channels"),
+            notification_recipients=record.get("notification_recipients"),
+            device_group=record.get("device_group"),
+            monitoring_item_id=uuid.UUID(record["monitoring_item_id"]) if record.get("monitoring_item_id") else None,
+            enabled=record.get("enabled", True),
+            created_at=convert_value(record.get("created_at")),
+            updated_at=convert_value(record.get("updated_at")),
         )
         session.add(rule)
         logger.info("Seeded alert rule %s", record["name"])
