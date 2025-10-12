@@ -63,7 +63,9 @@ export default function DashboardEnhanced() {
 
   const stats = statsResponse?.data
   const devices = devicesResponse?.data || []
-  const alerts = alertsResponse?.data?.alerts || []
+  // Safely extract alerts array - handle both response formats
+  const alertsData = alertsResponse?.data
+  const alerts = Array.isArray(alertsData?.alerts) ? alertsData.alerts : []
 
   // Calculate regional statistics
   const regionalStats: Record<string, any> = {}
@@ -339,7 +341,7 @@ export default function DashboardEnhanced() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {alerts.slice(0, 100).map((alert: any, index: number) => (
-                    <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-900">
+                    <tr key={alert.id || index} className="hover:bg-gray-50 dark:hover:bg-gray-900">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(
@@ -351,14 +353,16 @@ export default function DashboardEnhanced() {
                       </td>
                       <td className="px-4 py-3">
                         <Link
-                          to={`/devices/${alert.hostid}`}
+                          to={`/devices/${alert.device_id}`}
                           className="text-ward-green hover:text-ward-green-dark font-medium"
                         >
-                          {alert.host}
+                          {alert.device_name} ({alert.device_ip})
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-gray-900 dark:text-gray-100">{alert.description}</td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{alert.time}</td>
+                      <td className="px-4 py-3 text-gray-900 dark:text-gray-100">{alert.message}</td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        {alert.triggered_at ? new Date(alert.triggered_at).toLocaleString() : 'N/A'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
