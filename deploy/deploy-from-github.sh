@@ -14,13 +14,13 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Configuration
-GITHUB_REPO="${GITHUB_REPO:-https://github.com/your-org/wardops.git}"
+GITHUB_REPO="${GITHUB_REPO:-https://github.com/ward-tech-solutions/ward-flux-v2.git}"
 GITHUB_BRANCH="${GITHUB_BRANCH:-client/credo-bank}"
 INSTALL_DIR="/opt/wardops"
 TEMP_DIR="/tmp/wardops-deploy-$$"
-REGISTRY_URL="${REGISTRY_URL:-docker.io}"
-APP_IMAGE="${APP_IMAGE:-ward_flux/wardops-app:credobank-latest}"
-DB_IMAGE="${DB_IMAGE:-ward_flux/wardops-postgres-seeded:credobank-latest}"
+REGISTRY_URL="${REGISTRY_URL:-ghcr.io}"
+APP_IMAGE="${APP_IMAGE:-ghcr.io/ward-tech-solutions/ward-flux-v2/credobank:latest}"
+DB_IMAGE="${DB_IMAGE:-ghcr.io/ward-tech-solutions/ward-flux-v2/credobank-postgres:latest}"
 
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -208,7 +208,10 @@ EOF
 docker_login() {
     log_info "Checking Docker registry access..."
 
-    if [[ "${REGISTRY_URL}" != "docker.io" ]]; then
+    if [[ "${REGISTRY_URL}" == "ghcr.io" ]]; then
+        log_info "Using GitHub Container Registry (public images)"
+        log_info "No authentication required for public packages"
+    elif [[ "${REGISTRY_URL}" != "docker.io" ]]; then
         log_info "Private registry detected: ${REGISTRY_URL}"
 
         if [[ -n "${REGISTRY_USERNAME:-}" ]] && [[ -n "${REGISTRY_PASSWORD:-}" ]]; then
@@ -369,22 +372,22 @@ Options:
 
 Environment Variables:
   GITHUB_REPO                   GitHub repository URL
-                                Default: https://github.com/your-org/wardops.git
+                                Default: https://github.com/ward-tech-solutions/ward-flux-v2.git
 
   GITHUB_BRANCH                 Branch to deploy from
                                 Default: client/credo-bank
 
   REGISTRY_URL                  Docker registry URL
-                                Default: docker.io
+                                Default: ghcr.io
 
   REGISTRY_USERNAME             Registry username (for private registries)
   REGISTRY_PASSWORD             Registry password (for private registries)
 
   APP_IMAGE                     Application image name
-                                Default: ward_flux/wardops-app:credobank-latest
+                                Default: ghcr.io/ward-tech-solutions/ward-flux-v2/credobank:latest
 
   DB_IMAGE                      Database image name
-                                Default: ward_flux/wardops-postgres-seeded:credobank-latest
+                                Default: ghcr.io/ward-tech-solutions/ward-flux-v2/credobank-postgres:latest
 
 Examples:
   # Deploy with default settings

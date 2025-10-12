@@ -14,7 +14,7 @@ version: "3.8"
 services:
   # PostgreSQL Database (Pre-seeded with CredoBank data)
   db:
-    image: ward_flux/wardops-postgres-seeded:credobank-latest
+    image: ghcr.io/ward-tech-solutions/ward-flux-v2/credobank-postgres:latest
     container_name: wardops-db
     environment:
       POSTGRES_USER: fluxdb
@@ -66,7 +66,7 @@ services:
 
   # API Server (FastAPI)
   api:
-    image: ward_flux/wardops-app:credobank-latest
+    image: ghcr.io/ward-tech-solutions/ward-flux-v2/credobank:latest
     container_name: wardops-api
     env_file: .env.prod
     volumes:
@@ -91,7 +91,7 @@ services:
 
   # Celery Worker (SNMP Polling & Background Tasks)
   celery-worker:
-    image: ward_flux/wardops-app:credobank-latest
+    image: ghcr.io/ward-tech-solutions/ward-flux-v2/credobank:latest
     container_name: wardops-worker
     env_file: .env.prod
     command:
@@ -125,7 +125,7 @@ services:
 
   # Celery Beat (Task Scheduler)
   celery-beat:
-    image: ward_flux/wardops-app:credobank-latest
+    image: ghcr.io/ward-tech-solutions/ward-flux-v2/credobank:latest
     container_name: wardops-beat
     env_file: .env.prod
     command:
