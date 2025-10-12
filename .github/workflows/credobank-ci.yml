@@ -65,10 +65,9 @@ jobs:
           ./venv/bin/pip install -r requirements.txt
 
       - name: Install frontend dependencies
+        working-directory: frontend
         run: |
-          cd frontend
           npm ci --legacy-peer-deps
-          # Verify vite is installed
           npx vite --version
 
       - name: Migrate seed data into PostgreSQL
@@ -88,12 +87,10 @@ jobs:
           ./venv/bin/python -m pytest
 
       - name: Frontend build & typecheck
+        working-directory: frontend
         run: |
-          cd frontend
-          # Ensure node_modules/.bin is in PATH
-          export PATH="$PWD/node_modules/.bin:$PATH"
-          npm run build
-          npm run typecheck
+          npx vite build
+          npx tsc --noEmit
 
       - name: Celery smoke test
         env:
