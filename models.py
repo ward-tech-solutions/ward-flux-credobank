@@ -252,5 +252,5 @@ class DiscoveryCredential(Base):
     last_success = Column(DateTime)
 
     # Metadata
-    created_by = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    created_by = Column(Integer, ForeignKey('users.id'))
     created_at = Column(DateTime, server_default=func.now())
