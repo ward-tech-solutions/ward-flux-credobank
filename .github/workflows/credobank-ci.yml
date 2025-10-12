@@ -67,7 +67,7 @@ jobs:
       - name: Install frontend dependencies
         run: |
           cd frontend
-          npm ci
+          npm ci --legacy-peer-deps
 
       - name: Migrate seed data into PostgreSQL
         run: |
