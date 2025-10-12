@@ -39,7 +39,7 @@ router = APIRouter(prefix="/api/v1/monitoring", tags=["monitoring"])
 
 class MonitoringProfileCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    mode: str = Field(..., pattern="^(ZABBIX|STANDALONE|HYBRID)$")
+    mode: str = Field(..., pattern="^(zabbix|standalone|hybrid)$")
     description: Optional[str] = None
 
 

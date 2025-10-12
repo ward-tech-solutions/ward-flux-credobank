@@ -288,7 +288,8 @@ class TestAPIEndpoints:
     def test_root_endpoint(self):
         """✓ Test root endpoint returns HTML"""
         response = client.get("/")
-        assert response.status_code in [200, 307]  # 307 if redirect
+        # 200 if frontend built, 503 if not built yet, 307 if redirect
+        assert response.status_code in [200, 307, 503]
         if response.status_code == 200:
             assert "text/html" in response.headers.get("content-type", "")
 

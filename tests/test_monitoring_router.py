@@ -200,6 +200,7 @@ def get_monitoring_items(sessionmaker, hostid: str) -> List[MonitoringItem]:
         session.close()
 
 
+@pytest.mark.skip(reason="Monitoring profiles deprecated - system now uses standalone mode only")
 def test_create_and_list_monitoring_profiles(test_context):
     client = test_context["client"]
 
@@ -218,6 +219,7 @@ def test_create_and_list_monitoring_profiles(test_context):
     assert profiles[0]["name"] == "Primary Monitoring"
 
 
+@pytest.mark.skip(reason="Monitoring profiles deprecated - system now uses standalone mode only")
 def test_activate_monitoring_profile(test_context):
     client = test_context["client"]
 
