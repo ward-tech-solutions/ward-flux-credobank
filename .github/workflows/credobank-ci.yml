@@ -68,6 +68,8 @@ jobs:
         run: |
           cd frontend
           npm ci --legacy-peer-deps
+          # Verify vite is installed
+          npx vite --version
 
       - name: Migrate seed data into PostgreSQL
         run: |
@@ -88,6 +90,8 @@ jobs:
       - name: Frontend build & typecheck
         run: |
           cd frontend
+          # Ensure node_modules/.bin is in PATH
+          export PATH="$PWD/node_modules/.bin:$PATH"
           npm run build
           npm run typecheck
 
