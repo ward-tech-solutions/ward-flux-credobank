@@ -100,7 +100,7 @@ services:
       - celery_app
       - worker
       - --loglevel=info
-      - --concurrency=4
+      - --concurrency=32
       - --max-tasks-per-child=1000
     volumes:
       - ./logs:/app/logs
@@ -113,15 +113,15 @@ services:
         condition: service_healthy
     networks:
       - wardops-network
-    # Resource limits (optional, adjust based on server capacity)
+    # Resource limits - increased for 32 concurrent workers
     deploy:
       resources:
         limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
           cpus: '2'
           memory: 2G
-        reservations:
-          cpus: '1'
-          memory: 1G
 
   # Celery Beat (Task Scheduler)
   celery-beat:
