@@ -66,6 +66,8 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
+        env:
+          NODE_ENV: development
         run: |
           rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps
@@ -92,6 +94,8 @@ jobs:
 
       - name: Frontend build & typecheck
         working-directory: frontend
+        env:
+          NODE_ENV: production
         run: |
           npx vite build
           npx tsc --noEmit
