@@ -28,10 +28,10 @@ def split_statements(sql: str) -> list[str]:
         stripped = line.strip()
         buffer.append(line)
         if stripped.endswith(";"):
-            statements.append("".join(buffer).strip())
+            statements.append("\n".join(buffer).strip())
             buffer.clear()
     if buffer:
-        statements.append("".join(buffer).strip())
+        statements.append("\n".join(buffer).strip())
     return [stmt for stmt in statements if stmt]
 
 
