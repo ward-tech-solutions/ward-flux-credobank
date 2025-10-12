@@ -67,8 +67,11 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: |
-          npm ci --legacy-peer-deps
+          rm -rf node_modules package-lock.json
+          npm install --legacy-peer-deps
           echo "Installed $(ls node_modules | wc -l) packages"
+          echo "Checking for vite..."
+          ls -la node_modules/.bin/vite
           npx vite --version
 
       - name: Migrate seed data into PostgreSQL
