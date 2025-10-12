@@ -122,7 +122,8 @@ jobs:
 
       - name: Build application image
         run: |
-          docker build -t ward_flux/wardops-app:${{ github.sha }} .
+          docker build -t ghcr.io/${{ github.repository_owner }}/wardops-app:${{ github.sha }} \
+                       -t ghcr.io/${{ github.repository_owner }}/wardops-app:credobank-latest .
 
       - name: Generate PostgreSQL backup
         run: |
@@ -137,20 +138,22 @@ jobs:
           COPY seed.dump /docker-entrypoint-initdb.d/seed.dump
           EOF
           docker build -f Dockerfile.seeddb \
-            -t ward_flux/wardops-postgres-seeded:${{ github.sha }} .
+            -t ghcr.io/${{ github.repository_owner }}/wardops-postgres-seeded:${{ github.sha }} \
+            -t ghcr.io/${{ github.repository_owner }}/wardops-postgres-seeded:credobank-latest .
 
-      - name: Push images
-        env:
-          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push images to GHCR
         run: |
-          echo "$REGISTRY_PASSWORD" | docker login --username "$REGISTRY_USERNAME" --password-stdin
-          docker push ward_flux/wardops-app:${{ github.sha }}
-          docker push ward_flux/wardops-postgres-seeded:${{ github.sha }}
-          docker tag ward_flux/wardops-app:${{ github.sha }} ward_flux/wardops-app:credobank-latest
-          docker tag ward_flux/wardops-postgres-seeded:${{ github.sha }} ward_flux/wardops-postgres-seeded:credobank-latest
-          docker push ward_flux/wardops-app:credobank-latest
-          docker push ward_flux/wardops-postgres-seeded:credobank-latest
+          docker push ghcr.io/${{ github.repository_owner }}/wardops-app:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/wardops-app:credobank-latest
+          docker push ghcr.io/${{ github.repository_owner }}/wardops-postgres-seeded:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/wardops-postgres-seeded:credobank-latest
 
       - name: Upload deployment bundle
         uses: actions/upload-artifact@v4
