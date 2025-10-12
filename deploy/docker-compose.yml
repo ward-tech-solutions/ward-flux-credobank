@@ -1,6 +1,18 @@
 version: "3.8"
 
+# ========================================================================
+# CredoBank WARD OPS - Production Docker Compose
+# ========================================================================
+# Services:
+#   - db: PostgreSQL with pre-seeded CredoBank data
+#   - redis: Task queue and cache
+#   - api: FastAPI backend server
+#   - celery-worker: SNMP polling and background tasks
+#   - celery-beat: Task scheduler
+# ========================================================================
+
 services:
+  # PostgreSQL Database (Pre-seeded with CredoBank data)
   db:
     image: ward_flux/wardops-postgres-seeded:credobank-latest
     container_name: wardops-db
@@ -8,56 +20,147 @@ services:
       POSTGRES_USER: fluxdb
       POSTGRES_PASSWORD: FluxDB
       POSTGRES_DB: ward_ops
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./backups:/backups  # Mount for easy backup access
+    ports:
+      - "5432:5432"  # Expose for external tools (optional, can be removed for security)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fluxdb -d ward_ops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - wardops-network
 
+  # Redis - Task Queue & Cache
   redis:
     image: redis:7-alpine
     container_name: wardops-redis
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    networks:
+      - wardops-network
 
+  # API Server (FastAPI)
   api:
     image: ward_flux/wardops-app:credobank-latest
     container_name: wardops-api
     env_file: .env.prod
-    depends_on:
-      - db
-      - redis
+    volumes:
+      - ./logs:/app/logs
+      - api-data:/data
     ports:
       - "5001:5001"
-    command: ["./scripts/start_api.sh"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - wardops-network
 
+  # Celery Worker (SNMP Polling & Background Tasks)
   celery-worker:
     image: ward_flux/wardops-app:credobank-latest
     container_name: wardops-worker
     env_file: .env.prod
+    command:
+      - celery
+      - -A
+      - celery_app
+      - worker
+      - --loglevel=info
+      - --concurrency=4
+      - --max-tasks-per-child=1000
+    volumes:
+      - ./logs:/app/logs
+      - worker-data:/data
+    restart: unless-stopped
     depends_on:
-      - db
-      - redis
-    command: ["celery", "-A", "celery_app", "worker", "--loglevel=info", "--pool=solo"]
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - wardops-network
+    # Resource limits (optional, adjust based on server capacity)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
 
+  # Celery Beat (Task Scheduler)
   celery-beat:
     image: ward_flux/wardops-app:credobank-latest
     container_name: wardops-beat
     env_file: .env.prod
+    command:
+      - celery
+      - -A
+      - celery_app
+      - beat
+      - --loglevel=info
+    volumes:
+      - ./logs:/app/logs
+      - beat-data:/data
+    restart: unless-stopped
     depends_on:
-      - db
-      - redis
-    command: ["celery", "-A", "celery_app", "beat", "--loglevel=info"]
-
-  frontend:
-    image: ward_flux/wardops-app:credobank-latest
-    container_name: wardops-frontend
-    env_file: .env.prod
-    depends_on:
-      - api
-    ports:
-      - "3000:3000"
-    command: ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - wardops-network
 
 volumes:
   db-data:
+    driver: local
+  redis-data:
+    driver: local
+  api-data:
+    driver: local
+  worker-data:
+    driver: local
+  beat-data:
+    driver: local
+
+networks:
+  wardops-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
