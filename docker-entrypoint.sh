@@ -33,6 +33,12 @@ cd /app
 DATABASE_URL=${DATABASE_URL:-"sqlite:////data/ward_flux.db"}
 echo "[entrypoint] Seeding database at ${DATABASE_URL}"
 
+# Run SQL migrations first (creates tables like georgian_regions, georgian_cities, etc.)
+if [[ "${DATABASE_URL}" == postgresql://* ]] || [[ "${DATABASE_URL}" == postgres://* ]]; then
+  echo "[entrypoint] Running PostgreSQL migrations..."
+  PYTHONPATH=/app python3 /app/scripts/run_sql_migrations.py
+fi
+
 # Seed core data (users, system config, monitoring profiles)
 PYTHONPATH=/app python3 /app/scripts/seed_core.py --database-url "${DATABASE_URL}" --seeds-dir "seeds/core"
 
