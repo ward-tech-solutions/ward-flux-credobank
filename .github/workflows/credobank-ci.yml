@@ -126,13 +126,15 @@ jobs:
 
       - name: Generate PostgreSQL backup
         run: |
-          pg_dump --format=custom --file=seed.backup "$DATABASE_URL"
+          pg_dump --format=custom --file=seed.dump "$DATABASE_URL"
+          ls -lh seed.dump
+          file seed.dump
 
       - name: Build seeded PostgreSQL image
         run: |
           cat <<'EOF' > Dockerfile.seeddb
           FROM postgres:15-alpine
-          COPY seed.backup /docker-entrypoint-initdb.d/seed.backup
+          COPY seed.dump /docker-entrypoint-initdb.d/seed.dump
           EOF
           docker build -f Dockerfile.seeddb \
             -t ward_flux/wardops-postgres-seeded:${{ github.sha }} .
@@ -162,4 +164,4 @@ jobs:
       - name: Cleanup temporary build files
         if: always()
         run: |
-          rm -f seed.backup Dockerfile.seeddb || true
+          rm -f seed.dump Dockerfile.seeddb || true
