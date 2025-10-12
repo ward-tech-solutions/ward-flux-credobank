@@ -77,17 +77,16 @@ def seed_branches(session, branches_path: Path) -> None:
             continue
 
         branch = Branch(
-            id=uuid.UUID(branch_id) if branch_id else uuid.uuid4(),
+            id=str(uuid.UUID(branch_id)) if branch_id else str(uuid.uuid4()),
             name=record["name"],
-            code=record.get("code"),
+            display_name=record.get("display_name", record["name"]),
             region=record.get("region"),
-            city=record.get("city"),
+            branch_code=record.get("branch_code"),
             address=record.get("address"),
-            latitude=Decimal(str(record["latitude"])) if record.get("latitude") else None,
-            longitude=Decimal(str(record["longitude"])) if record.get("longitude") else None,
-            contact_phone=record.get("contact_phone"),
-            contact_email=record.get("contact_email"),
             is_active=record.get("is_active", True),
+            device_count=record.get("device_count", 0),
+            created_at=convert_value(record.get("created_at")),
+            updated_at=convert_value(record.get("updated_at")),
         )
         session.add(branch)
         logger.info("Seeded branch %s", record["name"])
