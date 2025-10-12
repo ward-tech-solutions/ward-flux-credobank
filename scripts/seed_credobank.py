@@ -120,9 +120,18 @@ def seed_devices(session, devices_path: Path) -> None:
             discovered_at=convert_value(record.get("discovered_at")),
             last_seen=convert_value(record.get("last_seen")),
             tags=record.get("tags"),
-            snmp_profile_id=uuid.UUID(record["snmp_profile_id"]) if record.get("snmp_profile_id") else None,
-            monitoring_profile_id=uuid.UUID(record["monitoring_profile_id"]) if record.get("monitoring_profile_id") else None,
-            branch_id=uuid.UUID(record["branch_id"]) if record.get("branch_id") else None,
+            custom_fields=record.get("custom_fields"),
+            branch_id=record.get("branch_id"),  # Already a string
+            normalized_name=record.get("normalized_name"),
+            device_subtype=record.get("device_subtype"),
+            floor_info=record.get("floor_info"),
+            unit_number=record.get("unit_number"),
+            original_name=record.get("original_name"),
+            ssh_port=record.get("ssh_port", 22),
+            ssh_username=record.get("ssh_username"),
+            ssh_enabled=record.get("ssh_enabled", True),
+            created_at=convert_value(record.get("created_at")),
+            updated_at=convert_value(record.get("updated_at")),
         )
         session.add(device)
         logger.debug("Seeded device %s (%s)", record["name"], record["ip"])
