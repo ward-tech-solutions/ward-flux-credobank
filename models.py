@@ -165,7 +165,7 @@ class DiscoveryJob(Base):
 
     # Metadata
     triggered_by = Column(String(50))  # 'manual', 'scheduled', 'api'
-    triggered_by_user = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    triggered_by_user = Column(Integer, ForeignKey('users.id'))
 
 
 class NetworkTopology(Base):
