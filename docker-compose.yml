@@ -89,7 +89,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: ward-celery-worker
-    command: celery -A celery_app worker --loglevel=info --concurrency=4
+    command: celery -A celery_app worker --loglevel=info --concurrency=60
     environment:
       - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
