@@ -36,7 +36,6 @@ import {
   Loader2,
   Activity,
   Clock,
-  Info,
 } from 'lucide-react'
 import {
   AreaChart,
@@ -689,7 +688,7 @@ export default function Monitor() {
   }, [historicalData])
 
   const uptimePercentage = useMemo(() => {
-    if (historicalData.length === 0) return 0
+    if (historicalData.length === 0) return "0"
     const upPoints = historicalData.filter(d => d.status === 1).length
     return ((upPoints / historicalData.length) * 100).toFixed(2)
   }, [historicalData])
@@ -1270,7 +1269,7 @@ export default function Monitor() {
                       key={range}
                       onClick={() => setTimeRange(range)}
                       size="sm"
-                      variant={timeRange === range ? 'default' : 'outline'}
+                      variant={timeRange === range ? 'primary' : 'outline'}
                       className={timeRange === range ? 'bg-gradient-to-r from-ward-green to-green-600 hover:from-green-600 hover:to-ward-green shadow-md' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}
                     >
                       {range === '24h' ? 'Last 24 Hours' : range === '7d' ? 'Last 7 Days' : 'Last 30 Days'}

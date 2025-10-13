@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Modal, ModalHeader, ModalTitle, ModalContent } from '@/components/ui/Modal'
 import { Skeleton } from '@/components/ui/Loading'
 import Badge from '@/components/ui/Badge'
@@ -20,9 +20,7 @@ import {
   Activity,
   Info,
   Network,
-  Edit3,
-  Save,
-  X as XIcon,
+  Wifi,
 } from 'lucide-react'
 import {
   AreaChart,
@@ -84,24 +82,8 @@ const formatDuration = (ms: number) => {
   return `${seconds}s`
 }
 
-const buildEditFormState = (deviceData: any) => ({
-  name: deviceData?.display_name || deviceData?.name || '',
-  ip: deviceData?.ip || '',
-  hostname: deviceData?.hostname || '',
-  vendor: deviceData?.vendor || '',
-  device_type: deviceData?.device_type || '',
-  model: deviceData?.model || '',
-  location: deviceData?.location || '',
-  description: deviceData?.description || '',
-  ssh_port: deviceData?.ssh_port ?? 22,
-  ssh_username: deviceData?.ssh_username || '',
-  ssh_enabled: deviceData?.ssh_enabled !== false,
-})
-
 export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }: DeviceDetailsModalProps) {
   const [copiedIP, setCopiedIP] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState<any>({ ssh_port: 22, ssh_enabled: true })
   const [timeRange, setTimeRange] = useState<TimeRange>('24h')
   const [isPinging, setIsPinging] = useState(false)
   const queryClient = useQueryClient()
@@ -128,16 +110,6 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
     refetchInterval: 30000,
   })
 
-  const updateMutation = useMutation({
-    mutationFn: (data: any) => devicesAPI.updateDevice(hostid, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['device', hostid] })
-      queryClient.invalidateQueries({ queryKey: ['devices'] })
-      setIsEditing(false)
-      refetch()
-    },
-  })
-
   useEffect(() => {
     if (open && hostid) {
       refetch()
@@ -145,12 +117,6 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
   }, [open, hostid, refetch])
 
   const deviceData = device?.data
-
-  useEffect(() => {
-    if (deviceData && isEditing) {
-      setEditForm(buildEditFormState(deviceData))
-    }
-  }, [isEditing, deviceData])
 
   const isOnline = deviceData?.ping_status === 'Up' || deviceData?.available === 'Available'
   const statusText = deviceData?.ping_status || deviceData?.available || 'Unknown'
@@ -282,22 +248,6 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
       onOpenSSH(deviceData.display_name, `${deviceData.ip}:${port}`)
       onClose()
     }
-  }
-
-  const handleSave = () => {
-    updateMutation.mutate(editForm)
-  }
-
-  const handleCancel = () => {
-    setIsEditing(false)
-    setEditForm({ ssh_port: 22, ssh_enabled: true })
-  }
-
-  const handleEditToggle = () => {
-    if (!isEditing && deviceData) {
-      setEditForm(buildEditFormState(deviceData))
-    }
-    setIsEditing(!isEditing)
   }
 
   return (
@@ -462,7 +412,7 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                 <div className="flex gap-2">
                   <Button
                     size="sm"
-                    variant={timeRange === '24h' ? 'default' : 'outline'}
+                    variant={timeRange === '24h' ? 'primary' : 'outline'}
                     onClick={() => setTimeRange('24h')}
                     className={timeRange === '24h' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
                   >
@@ -470,7 +420,7 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                   </Button>
                   <Button
                     size="sm"
-                    variant={timeRange === '7d' ? 'default' : 'outline'}
+                    variant={timeRange === '7d' ? 'primary' : 'outline'}
                     onClick={() => setTimeRange('7d')}
                     className={timeRange === '7d' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
                   >
@@ -478,7 +428,7 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                   </Button>
                   <Button
                     size="sm"
-                    variant={timeRange === '30d' ? 'default' : 'outline'}
+                    variant={timeRange === '30d' ? 'primary' : 'outline'}
                     onClick={() => setTimeRange('30d')}
                     className={timeRange === '30d' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
                   >
@@ -699,53 +649,19 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                 <Info className="h-5 w-5 text-ward-green" />
                 Device Information
               </h3>
-              {isEditing ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <InputField label="Device Name" value={editForm.name || ''} onChange={(v) => setEditForm({...editForm, name: v})} />
-                    <InputField label="IP Address" value={editForm.ip || ''} onChange={(v) => setEditForm({...editForm, ip: v})} />
-                    <InputField label="Hostname" value={editForm.hostname || ''} onChange={(v) => setEditForm({...editForm, hostname: v})} />
-                    <InputField label="Vendor" value={editForm.vendor || ''} onChange={(v) => setEditForm({...editForm, vendor: v})} />
-                    <InputField label="Device Type" value={editForm.device_type || ''} onChange={(v) => setEditForm({...editForm, device_type: v})} />
-                    <InputField label="Model" value={editForm.model || ''} onChange={(v) => setEditForm({...editForm, model: v})} />
-                    <InputField label="Location" value={editForm.location || ''} onChange={(v) => setEditForm({...editForm, location: v})} />
-                    <InputField label="Description" value={editForm.description || ''} onChange={(v) => setEditForm({...editForm, description: v})} />
-                  </div>
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-                    <h4 className="text-md font-semibold mb-3 text-gray-900 dark:text-gray-100">SSH Configuration</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <InputField label="SSH Port" type="number" value={editForm.ssh_port || 22} onChange={(v) => setEditForm({...editForm, ssh_port: parseInt(v) || 22})} />
-                      <InputField label="SSH Username" value={editForm.ssh_username || ''} onChange={(v) => setEditForm({...editForm, ssh_username: v})} />
-                      <div className="flex items-center gap-2 pt-6">
-                        <input
-                          type="checkbox"
-                          id="ssh_enabled"
-                          checked={editForm.ssh_enabled}
-                          onChange={(e) => setEditForm({...editForm, ssh_enabled: e.target.checked})}
-                          className="h-4 w-4 rounded border-gray-300 text-ward-green focus:ring-ward-green"
-                        />
-                        <label htmlFor="ssh_enabled" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          SSH Enabled
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoRow label="Branch Location" value={deviceData.branch} />
-                  <InfoRow label="Region" value={deviceData.region} />
-                  <InfoRow label="IP Address" value={deviceData.ip} />
-                  <InfoRow label="Device Type" value={deviceData.device_type} />
-                  <InfoRow label="Hostname" value={deviceData.hostname} />
-                  <InfoRow label="Vendor" value={deviceData.vendor || 'Not set'} />
-                  <InfoRow label="Model" value={deviceData.model || 'Not set'} />
-                  <InfoRow label="Location" value={deviceData.location || 'Not set'} />
-                  <InfoRow label="SSH Port" value={deviceData.ssh_port?.toString() || '22'} />
-                  <InfoRow label="SSH Username" value={deviceData.ssh_username || 'Not set'} />
-                  <InfoRow label="Available" value={deviceData.available} />
-                </div>
-              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InfoRow label="Branch Location" value={deviceData.branch} />
+                <InfoRow label="Region" value={deviceData.region} />
+                <InfoRow label="IP Address" value={deviceData.ip} />
+                <InfoRow label="Device Type" value={deviceData.device_type} />
+                <InfoRow label="Hostname" value={deviceData.hostname} />
+                <InfoRow label="Vendor" value={deviceData.vendor || 'Not set'} />
+                <InfoRow label="Model" value={deviceData.model || 'Not set'} />
+                <InfoRow label="Location" value={deviceData.location || 'Not set'} />
+                <InfoRow label="SSH Port" value={deviceData.ssh_port?.toString() || '22'} />
+                <InfoRow label="SSH Username" value={deviceData.ssh_username || 'Not set'} />
+                <InfoRow label="Available" value={deviceData.available} />
+              </div>
             </div>
 
             {/* Alert History Timeline - Modern */}
@@ -772,20 +688,6 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                       : isActive
                         ? formatDuration(Date.now() - triggeredAt.getTime())
                         : 'N/A'
-
-                    const getSeverityColor = (severity: string) => {
-                      switch (severity.toUpperCase()) {
-                        case 'CRITICAL':
-                          return 'bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100'
-                        case 'HIGH':
-                          return 'bg-orange-100 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-900 dark:text-orange-100'
-                        case 'WARNING':
-                        case 'MEDIUM':
-                          return 'bg-yellow-100 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-900 dark:text-yellow-100'
-                        default:
-                          return 'bg-blue-100 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100'
-                      }
-                    }
 
                     return (
                       <div
@@ -926,20 +828,6 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
     <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
       <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>
       <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{value}</span>
-    </div>
-  )
-}
-
-function InputField({ label, value, onChange, type = 'text' }: { label: string; value: string | number; onChange: (value: string) => void; type?: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent"
-      />
     </div>
   )
 }
