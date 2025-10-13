@@ -285,6 +285,68 @@ export default function Devices() {
         </Button>
       </div>
 
+      {/* Device Stats Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Total Devices</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {devices?.data?.length || 0}
+                </p>
+              </div>
+              <Wifi className="h-8 w-8 text-gray-400" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Up</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {devices?.data?.filter((d: any) => d.ping_status === 'Up').length || 0}
+                </p>
+              </div>
+              <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+                <div className="h-4 w-4 rounded-full bg-green-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Down</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {devices?.data?.filter((d: any) => d.ping_status === 'Down').length || 0}
+                </p>
+              </div>
+              <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+                <div className="h-4 w-4 rounded-full bg-red-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Unknown</p>
+                <p className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                  {devices?.data?.filter((d: any) => !d.ping_status || d.ping_status === 'Unknown').length || 0}
+                </p>
+              </div>
+              <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                <div className="h-4 w-4 rounded-full bg-gray-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filters and View Toggle */}
       <Card>
         <CardContent className="p-4">
@@ -500,7 +562,10 @@ export default function Devices() {
                 {filteredDevices.map((device: any) => {
                   const isOnline = device.ping_status === 'Up' || device.available === 'Available'
                   return (
-                    <TableRow key={device.hostid}>
+                    <TableRow
+                      key={device.hostid}
+                      className={!isOnline ? 'bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20' : ''}
+                    >
                       <TableCell>
                         <Badge variant={isOnline ? 'success' : 'danger'} dot>
                           {device.ping_status || 'Unknown'}

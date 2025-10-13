@@ -5,14 +5,15 @@ Standalone alerts API for alert_history table
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
-from sqlalchemy import and_, or_, desc
+from sqlalchemy import and_, or_, desc, func
 from sqlalchemy.orm import Session
 
 from fastapi import APIRouter, Depends, Query
 
 from auth import get_current_active_user
-from database import User, get_db
+from database import User, get_db, PingResult
 from monitoring.models import AlertHistory, StandaloneDevice, AlertRule
+from models import Branch
 from pydantic import BaseModel
 import uuid
 
@@ -43,21 +44,156 @@ class AlertRuleUpdate(BaseModel):
     branch_id: Optional[str] = None
 
 
+@router.get("/realtime")
+async def get_realtime_alerts(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get REAL-TIME alerts based on actual device ping status
+    Shows ALL down devices, not just historical alerts
+    """
+
+    try:
+        # Get latest ping result for each device (last 10 minutes)
+        recent_time = datetime.now() - timedelta(minutes=10)
+
+        # Subquery to get latest ping per device
+        latest_pings = (
+            db.query(
+                PingResult.device_ip,
+                func.max(PingResult.timestamp).label('last_timestamp')
+            )
+            .filter(PingResult.timestamp >= recent_time)
+            .group_by(PingResult.device_ip)
+            .subquery()
+        )
+
+        # Get all enabled devices with their latest ping status
+        query = (
+            db.query(StandaloneDevice, Branch, PingResult)
+            .outerjoin(Branch, StandaloneDevice.branch_id == Branch.id)
+            .outerjoin(
+                latest_pings,
+                StandaloneDevice.ip == latest_pings.c.device_ip
+            )
+            .outerjoin(
+                PingResult,
+                and_(
+                    PingResult.device_ip == latest_pings.c.device_ip,
+                    PingResult.timestamp == latest_pings.c.last_timestamp
+                )
+            )
+            .filter(StandaloneDevice.enabled == True)
+        )
+
+        results = query.all()
+
+        # Build alert list from down devices
+        alerts = []
+        for device, branch, ping_result in results:
+            custom_fields = device.custom_fields or {}
+
+            # Determine if device is down
+            is_down = False
+            last_ping_time = None
+            downtime_seconds = None
+
+            if ping_result:
+                is_down = not ping_result.is_reachable
+                last_ping_time = ping_result.timestamp
+
+                if is_down:
+                    # Calculate downtime
+                    downtime_seconds = int((datetime.now() - ping_result.timestamp).total_seconds())
+            else:
+                # No recent ping data = device is considered down
+                is_down = True
+                downtime_seconds = 600  # At least 10 minutes
+
+            # Only include down devices
+            if not is_down:
+                continue
+
+            # Get branch information
+            branch_name = branch.display_name if branch else custom_fields.get("branch", "Unknown")
+            branch_id = str(branch.id) if branch else device.branch_id
+            branch_region = branch.region if branch else custom_fields.get("region", device.location or "Unknown")
+            branch_code = branch.branch_code if branch else None
+
+            # Determine severity based on downtime
+            if downtime_seconds and downtime_seconds > 3600:  # > 1 hour
+                severity = "CRITICAL"
+            elif downtime_seconds and downtime_seconds > 900:  # > 15 minutes
+                severity = "HIGH"
+            else:
+                severity = "WARNING"
+
+            alerts.append({
+                "id": f"ping-{str(device.id)}",  # Unique ID for real-time alert
+                "device_id": str(device.id),
+                "device_name": device.name,
+                "device_ip": device.ip,
+                "device_type": device.device_type,
+                "device_location": branch_region,
+                "branch_id": branch_id,
+                "branch_name": branch_name,
+                "branch_code": branch_code,
+                "branch_region": branch_region,
+                "rule_name": "Ping Unavailable",
+                "severity": severity,
+                "message": f"Device {device.name} ({device.ip}) is DOWN - unreachable for {int(downtime_seconds / 60) if downtime_seconds else '?'} minutes" if downtime_seconds else f"Device {device.name} ({device.ip}) is DOWN - no recent ping data",
+                "value": "Down",
+                "threshold": "Up",
+                "triggered_at": last_ping_time.isoformat() if last_ping_time else (datetime.now() - timedelta(minutes=10)).isoformat(),
+                "resolved_at": None,  # Active alerts have no resolved_at
+                "duration_seconds": downtime_seconds,
+                "acknowledged": False,
+                "acknowledged_by": None,
+                "acknowledged_at": None,
+                "notifications_sent": 0,
+            })
+
+        return {
+            "alerts": alerts,
+            "total": len(alerts),
+        "limit": len(alerts),
+        "offset": 0,
+    }
+
+    except Exception as e:
+        logger.error(f"Error in realtime alerts endpoint: {e}", exc_info=True)
+        return {
+            "alerts": [],
+            "total": 0,
+            "limit": 0,
+            "offset": 0,
+            "error": str(e)
+        }
+
+
 @router.get("")
 async def get_alerts(
     severity: Optional[str] = Query(None, description="Filter by severity: info, warning, critical"),
     status: Optional[str] = Query(None, description="Filter by status: active, resolved"),
+    device_id: Optional[str] = Query(None, description="Filter by device_id"),
     limit: int = Query(100, le=1000, description="Maximum number of alerts to return"),
     offset: int = Query(0, description="Number of alerts to skip"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Get alerts from alert_history table with filtering"""
+    """Get alerts from alert_history table with filtering (historical alerts)"""
 
-    # Build query
-    query = db.query(AlertHistory, StandaloneDevice).join(
+    # Build query with left join to Branch for branch information
+    query = db.query(AlertHistory, StandaloneDevice, Branch).join(
         StandaloneDevice, AlertHistory.device_id == StandaloneDevice.id
+    ).outerjoin(
+        Branch, StandaloneDevice.branch_id == Branch.id
     )
+
+    # Filter by device_id
+    if device_id:
+        query = query.filter(AlertHistory.device_id == device_id)
 
     # Filter by status (resolved or active)
     if status == "resolved":
@@ -80,7 +216,7 @@ async def get_alerts(
 
     # Format response
     alerts = []
-    for alert, device in results:
+    for alert, device, branch in results:
         custom_fields = device.custom_fields or {}
 
         # Calculate duration if resolved
@@ -88,12 +224,23 @@ async def get_alerts(
         if alert.resolved_at and alert.triggered_at:
             duration = int((alert.resolved_at - alert.triggered_at).total_seconds())
 
+        # Get branch information
+        branch_name = branch.display_name if branch else custom_fields.get("branch", "Unknown")
+        branch_id = str(branch.id) if branch else device.branch_id
+        branch_region = branch.region if branch else custom_fields.get("region", device.location or "Unknown")
+        branch_code = branch.branch_code if branch else None
+
         alerts.append({
             "id": str(alert.id),
             "device_id": str(alert.device_id),
             "device_name": device.name,
             "device_ip": device.ip,
-            "device_location": custom_fields.get("region", device.location or "Unknown"),
+            "device_type": device.device_type,
+            "device_location": branch_region,
+            "branch_id": branch_id,
+            "branch_name": branch_name,
+            "branch_code": branch_code,
+            "branch_region": branch_region,
             "rule_name": alert.rule_name,
             "severity": alert.severity,
             "message": alert.message,
@@ -110,6 +257,8 @@ async def get_alerts(
 
     # Get total count for pagination
     count_query = db.query(AlertHistory)
+    if device_id:
+        count_query = count_query.filter(AlertHistory.device_id == device_id)
     if status == "resolved":
         count_query = count_query.filter(AlertHistory.resolved_at.isnot(None))
     elif status == "active":

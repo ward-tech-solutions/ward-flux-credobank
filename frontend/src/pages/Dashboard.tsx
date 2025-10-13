@@ -6,6 +6,7 @@ import Badge from '@/components/ui/Badge'
 import Select from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { devicesAPI } from '@/services/api'
+import ActiveAlertsTable from '@/components/ActiveAlertsTable'
 import {
   Activity,
   AlertTriangle,
@@ -56,9 +57,10 @@ export default function DashboardEnhanced() {
     queryFn: () => devicesAPI.getAll(),
   })
 
-  const { data: alertsResponse } = useQuery({
-    queryKey: ['alerts', selectedSeverity],
-    queryFn: () => devicesAPI.getAlerts(selectedSeverity),
+  const { data: alertsResponse, isLoading: alertsLoading } = useQuery({
+    queryKey: ['realtime-alerts'],
+    queryFn: () => devicesAPI.getRealtimeAlerts(),
+    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
   })
 
   const stats = statsResponse?.data
@@ -66,6 +68,12 @@ export default function DashboardEnhanced() {
   // Safely extract alerts array - handle both response formats
   const alertsData = alertsResponse?.data
   const alerts = Array.isArray(alertsData?.alerts) ? alertsData.alerts : []
+
+  // Debug logging
+  console.log('Alerts Response:', alertsResponse)
+  console.log('Alerts Data:', alertsData)
+  console.log('Alerts Array:', alerts)
+  console.log('Alerts Count:', alerts.length)
 
   // Calculate regional statistics
   const regionalStats: Record<string, any> = {}
@@ -295,80 +303,28 @@ export default function DashboardEnhanced() {
         </CardContent>
       </Card>
 
-      {/* Active Alerts */}
+      {/* Active Alerts - Enhanced with Branch Grouping */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Active Alerts</CardTitle>
+            <div className="flex items-center gap-3">
+              <CardTitle>Active Alerts</CardTitle>
+              <Badge variant="default" className="h-7 px-3 flex items-center justify-center">
+                {alerts.length}
+              </Badge>
+            </div>
             <div className="flex items-center gap-3">
               <Select
-                label="Severity"
+                label="Filter by Severity"
                 value={selectedSeverity}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedSeverity(e.target.value)}
                 options={severityOptions}
               />
-              <Badge variant="default" className="h-8 px-3 flex items-center justify-center">
-                {alerts.length}
-              </Badge>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {alerts.length === 0 ? (
-            <div className="text-center py-12">
-              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No alerts</h3>
-              <p className="text-gray-500 dark:text-gray-400 mt-1">All systems are operating normally</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Severity
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Host
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Description
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Time
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {alerts.slice(0, 100).map((alert: any, index: number) => (
-                    <tr key={alert.id || index} className="hover:bg-gray-50 dark:hover:bg-gray-900">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(
-                            alert.severity
-                          )}`}
-                        >
-                          {alert.severity}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link
-                          to={`/devices/${alert.device_id}`}
-                          className="text-ward-green hover:text-ward-green-dark font-medium"
-                        >
-                          {alert.device_name} ({alert.device_ip})
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-gray-900 dark:text-gray-100">{alert.message}</td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                        {alert.triggered_at ? new Date(alert.triggered_at).toLocaleString() : 'N/A'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <ActiveAlertsTable alerts={alerts} isLoading={alertsLoading} />
         </CardContent>
       </Card>
 

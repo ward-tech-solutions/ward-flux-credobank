@@ -157,9 +157,22 @@ export const devicesAPI = {
   getStats: () => api.get<Stats>('/dashboard/stats'),
 
   // Get alerts from standalone monitoring
-  getAlerts: (severity?: string) => {
-    const params = severity ? `?severity=${severity}&status=active` : '?status=active'
+  getAlerts: (severity?: string, deviceId?: string) => {
+    let params = '?'
+    if (severity) params += `severity=${severity}&`
+    if (deviceId) params += `device_id=${deviceId}&`
+    params += 'status=active'
     return api.get(`/alerts${params}`)
+  },
+
+  // Get alert history for a specific device
+  getDeviceAlerts: (deviceId: string, limit = 50) => {
+    return api.get(`/alerts?device_id=${deviceId}&limit=${limit}`)
+  },
+
+  // Get real-time alerts based on actual ping status (shows ALL down devices)
+  getRealtimeAlerts: () => {
+    return api.get(`/alerts/realtime`)
   },
 
   // Standalone devices

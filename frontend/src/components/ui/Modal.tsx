@@ -47,7 +47,7 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm"
               onClick={handleOverlayClick}
             />
 
@@ -58,20 +58,13 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', duration: 0.3 }}
               className={cn(
-                'relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full',
+                'relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-h-[90vh] flex flex-col z-10 overflow-hidden',
                 sizes[size],
                 className
               )}
               onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
-              {title && (
-                <ModalHeader onClose={onClose}>
-                  <ModalTitle>{title}</ModalTitle>
-                </ModalHeader>
-              )}
-              <div className={cn(title && 'p-6')}>
-                {children}
-              </div>
+              {children}
             </motion.div>
           </div>
         )}
@@ -90,7 +83,7 @@ const ModalHeader = forwardRef<HTMLDivElement, ModalHeaderProps>(
   ({ className, onClose, children, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700', className)}
+      className={cn('flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0', className)}
       {...props}
     >
       <div className="flex-1">{children}</div>
@@ -128,7 +121,7 @@ const ModalContent = forwardRef<HTMLDivElement, ModalContentProps>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('p-6', className)}
+      className={cn('p-6 overflow-y-auto flex-1', className)}
       {...props}
     />
   )
@@ -142,7 +135,7 @@ const ModalFooter = forwardRef<HTMLDivElement, ModalFooterProps>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700', className)}
+      className={cn('flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0', className)}
       {...props}
     />
   )

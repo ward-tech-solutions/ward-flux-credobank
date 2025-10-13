@@ -100,8 +100,12 @@ export default function DeviceDetails() {
             <p className="text-gray-500 dark:text-gray-400 mt-1 font-mono">{deviceData.ip}</p>
           </div>
         </div>
-        <Badge variant={deviceData.enabled ? 'success' : 'danger'} size="lg" dot>
-          {deviceData.enabled ? 'Active' : 'Inactive'}
+        <Badge
+          variant={deviceData.ping_status === 'Up' ? 'success' : 'danger'}
+          size="lg"
+          dot
+        >
+          {deviceData.ping_status === 'Up' ? 'Up' : 'Down'}
         </Badge>
       </div>
 
@@ -155,8 +159,14 @@ export default function DeviceDetails() {
                   <span className="font-medium text-gray-900 dark:text-gray-100">{deviceData.model || '-'}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-                  <span className="text-gray-500 dark:text-gray-400">Status</span>
-                  <Badge variant={deviceData.enabled ? 'success' : 'danger'} dot>
+                  <span className="text-gray-500 dark:text-gray-400">Ping Status</span>
+                  <Badge variant={deviceData.ping_status === 'Up' ? 'success' : 'danger'} dot>
+                    {deviceData.ping_status || 'Unknown'}
+                  </Badge>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                  <span className="text-gray-500 dark:text-gray-400">Monitoring</span>
+                  <Badge variant={deviceData.enabled ? 'info' : 'default'} dot>
                     {deviceData.enabled ? 'Enabled' : 'Disabled'}
                   </Badge>
                 </div>
