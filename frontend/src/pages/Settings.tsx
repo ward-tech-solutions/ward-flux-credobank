@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
+import MultiSelect from '@/components/ui/MultiSelect'
 import { Badge } from '@/components/ui/Badge'
 import { LoadingSpinner } from '@/components/ui/Loading'
 import { Modal } from '@/components/ui/Modal'
@@ -16,7 +17,8 @@ interface User {
   email: string
   full_name: string
   role: 'admin' | 'regional_manager' | 'technician' | 'viewer'
-  region?: string | null
+  regions?: string[]
+  region?: string | null  // Keep for backward compatibility
   is_active: boolean
   created_at?: string
 }
@@ -35,6 +37,22 @@ interface City {
   longitude: number
   region_name: string
 }
+
+// Georgian regions list
+const GEORGIAN_REGIONS = [
+  'Tbilisi',
+  'Kvemo Kartli',
+  'Kakheti',
+  'Mtskheta-Mtianeti',
+  'Samtskhe-Javakheti',
+  'Shida Kartli',
+  'Imereti',
+  'Samegrelo',
+  'Guria',
+  'Achara',
+  'Racha-Lechkhumi',
+  'Kvemo Svaneti'
+]
 
 export default function Settings() {
   const [activeSection, setActiveSection] = useState('notifications')
@@ -73,7 +91,7 @@ export default function Settings() {
     full_name: '',
     password: '',
     role: 'technician' as 'admin' | 'regional_manager' | 'technician' | 'viewer',
-    region: '',
+    regions: [] as string[],
   })
 
 
@@ -119,7 +137,7 @@ export default function Settings() {
             email: userForm.email,
             full_name: userForm.full_name,
             role: userForm.role,
-            region: userForm.region,
+            regions: userForm.regions,
           }
       await authAPI.updateUser(Number(selectedUser.id), updateData)
       setShowEditModal(false)
@@ -148,7 +166,7 @@ export default function Settings() {
       full_name: '',
       password: '',
       role: 'technician',
-      region: '',
+      regions: [],
     })
   }
 
@@ -160,7 +178,7 @@ export default function Settings() {
       full_name: user.full_name,
       password: '',
       role: user.role,
-      region: user.region || '',
+      regions: user.regions || (user.region ? [user.region] : []),
     })
     setShowEditModal(true)
   }
@@ -610,7 +628,13 @@ export default function Settings() {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {user.region ? (
+                              {user.regions && user.regions.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {user.regions.map((region) => (
+                                    <Badge key={region} variant="default" size="sm">{region}</Badge>
+                                  ))}
+                                </div>
+                              ) : user.region ? (
                                 <Badge variant="default">{user.region}</Badge>
                               ) : (
                                 <span className="text-gray-400">All Regions</span>
@@ -702,26 +726,14 @@ export default function Settings() {
                 ]}
               />
               {userForm.role === 'regional_manager' && (
-                <Select
-                  label="Region"
-                  value={userForm.region}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, region: e.target.value })}
-                  helperText="Regional managers only see devices in their region"
-                >
-                  <option value="">Select a region</option>
-                  <option value="Tbilisi">Tbilisi</option>
-                  <option value="Kvemo Kartli">Kvemo Kartli</option>
-                  <option value="Kakheti">Kakheti</option>
-                  <option value="Mtskheta-Mtianeti">Mtskheta-Mtianeti</option>
-                  <option value="Samtskhe-Javakheti">Samtskhe-Javakheti</option>
-                  <option value="Shida Kartli">Shida Kartli</option>
-                  <option value="Imereti">Imereti</option>
-                  <option value="Samegrelo">Samegrelo</option>
-                  <option value="Guria">Guria</option>
-                  <option value="Achara">Achara</option>
-                  <option value="Racha-Lechkhumi">Racha-Lechkhumi</option>
-                  <option value="Kvemo Svaneti">Kvemo Svaneti</option>
-                </Select>
+                <MultiSelect
+                  label="Regions"
+                  options={GEORGIAN_REGIONS}
+                  selected={userForm.regions}
+                  onChange={(selected) => setUserForm({ ...userForm, regions: selected })}
+                  placeholder="Select regions"
+                  helperText="Regional managers only see devices in their selected regions"
+                />
               )}
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleAddUser} className="flex-1">
@@ -791,26 +803,14 @@ export default function Settings() {
                 ]}
               />
               {userForm.role === 'regional_manager' && (
-                <Select
-                  label="Region"
-                  value={userForm.region}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, region: e.target.value })}
-                  helperText="Regional managers only see devices in their region"
-                >
-                  <option value="">Select a region</option>
-                  <option value="Tbilisi">Tbilisi</option>
-                  <option value="Kvemo Kartli">Kvemo Kartli</option>
-                  <option value="Kakheti">Kakheti</option>
-                  <option value="Mtskheta-Mtianeti">Mtskheta-Mtianeti</option>
-                  <option value="Samtskhe-Javakheti">Samtskhe-Javakheti</option>
-                  <option value="Shida Kartli">Shida Kartli</option>
-                  <option value="Imereti">Imereti</option>
-                  <option value="Samegrelo">Samegrelo</option>
-                  <option value="Guria">Guria</option>
-                  <option value="Achara">Achara</option>
-                  <option value="Racha-Lechkhumi">Racha-Lechkhumi</option>
-                  <option value="Kvemo Svaneti">Kvemo Svaneti</option>
-                </Select>
+                <MultiSelect
+                  label="Regions"
+                  options={GEORGIAN_REGIONS}
+                  selected={userForm.regions}
+                  onChange={(selected) => setUserForm({ ...userForm, regions: selected })}
+                  placeholder="Select regions"
+                  helperText="Regional managers only see devices in their selected regions"
+                />
               )}
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleEditUser} className="flex-1">

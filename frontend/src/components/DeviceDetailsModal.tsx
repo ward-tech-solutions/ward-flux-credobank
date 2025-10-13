@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/Loading'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { devicesAPI } from '@/services/api'
+import { toast } from 'sonner'
 import {
   Globe,
   Copy,
@@ -31,6 +32,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts'
 
 interface DeviceDetailsModalProps {
@@ -40,19 +42,22 @@ interface DeviceDetailsModalProps {
   onOpenSSH?: (deviceName: string, deviceIP: string) => void
 }
 
-const getDeviceIcon = (deviceType: string) => {
-  const iconMap: Record<string, any> = {
-    'Paybox': '💳',
-    'ATM': '🏧',
-    'NVR': '📹',
-    'Access Point': '📡',
-    'Switch': '🔀',
-    'Router': '🌐',
-    'Core Router': '🖥️',
-    'Biostar': '👆',
-    'Disaster Recovery': '🛡️',
-  }
-  return iconMap[deviceType] || '📦'
+type TimeRange = '24h' | '7d' | '30d'
+
+const getDeviceIcon = (deviceType: string): any => {
+  const type = deviceType?.toLowerCase() || ''
+
+  // Return Lucide icon component
+  if (type.includes('paybox')) return Activity
+  if (type.includes('atm')) return Activity
+  if (type.includes('nvr') || type.includes('camera')) return Activity
+  if (type.includes('access point') || type.includes('ap')) return Wifi
+  if (type.includes('switch')) return Network
+  if (type.includes('router')) return Globe
+  if (type.includes('biostar')) return Activity
+  if (type.includes('disaster')) return Activity
+
+  return Activity // Default
 }
 
 const getSeverityName = (priority: number) => {
@@ -79,46 +84,6 @@ const formatDuration = (ms: number) => {
   return `${seconds}s`
 }
 
-// Generate simulated historical data for 24h status chart
-const generateStatusHistory = (isOnline: boolean) => {
-  const data = []
-  const now = Date.now()
-  const points = 24 // Last 24 hours
-
-  for (let i = points; i >= 0; i--) {
-    const timestamp = now - (i * 60 * 60 * 1000) // Hourly intervals
-    const hour = new Date(timestamp).getHours()
-
-    // Simulate realistic patterns
-    let status = 1 // Up
-    let responseTime = 5 + Math.random() * 15 // 5-20ms for normal
-
-    // If currently offline, make recent hours offline
-    if (!isOnline && i < 2) {
-      status = 0
-      responseTime = 0
-    } else if (Math.random() < 0.05) {
-      // 5% chance of historical downtime
-      status = 0
-      responseTime = 0
-    } else if (hour >= 2 && hour <= 5) {
-      // Better performance during night hours
-      responseTime = 3 + Math.random() * 8
-    }
-
-    data.push({
-      time: new Date(timestamp).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      status,
-      responseTime: status === 1 ? responseTime : 0,
-    })
-  }
-
-  return data
-}
-
 const buildEditFormState = (deviceData: any) => ({
   name: deviceData?.display_name || deviceData?.name || '',
   ip: deviceData?.ip || '',
@@ -137,12 +102,30 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
   const [copiedIP, setCopiedIP] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState<any>({ ssh_port: 22, ssh_enabled: true })
+  const [timeRange, setTimeRange] = useState<TimeRange>('24h')
+  const [isPinging, setIsPinging] = useState(false)
   const queryClient = useQueryClient()
 
   const { data: device, isLoading, refetch } = useQuery({
     queryKey: ['device', hostid],
     queryFn: () => devicesAPI.getById(hostid),
     enabled: open && !!hostid,
+  })
+
+  // Fetch real historical ping data
+  const { data: historyData, isLoading: historyLoading } = useQuery({
+    queryKey: ['device-history', hostid, timeRange],
+    queryFn: () => devicesAPI.getHistory(hostid, timeRange),
+    enabled: open && !!hostid,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  })
+
+  // Fetch alert history for this device
+  const { data: alertsData, isLoading: alertsLoading } = useQuery({
+    queryKey: ['device-alerts', hostid],
+    queryFn: () => devicesAPI.getDeviceAlerts(hostid, 50),
+    enabled: open && !!hostid,
+    refetchInterval: 30000,
   })
 
   const updateMutation = useMutation({
@@ -172,11 +155,68 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
   const isOnline = deviceData?.ping_status === 'Up' || deviceData?.available === 'Available'
   const statusText = deviceData?.ping_status || deviceData?.available || 'Unknown'
 
-  // Generate status history data
+  // Transform real ping history data to chart format
+  type PingHistoryPoint = {
+    clock: number
+    reachable: boolean
+    value: number | null
+  }
+
   const statusHistory = useMemo(() => {
-    if (!deviceData) return []
-    return generateStatusHistory(isOnline)
-  }, [deviceData, isOnline])
+    if (!historyData?.data?.history || historyData.data.history.length === 0) {
+      return []
+    }
+
+    const history = historyData.data.history as PingHistoryPoint[]
+
+    return history.map((point) => {
+      const date = new Date(point.clock * 1000)
+
+      // Format time based on time range
+      let timeFormat = ''
+      if (timeRange === '24h') {
+        const hours = date.getHours().toString().padStart(2, '0')
+        const minutes = date.getMinutes().toString().padStart(2, '0')
+        timeFormat = `${hours}:${minutes}`
+      } else if (timeRange === '7d') {
+        const day = date.toLocaleDateString('en-US', { weekday: 'short' })
+        const hours = date.getHours().toString().padStart(2, '0')
+        timeFormat = `${day} ${hours}:00`
+      } else {
+        const month = date.getMonth() + 1
+        const day = date.getDate()
+        timeFormat = `${month}/${day}`
+      }
+
+      return {
+        time: timeFormat,
+        timestamp: point.clock,
+        status: point.reachable ? 1 : 0,
+        responseTime: point.reachable && point.value ? point.value : 0,
+      }
+    }).reverse() // Reverse to show oldest to newest
+  }, [historyData, timeRange])
+
+  // Calculate uptime percentage and incidents
+  const uptimeStats = useMemo(() => {
+    if (statusHistory.length === 0) {
+      return { uptime: 0, incidents: 0, mttr: 'N/A' }
+    }
+
+    const totalPoints = statusHistory.length
+    const upPoints = statusHistory.filter(p => p.status === 1).length
+    const uptime = ((upPoints / totalPoints) * 100).toFixed(2)
+
+    // Count incidents (transitions from up to down)
+    let incidents = 0
+    for (let i = 1; i < statusHistory.length; i++) {
+      if (statusHistory[i].status === 0 && statusHistory[i - 1].status === 1) {
+        incidents++
+      }
+    }
+
+    return { uptime, incidents, mttr: 'N/A' }
+  }, [statusHistory])
 
   const copyIP = () => {
     if (deviceData?.ip) {
@@ -194,6 +234,46 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
 
   const handleRefresh = () => {
     refetch()
+  }
+
+  const handlePing = async () => {
+    if (!deviceData) return
+
+    setIsPinging(true)
+    try {
+      const response = await devicesAPI.pingDevice(hostid)
+
+      // Check actual ping result from backend
+      if (response?.data?.success) {
+        const responseTime = response.data.response_time
+        toast.success('Device is reachable!', {
+          description: responseTime
+            ? `${deviceData.display_name} responded in ${responseTime}ms`
+            : `${deviceData.display_name} responded to ping`,
+          duration: 4000,
+        })
+      } else {
+        const errorMsg = response?.data?.error || 'Device did not respond'
+        toast.error('Device is unreachable', {
+          description: `${deviceData.display_name}: ${errorMsg}`,
+          duration: 5000,
+        })
+      }
+
+      // Refresh device data after ping
+      setTimeout(() => {
+        refetch()
+        queryClient.invalidateQueries({ queryKey: ['device', hostid] })
+      }, 1000)
+    } catch (error) {
+      console.error('Ping failed:', error)
+      toast.error('Ping request failed', {
+        description: 'Could not send ping request. Please try again.',
+        duration: 4000,
+      })
+    } finally {
+      setTimeout(() => setIsPinging(false), 2000)
+    }
   }
 
   const handleSSH = () => {
@@ -222,46 +302,28 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
 
   return (
     <Modal open={open} onClose={onClose} size="xl">
-      <ModalHeader onClose={onClose}>
+      <ModalHeader onClose={onClose} className="border-none pb-0">
         <div className="flex items-center justify-between w-full pr-8">
-          <ModalTitle className="flex items-center gap-2">
-            {deviceData && <span className="text-2xl">{getDeviceIcon(deviceData.device_type)}</span>}
-            {deviceData?.display_name || 'Device Details'}
+          <ModalTitle className="flex items-center gap-3">
+            <div className={`p-3 rounded-2xl ${
+              isOnline
+                ? 'bg-gradient-to-br from-green-400 to-green-600'
+                : 'bg-gradient-to-br from-red-400 to-red-600'
+            } shadow-lg`}>
+              {deviceData && (() => {
+                const Icon = getDeviceIcon(deviceData.device_type)
+                return <Icon className="h-8 w-8 text-white filter drop-shadow-lg" strokeWidth={2.5} />
+              })()}
+            </div>
+            <div>
+              <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                {deviceData?.display_name || 'Device Details'}
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                {deviceData?.ip}
+              </div>
+            </div>
           </ModalTitle>
-          <div className="flex items-center gap-2">
-            {isEditing ? (
-              <>
-                <Button
-                  onClick={handleCancel}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <XIcon className="h-4 w-4" />
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  size="sm"
-                  className="flex items-center gap-2 bg-ward-green hover:bg-ward-green-dark"
-                  disabled={updateMutation.isPending}
-                >
-                  <Save className="h-4 w-4" />
-                  {updateMutation.isPending ? 'Saving...' : 'Save'}
-                </Button>
-              </>
-            ) : (
-              <Button
-                onClick={handleEditToggle}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <Edit3 className="h-4 w-4" />
-                Edit Device
-              </Button>
-            )}
-          </div>
         </div>
       </ModalHeader>
       <ModalContent className="max-h-[80vh] overflow-y-auto">
@@ -272,204 +334,363 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
             <Skeleton variant="card" />
           </div>
         ) : deviceData ? (
-          <div className="space-y-6">
-            {/* Status Banner */}
-            <div
-              className={`rounded-xl p-6 ${
-                isOnline
-                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800'
-                  : 'bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-800'
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                <div className={`p-3 rounded-full ${isOnline ? 'bg-green-100 dark:bg-green-900/40' : 'bg-red-100 dark:bg-red-900/40'}`}>
-                  {isOnline ? (
-                    <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
-                  ) : (
-                    <XCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
-                  )}
+          <div className="space-y-4">
+            {/* Compact Status & Quick Actions Bar */}
+            <div className={`relative overflow-hidden rounded-2xl p-5 ${
+              isOnline
+                ? 'bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-green-900/10 dark:via-emerald-900/10 dark:to-teal-900/10'
+                : 'bg-gradient-to-br from-red-50 via-rose-50 to-pink-50 dark:from-red-900/10 dark:via-rose-900/10 dark:to-pink-900/10'
+            }`}>
+              {/* Subtle background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                  <pattern id="dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <circle cx="2" cy="2" r="1" fill="currentColor" />
+                  </pattern>
+                  <rect width="100%" height="100%" fill="url(#dots)" />
+                </svg>
+              </div>
+
+              <div className="relative flex items-center justify-between">
+                {/* Status Info */}
+                <div className="flex items-center gap-4">
+                  <div className={`p-2.5 rounded-xl ${isOnline ? 'bg-green-500/20' : 'bg-red-500/20'} backdrop-blur-sm`}>
+                    {isOnline ? (
+                      <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                    )}
+                  </div>
+                  <div>
+                    <div className={`text-lg font-bold ${isOnline ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
+                      {statusText}
+                    </div>
+                    <div className={`text-sm ${isOnline ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                      {isOnline ? 'Responding normally' : 'Not responding'}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className={`text-xl font-semibold ${isOnline ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
-                    {statusText}
-                  </h3>
-                  <p className={`mt-1 ${isOnline ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-                    {isOnline ? 'Device is responding normally' : 'Device is not responding'}
-                  </p>
+
+                {/* Quick Actions - Compact */}
+                <div className="flex items-center gap-2">
+                  {onOpenSSH && (
+                    <Button
+                      onClick={handleSSH}
+                      size="sm"
+                      className="bg-ward-green/10 hover:bg-ward-green hover:text-white text-ward-green border-ward-green/20 transition-all"
+                    >
+                      <Terminal className="h-4 w-4 mr-1.5" />
+                      SSH
+                    </Button>
+                  )}
+                  <Button
+                    onClick={openWebUI}
+                    size="sm"
+                    variant="outline"
+                    className="hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-all"
+                  >
+                    <Globe className="h-4 w-4 mr-1.5" />
+                    Web
+                  </Button>
+                  <Button
+                    onClick={copyIP}
+                    size="sm"
+                    variant="outline"
+                    className="hover:bg-purple-500 hover:text-white hover:border-purple-500 transition-all"
+                  >
+                    <Copy className="h-4 w-4 mr-1.5" />
+                    {copiedIP ? 'Copied!' : 'IP'}
+                  </Button>
+                  <Button
+                    onClick={handlePing}
+                    size="sm"
+                    variant="outline"
+                    disabled={isPinging}
+                    className="hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all disabled:opacity-50"
+                  >
+                    <Activity className={`h-4 w-4 mr-1.5 ${isPinging ? 'animate-pulse' : ''}`} />
+                    {isPinging ? 'Pinging...' : 'Ping'}
+                  </Button>
+                  <Button
+                    onClick={handleRefresh}
+                    size="sm"
+                    variant="outline"
+                    className="hover:bg-gray-500 hover:text-white hover:border-gray-500 transition-all"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>
 
-            {/* Action Bar */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {onOpenSSH && (
-                <Button
-                  onClick={handleSSH}
-                  variant="outline"
-                  className="flex flex-col items-center gap-2 h-auto py-3 bg-ward-green/10 hover:bg-ward-green/20 border-ward-green text-ward-green"
-                >
-                  <Terminal className="h-5 w-5" />
-                  <span className="text-xs font-medium">SSH</span>
-                </Button>
-              )}
-              <Button
-                onClick={openWebUI}
-                variant="outline"
-                className="flex flex-col items-center gap-2 h-auto py-3"
-              >
-                <Globe className="h-5 w-5" />
-                <span className="text-xs font-medium">Web UI</span>
-              </Button>
-              <Button
-                onClick={copyIP}
-                variant="outline"
-                className="flex flex-col items-center gap-2 h-auto py-3"
-              >
-                <Copy className="h-5 w-5" />
-                <span className="text-xs font-medium">{copiedIP ? 'Copied!' : 'Copy IP'}</span>
-              </Button>
-              <Button
-                onClick={handleRefresh}
-                variant="outline"
-                className="flex flex-col items-center gap-2 h-auto py-3"
-              >
-                <RefreshCw className="h-5 w-5" />
-                <span className="text-xs font-medium">Refresh</span>
-              </Button>
-              <Button
+            {/* Secondary Actions - Compact Pills */}
+            <div className="flex flex-wrap gap-2 text-xs">
+              <button
                 onClick={() => window.location.href = `/devices?branch=${deviceData.branch}`}
-                variant="outline"
-                className="flex flex-col items-center gap-2 h-auto py-3"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all"
               >
-                <MapPin className="h-5 w-5" />
-                <span className="text-xs font-medium">Branch</span>
-              </Button>
+                <MapPin className="h-3.5 w-3.5" />
+                {deviceData.branch}
+              </button>
               {(deviceData.device_type?.toLowerCase().includes('router') ||
                 deviceData.device_type?.toLowerCase().includes('switch')) && (
-                <Button
+                <button
                   onClick={() => {
                     window.location.href = `/topology?deviceId=${deviceData.hostid}&deviceName=${encodeURIComponent(deviceData.display_name)}`
                   }}
-                  variant="outline"
-                  className="flex flex-col items-center gap-2 h-auto py-3"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/20 hover:bg-blue-200 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-all"
                 >
-                  <Network className="h-5 w-5" />
-                  <span className="text-xs font-medium">Topology</span>
-                </Button>
+                  <Network className="h-3.5 w-3.5" />
+                  Topology
+                </button>
               )}
-              <Button
-                variant="outline"
-                className="flex flex-col items-center gap-2 h-auto py-3"
+              <button
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-100 dark:bg-orange-900/20 hover:bg-orange-200 dark:hover:bg-orange-900/30 text-orange-700 dark:text-orange-300 transition-all"
               >
-                <Wrench className="h-5 w-5" />
-                <span className="text-xs font-medium">Maintain</span>
-              </Button>
+                <Wrench className="h-3.5 w-3.5" />
+                Maintain Mode
+              </button>
             </div>
 
             {/* Status History */}
             <div>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
-                <Activity className="h-5 w-5 text-ward-green" />
-                Status History (Last 24 Hours)
-              </h3>
-
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 mb-4">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Availability Timeline
-                </h4>
-                <ResponsiveContainer width="100%" height={180}>
-                  <AreaChart data={statusHistory}>
-                    <defs>
-                      <linearGradient id="statusGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-                    <XAxis
-                      dataKey="time"
-                      stroke="#6b7280"
-                      tick={{ fill: '#6b7280', fontSize: 11 }}
-                      tickFormatter={(value, index) => {
-                        // Show fewer labels
-                        if (index % 4 !== 0) return ''
-                        return value
-                      }}
-                    />
-                    <YAxis
-                      stroke="#6b7280"
-                      tick={{ fill: '#6b7280', fontSize: 11 }}
-                      domain={[0, 1]}
-                      ticks={[0, 1]}
-                      tickFormatter={(value) => value === 1 ? 'Up' : 'Down'}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1f2937',
-                        border: '1px solid #374151',
-                        borderRadius: '8px',
-                        color: '#f3f4f6',
-                        fontSize: '12px'
-                      }}
-                      formatter={(value: any) => [value === 1 ? 'Online' : 'Offline', 'Status']}
-                    />
-                    <Area
-                      type="stepAfter"
-                      dataKey="status"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                      fill="url(#statusGradient)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <Activity className="h-5 w-5 text-ward-green" />
+                  Status History
+                </h3>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant={timeRange === '24h' ? 'default' : 'outline'}
+                    onClick={() => setTimeRange('24h')}
+                    className={timeRange === '24h' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
+                  >
+                    Last 24 Hours
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={timeRange === '7d' ? 'default' : 'outline'}
+                    onClick={() => setTimeRange('7d')}
+                    className={timeRange === '7d' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
+                  >
+                    Last 7 Days
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={timeRange === '30d' ? 'default' : 'outline'}
+                    onClick={() => setTimeRange('30d')}
+                    className={timeRange === '30d' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
+                  >
+                    Last 30 Days
+                  </Button>
+                </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Response Time (ms)
-                </h4>
-                <ResponsiveContainer width="100%" height={180}>
-                  <AreaChart data={statusHistory}>
-                    <defs>
-                      <linearGradient id="responseGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#5EBBA8" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#5EBBA8" stopOpacity={0.1}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-                    <XAxis
-                      dataKey="time"
-                      stroke="#6b7280"
-                      tick={{ fill: '#6b7280', fontSize: 11 }}
-                      tickFormatter={(value, index) => {
-                        if (index % 4 !== 0) return ''
-                        return value
-                      }}
-                    />
-                    <YAxis
-                      stroke="#6b7280"
-                      tick={{ fill: '#6b7280', fontSize: 11 }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1f2937',
-                        border: '1px solid #374151',
-                        borderRadius: '8px',
-                        color: '#f3f4f6',
-                        fontSize: '12px'
-                      }}
-                      formatter={(value: any) => [`${value.toFixed(2)} ms`, 'Response Time']}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="responseTime"
-                      stroke="#5EBBA8"
-                      strokeWidth={2}
-                      fill="url(#responseGradient)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+              {/* Modern Stats Cards with Gradients */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {/* Uptime Card */}
+                <div className={`relative overflow-hidden rounded-2xl p-4 ${
+                  parseFloat(uptimeStats.uptime as string) > 99
+                    ? 'bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/30'
+                    : parseFloat(uptimeStats.uptime as string) > 95
+                    ? 'bg-gradient-to-br from-yellow-50 to-orange-100 dark:from-yellow-900/20 dark:to-orange-900/30'
+                    : 'bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-900/20 dark:to-rose-900/30'
+                }`}>
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Uptime</span>
+                      <Activity className={`h-4 w-4 ${
+                        parseFloat(uptimeStats.uptime as string) > 99 ? 'text-green-600' :
+                        parseFloat(uptimeStats.uptime as string) > 95 ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`} />
+                    </div>
+                    <div className={`text-3xl font-black ${
+                      parseFloat(uptimeStats.uptime as string) > 99 ? 'text-green-700 dark:text-green-400' :
+                      parseFloat(uptimeStats.uptime as string) > 95 ? 'text-yellow-700 dark:text-yellow-400' :
+                      'text-red-700 dark:text-red-400'
+                    }`}>
+                      {uptimeStats.uptime}%
+                    </div>
+                  </div>
+                  {/* Decorative circle */}
+                  <div className={`absolute -right-6 -bottom-6 w-24 h-24 rounded-full ${
+                    parseFloat(uptimeStats.uptime as string) > 99 ? 'bg-green-200/30' :
+                    parseFloat(uptimeStats.uptime as string) > 95 ? 'bg-yellow-200/30' :
+                    'bg-red-200/30'
+                  }`} />
+                </div>
+
+                {/* Incidents Card */}
+                <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-red-50 to-pink-100 dark:from-red-900/20 dark:to-pink-900/30">
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Incidents</span>
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                    </div>
+                    <div className="text-3xl font-black text-red-700 dark:text-red-400">
+                      {uptimeStats.incidents}
+                    </div>
+                  </div>
+                  <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-red-200/30" />
+                </div>
+
+                {/* MTTR Card */}
+                <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/30">
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">MTTR</span>
+                      <Clock className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="text-3xl font-black text-blue-700 dark:text-blue-400">
+                      {uptimeStats.mttr}
+                    </div>
+                  </div>
+                  <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-blue-200/30" />
+                </div>
               </div>
+
+              {historyLoading ? (
+                <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-200/50 dark:border-gray-700/50 mb-4">
+                  <div className="text-center text-gray-500">Loading history data...</div>
+                </div>
+              ) : statusHistory.length === 0 ? (
+                <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-200/50 dark:border-gray-700/50 mb-4">
+                  <div className="text-center text-gray-500">No history data available for this time range</div>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 mb-3 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500">
+                        <Activity className="h-4 w-4 text-white" />
+                      </div>
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                        Availability Timeline
+                      </h4>
+                    </div>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <AreaChart data={statusHistory}>
+                        <defs>
+                          <linearGradient id="statusGradientUp" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                          </linearGradient>
+                          <linearGradient id="statusGradientDown" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                        <XAxis
+                          dataKey="time"
+                          stroke="#6b7280"
+                          tick={{ fill: '#6b7280', fontSize: 11 }}
+                          tickFormatter={(value, index) => {
+                            // Show fewer labels based on data length
+                            const skipInterval = Math.max(1, Math.floor(statusHistory.length / 12))
+                            if (index % skipInterval !== 0) return ''
+                            return value
+                          }}
+                        />
+                        <YAxis
+                          stroke="#6b7280"
+                          tick={{ fill: '#6b7280', fontSize: 11 }}
+                          domain={[0, 1]}
+                          ticks={[0, 1]}
+                          tickFormatter={(value) => value === 1 ? 'Up' : 'Down'}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#1f2937',
+                            border: '1px solid #374151',
+                            borderRadius: '8px',
+                            color: '#f3f4f6',
+                            fontSize: '12px'
+                          }}
+                          formatter={(value: any, name: string) => {
+                            if (name === 'status') {
+                              return [value === 1 ? 'Up' : 'Down', 'Status']
+                            }
+                            return [value, name]
+                          }}
+                          labelFormatter={(label) => `Time: ${label}`}
+                        />
+                        <ReferenceLine y={0.5} stroke="#6b7280" strokeDasharray="3 3" />
+                        <Area
+                          type="stepAfter"
+                          dataKey="status"
+                          stroke={isOnline ? "#10b981" : "#ef4444"}
+                          strokeWidth={2}
+                          fill={isOnline ? "url(#statusGradientUp)" : "url(#statusGradientDown)"}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </>
+              )}
+
+              {!historyLoading && statusHistory.length > 0 && (
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 mb-3 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500">
+                      <Clock className="h-4 w-4 text-white" />
+                    </div>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                      Response Time (ms)
+                    </h4>
+                  </div>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <AreaChart data={statusHistory}>
+                      <defs>
+                        <linearGradient id="responseGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#5EBBA8" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#5EBBA8" stopOpacity={0.1}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                      <XAxis
+                        dataKey="time"
+                        stroke="#6b7280"
+                        tick={{ fill: '#6b7280', fontSize: 11 }}
+                        tickFormatter={(value, index) => {
+                          const skipInterval = Math.max(1, Math.floor(statusHistory.length / 12))
+                          if (index % skipInterval !== 0) return ''
+                          return value
+                        }}
+                      />
+                      <YAxis
+                        stroke="#6b7280"
+                        tick={{ fill: '#6b7280', fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1f2937',
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                          color: '#f3f4f6',
+                          fontSize: '12px'
+                        }}
+                        formatter={(value: any) => {
+                          if (typeof value === 'number') {
+                            return [`${value.toFixed(2)} ms`, 'Response Time']
+                          }
+                          return ['0 ms', 'Response Time']
+                        }}
+                        labelFormatter={(label) => `Time: ${label}`}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="responseTime"
+                        stroke="#5EBBA8"
+                        strokeWidth={2}
+                        fill="url(#responseGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
 
             {/* Device Information */}
@@ -523,6 +744,125 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                   <InfoRow label="SSH Port" value={deviceData.ssh_port?.toString() || '22'} />
                   <InfoRow label="SSH Username" value={deviceData.ssh_username || 'Not set'} />
                   <InfoRow label="Available" value={deviceData.available} />
+                </div>
+              )}
+            </div>
+
+            {/* Alert History Timeline - Modern */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-400 to-red-500">
+                  <AlertTriangle className="h-4 w-4 text-white" />
+                </div>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                  Alert History
+                </h4>
+              </div>
+
+              {alertsLoading ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading alert history...</div>
+              ) : alertsData?.data?.alerts && alertsData.data.alerts.length > 0 ? (
+                <div className="space-y-3">
+                  {alertsData.data.alerts.map((alert: any) => {
+                    const triggeredAt = new Date(alert.triggered_at)
+                    const resolvedAt = alert.resolved_at ? new Date(alert.resolved_at) : null
+                    const isActive = !alert.resolved_at
+                    const duration = alert.duration_seconds
+                      ? formatDuration(alert.duration_seconds * 1000)
+                      : isActive
+                        ? formatDuration(Date.now() - triggeredAt.getTime())
+                        : 'N/A'
+
+                    const getSeverityColor = (severity: string) => {
+                      switch (severity.toUpperCase()) {
+                        case 'CRITICAL':
+                          return 'bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100'
+                        case 'HIGH':
+                          return 'bg-orange-100 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-900 dark:text-orange-100'
+                        case 'WARNING':
+                        case 'MEDIUM':
+                          return 'bg-yellow-100 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-900 dark:text-yellow-100'
+                        default:
+                          return 'bg-blue-100 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100'
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={alert.id}
+                        className={`rounded-xl p-4 border transition-all hover:shadow-lg ${
+                          isActive
+                            ? 'bg-red-50 dark:bg-red-950/50 border-red-300 dark:border-red-800 shadow-md'
+                            : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge
+                                variant={
+                                  alert.severity === 'CRITICAL' ? 'danger' :
+                                  alert.severity === 'HIGH' ? 'warning' :
+                                  alert.severity === 'WARNING' ? 'warning' :
+                                  'default'
+                                }
+                              >
+                                {alert.severity}
+                              </Badge>
+                              {isActive && (
+                                <Badge variant="danger">
+                                  <div className="flex items-center gap-1">
+                                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                    Active
+                                  </div>
+                                </Badge>
+                              )}
+                              {alert.acknowledged && (
+                                <Badge variant="default">
+                                  Acknowledged
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-gray-900 dark:text-gray-100 font-medium mb-1">
+                              {alert.rule_name}
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                              {alert.message}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-4 w-4" />
+                                Started: {triggeredAt.toLocaleString()}
+                              </span>
+                              {resolvedAt && (
+                                <span className="flex items-center gap-1">
+                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                  Resolved: {resolvedAt.toLocaleString()}
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1">
+                                <Activity className="h-4 w-4" />
+                                Duration: {duration}
+                              </span>
+                            </div>
+                            {alert.acknowledged_by && (
+                              <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                Acknowledged by {alert.acknowledged_by} at {new Date(alert.acknowledged_at).toLocaleString()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-8 border border-gray-200 dark:border-gray-700">
+                  <div className="text-center">
+                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                    <p className="text-gray-500">No alerts recorded for this device</p>
+                    <p className="text-sm text-gray-400 mt-1">This device has a clean alert history</p>
+                  </div>
                 </div>
               )}
             </div>

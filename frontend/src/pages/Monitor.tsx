@@ -35,6 +35,8 @@ import {
   ChevronUp,
   Loader2,
   Activity,
+  Clock,
+  Info,
 } from 'lucide-react'
 import {
   AreaChart,
@@ -226,7 +228,9 @@ const fetchHistoricalData = async (device: Device, timeRange: '24h' | '7d' | '30
 
     // Transform history data to chart format
     return history.map((point: any) => {
-      const date = new Date(point.timestamp)
+      // API returns 'clock' field as Unix timestamp in seconds
+      const timestamp = point.clock * 1000 // Convert to milliseconds
+      const date = new Date(timestamp)
       let timeLabel = ''
 
       if (timeRange === '24h') {
@@ -238,12 +242,12 @@ const fetchHistoricalData = async (device: Device, timeRange: '24h' | '7d' | '30
       }
 
       return {
-        timestamp: point.timestamp,
+        timestamp: timestamp,
         time: timeLabel,
-        status: point.value, // 1 = UP, 0 = DOWN
-        responseTime: point.value === 1 ? (device.ping_response_time || 10) : 0,
+        status: point.reachable ? 1 : 0, // Convert boolean to 1/0
+        responseTime: point.reachable && point.value ? point.value : 0,
       }
-    })
+    }).reverse() // Reverse to show oldest to newest
   } catch (error) {
     console.error('Failed to fetch historical data:', error)
     return []
@@ -312,7 +316,9 @@ export default function Monitor() {
     const saved = localStorage.getItem('monitor_typeFilters')
     return saved ? JSON.parse(saved) : []
   })
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return localStorage.getItem('monitor_searchQuery') || ''
+  })
 
   // Save filters to localStorage whenever they change
   useEffect(() => {
@@ -330,6 +336,10 @@ export default function Monitor() {
   useEffect(() => {
     localStorage.setItem('monitor_typeFilters', JSON.stringify(typeFilters))
   }, [typeFilters])
+
+  useEffect(() => {
+    localStorage.setItem('monitor_searchQuery', searchQuery)
+  }, [searchQuery])
 
   const { data: devices, isLoading, refetch } = useQuery({
     queryKey: ['devices'],
@@ -421,6 +431,26 @@ export default function Monitor() {
         })
     }
   }, [selectedDevice, timeRange])
+
+  // Fetch alert history for selected device
+  const [deviceAlerts, setDeviceAlerts] = useState<any[]>([])
+  const [loadingAlerts, setLoadingAlerts] = useState(false)
+
+  useEffect(() => {
+    if (selectedDevice) {
+      setLoadingAlerts(true)
+      devicesAPI.getDeviceAlerts(selectedDevice.hostid, 50)
+        .then(response => {
+          setDeviceAlerts(response.data?.alerts || [])
+          setLoadingAlerts(false)
+        })
+        .catch(error => {
+          console.error('Failed to load alerts:', error)
+          setDeviceAlerts([])
+          setLoadingAlerts(false)
+        })
+    }
+  }, [selectedDevice])
 
   // Update countdown on data fetch
   useEffect(() => {
@@ -925,7 +955,7 @@ export default function Monitor() {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-gray-400" />
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                Showing {filteredDevices.length} of {devices?.data.length || 0} devices
+                Showing {filteredDevices?.length || 0} of {devices?.data?.length || 0} devices
               </span>
               <Button
                 variant="ghost"
@@ -1200,47 +1230,53 @@ export default function Monitor() {
         </Card>
       )}
 
-      {/* Device Status History Modal */}
+      {/* Device Status History Modal - MODERN DESIGN */}
       {selectedDevice && (
         <Modal
           open={!!selectedDevice}
           onClose={() => setSelectedDevice(null)}
           size="xl"
         >
-          <ModalHeader onClose={() => setSelectedDevice(null)}>
+          <ModalHeader onClose={() => setSelectedDevice(null)} className="border-none pb-0">
             <ModalTitle className="flex items-center gap-3">
-              <div className={`p-2 rounded-full ${
+              <div className={`p-3 rounded-2xl ${
                 selectedDevice.ping_status === 'Down'
-                  ? 'bg-red-100 dark:bg-red-900/30'
-                  : 'bg-green-100 dark:bg-green-900/30'
-              }`}>
+                  ? 'bg-gradient-to-br from-red-400 to-red-600'
+                  : 'bg-gradient-to-br from-green-400 to-green-600'
+              } shadow-lg`}>
                 {(() => {
                   const Icon = getDeviceIcon(selectedDevice.device_type)
-                  return <Icon className={`h-6 w-6 ${
-                    selectedDevice.ping_status === 'Down' ? 'text-red-600' : 'text-green-600'
-                  }`} />
+                  return <Icon className="h-8 w-8 text-white filter drop-shadow-lg" strokeWidth={2.5} />
                 })()}
               </div>
-              {getCleanDeviceName(selectedDevice.display_name)} - Status History
+              <div>
+                <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  {getCleanDeviceName(selectedDevice.display_name)}
+                </div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                  {selectedDevice.ip}
+                </div>
+              </div>
             </ModalTitle>
           </ModalHeader>
           <ModalContent className="max-h-[85vh] overflow-y-auto">
-            <div className="space-y-6 pb-6">
-              {/* Time Range Selector */}
-              <div className="flex items-center gap-2">
-                {(['24h', '7d', '30d'] as const).map((range) => (
-                  <button
-                    key={range}
-                    onClick={() => setTimeRange(range)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      timeRange === range
-                        ? 'bg-ward-green text-white'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    {range === '24h' ? 'Last 24 Hours' : range === '7d' ? 'Last 7 Days' : 'Last 30 Days'}
-                  </button>
-                ))}
+            <div className="space-y-4 pb-6">
+              {/* Modern Time Range Selector */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Status History</h3>
+                <div className="flex items-center gap-2">
+                  {(['24h', '7d', '30d'] as const).map((range) => (
+                    <Button
+                      key={range}
+                      onClick={() => setTimeRange(range)}
+                      size="sm"
+                      variant={timeRange === range ? 'default' : 'outline'}
+                      className={timeRange === range ? 'bg-gradient-to-r from-ward-green to-green-600 hover:from-green-600 hover:to-ward-green shadow-md' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}
+                    >
+                      {range === '24h' ? 'Last 24 Hours' : range === '7d' ? 'Last 7 Days' : 'Last 30 Days'}
+                    </Button>
+                  ))}
+                </div>
               </div>
 
               {loadingHistory ? (
@@ -1249,37 +1285,84 @@ export default function Monitor() {
                 </div>
               ) : (
                 <>
-                  {/* Statistics */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Uptime</p>
-                      <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-                        {uptimePercentage}%
-                      </p>
+                  {/* Modern Stats Cards with Gradients */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {/* Uptime Card */}
+                    <div className={`relative overflow-hidden rounded-2xl p-4 ${
+                      parseFloat(uptimePercentage) > 99
+                        ? 'bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/30'
+                        : parseFloat(uptimePercentage) > 95
+                        ? 'bg-gradient-to-br from-yellow-50 to-orange-100 dark:from-yellow-900/20 dark:to-orange-900/30'
+                        : 'bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-900/20 dark:to-rose-900/30'
+                    }`}>
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Uptime</span>
+                          <Activity className={`h-4 w-4 ${
+                            parseFloat(uptimePercentage) > 99 ? 'text-green-600' :
+                            parseFloat(uptimePercentage) > 95 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`} />
+                        </div>
+                        <div className={`text-3xl font-black ${
+                          parseFloat(uptimePercentage) > 99 ? 'text-green-700 dark:text-green-400' :
+                          parseFloat(uptimePercentage) > 95 ? 'text-yellow-700 dark:text-yellow-400' :
+                          'text-red-700 dark:text-red-400'
+                        }`}>
+                          {uptimePercentage}%
+                        </div>
+                      </div>
+                      <div className={`absolute -right-6 -bottom-6 w-24 h-24 rounded-full ${
+                        parseFloat(uptimePercentage) > 99 ? 'bg-green-200/30' :
+                        parseFloat(uptimePercentage) > 95 ? 'bg-yellow-200/30' :
+                        'bg-red-200/30'
+                      }`} />
                     </div>
-                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Incidents</p>
-                      <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-                        {incidents}
-                      </p>
+
+                    {/* Incidents Card */}
+                    <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-red-50 to-pink-100 dark:from-red-900/20 dark:to-pink-900/30">
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Incidents</span>
+                          <AlertTriangle className="h-4 w-4 text-red-600" />
+                        </div>
+                        <div className="text-3xl font-black text-red-700 dark:text-red-400">
+                          {incidents}
+                        </div>
+                      </div>
+                      <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-red-200/30" />
                     </div>
-                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">MTTR</p>
-                      <p className="text-2xl font-bold text-ward-green mt-1">
-                        {mttr}
-                      </p>
+
+                    {/* MTTR Card */}
+                    <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/30">
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">MTTR</span>
+                          <Clock className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="text-3xl font-black text-blue-700 dark:text-blue-400">
+                          {mttr}
+                        </div>
+                      </div>
+                      <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-blue-200/30" />
                     </div>
                   </div>
 
                   {/* Status Timeline Chart */}
-                  {historicalData.length > 0 && (
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                        Status Timeline
-                      </h3>
-                      <div className="w-full overflow-x-auto">
-                        <ResponsiveContainer width="100%" height={200}>
-                        <AreaChart data={historicalData}>
+                  {historicalData.length > 0 ? (
+                    <>
+                      <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="p-1.5 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500">
+                            <Activity className="h-4 w-4 text-white" />
+                          </div>
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            Availability Timeline
+                          </h4>
+                        </div>
+                        <div className="w-full overflow-x-auto">
+                          <ResponsiveContainer width="100%" height={200}>
+                          <AreaChart data={historicalData}>
                           <defs>
                             <linearGradient id="colorUp" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
@@ -1346,8 +1429,74 @@ export default function Monitor() {
                             fill="url(#colorUp)"
                           />
                         </AreaChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                        </div>
                       </div>
+
+                      {/* Response Time Chart */}
+                      <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="p-1.5 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500">
+                            <Clock className="h-4 w-4 text-white" />
+                          </div>
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            Response Time (ms)
+                          </h4>
+                        </div>
+                        <div className="w-full overflow-x-auto">
+                          <ResponsiveContainer width="100%" height={200}>
+                            <AreaChart data={historicalData}>
+                              <defs>
+                                <linearGradient id="responseGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#5EBBA8" stopOpacity={0.8}/>
+                                  <stop offset="95%" stopColor="#5EBBA8" stopOpacity={0.1}/>
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                              <XAxis
+                                dataKey="time"
+                                stroke="#6b7280"
+                                tick={{ fill: '#6b7280', fontSize: 12 }}
+                                tickFormatter={(value) => {
+                                  const dataIndex = historicalData.findIndex(d => d.time === value)
+                                  if (dataIndex === -1 || dataIndex % Math.ceil(historicalData.length / 8) !== 0) return ''
+                                  return value
+                                }}
+                              />
+                              <YAxis
+                                stroke="#6b7280"
+                                tick={{ fill: '#6b7280', fontSize: 12 }}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: '#1f2937',
+                                  border: '1px solid #374151',
+                                  borderRadius: '8px',
+                                  color: '#f3f4f6'
+                                }}
+                                formatter={(value: any) => {
+                                  if (typeof value === 'number') {
+                                    return [`${value.toFixed(2)} ms`, 'Response Time']
+                                  }
+                                  return ['0 ms', 'Response Time']
+                                }}
+                                labelStyle={{ color: '#9ca3af' }}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="responseTime"
+                                stroke="#5EBBA8"
+                                strokeWidth={2}
+                                fill="url(#responseGradient)"
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-8 border border-gray-200 dark:border-gray-700 text-center">
+                      <p className="text-gray-500">No history data available for this time range</p>
                     </div>
                   )}
 
@@ -1386,6 +1535,110 @@ export default function Monitor() {
                         </Badge>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Alert History */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-ward-green" />
+                      Alert History
+                    </h3>
+
+                    {loadingAlerts ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 text-ward-green animate-spin" />
+                      </div>
+                    ) : deviceAlerts.length > 0 ? (
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {deviceAlerts.map((alert: any) => {
+                          const triggeredAt = new Date(alert.triggered_at)
+                          const resolvedAt = alert.resolved_at ? new Date(alert.resolved_at) : null
+                          const isActive = !alert.resolved_at
+
+                          const getDurationText = () => {
+                            if (alert.duration_seconds) {
+                              const minutes = Math.floor(alert.duration_seconds / 60)
+                              const hours = Math.floor(minutes / 60)
+                              const days = Math.floor(hours / 24)
+                              if (days > 0) return `${days}d ${hours % 24}h`
+                              if (hours > 0) return `${hours}h ${minutes % 60}m`
+                              return `${minutes}m`
+                            }
+                            if (isActive) {
+                              const diff = Date.now() - triggeredAt.getTime()
+                              const minutes = Math.floor(diff / (1000 * 60))
+                              const hours = Math.floor(minutes / 60)
+                              if (hours > 0) return `${hours}h ${minutes % 60}m`
+                              return `${minutes}m`
+                            }
+                            return 'N/A'
+                          }
+
+                          return (
+                            <div
+                              key={alert.id}
+                              className={`rounded-lg p-3 border transition-shadow ${
+                                isActive
+                                  ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                                  : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                    <Badge
+                                      variant={
+                                        alert.severity === 'CRITICAL' ? 'danger' :
+                                        alert.severity === 'HIGH' ? 'warning' :
+                                        'default'
+                                      }
+                                      className="text-xs"
+                                    >
+                                      {alert.severity}
+                                    </Badge>
+                                    {isActive && (
+                                      <Badge variant="danger" className="text-xs">
+                                        <div className="flex items-center gap-1">
+                                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                                          Active
+                                        </div>
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                                    {alert.rule_name}
+                                  </p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                                    {alert.message}
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      {triggeredAt.toLocaleString()}
+                                    </span>
+                                    {resolvedAt && (
+                                      <span className="flex items-center gap-1">
+                                        <CheckCircle className="h-3 w-3 text-green-600" />
+                                        {resolvedAt.toLocaleString()}
+                                      </span>
+                                    )}
+                                    <span className="flex items-center gap-1">
+                                      <Activity className="h-3 w-3" />
+                                      {getDurationText()}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">No alerts recorded for this device</p>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
