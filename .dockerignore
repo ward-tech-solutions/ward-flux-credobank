@@ -67,9 +67,10 @@ dist/
 *.egg-info/
 wheels/
 
-# Frontend directory (will be built in multi-stage and copied separately)
-# CRITICAL: Exclude entire frontend/ to prevent source code from being copied
-frontend/
+# Frontend build artifacts (will be built in container)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
 
 # Development scripts
 setup.sh

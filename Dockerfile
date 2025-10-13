@@ -64,6 +64,10 @@ COPY --from=python-builder /root/.local /home/ward/.local
 # Copy application code FIRST
 COPY --chown=ward:ward . .
 
+# Remove the frontend source directory to prevent confusion
+# (it's already built and will be served from static_new)
+RUN rm -rf /app/frontend
+
 # Copy built frontend from frontend-builder AFTER (overwrites empty frontend/dist)
 # This ensures the built assets are not overwritten by the source directory
 COPY --from=frontend-builder --chown=ward:ward /frontend/dist /app/static_new
