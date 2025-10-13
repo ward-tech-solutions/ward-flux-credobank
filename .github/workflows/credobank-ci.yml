@@ -86,7 +86,7 @@ jobs:
         env:
           NODE_ENV: development
         run: |
-          rm -rf node_modules package-lock.json
+          rm -rf node_modules package-lock.json dist .vite
           npm install --legacy-peer-deps
           echo "Installed $(ls node_modules | wc -l) packages"
           echo "Checking for vite..."
@@ -114,8 +114,12 @@ jobs:
         env:
           NODE_ENV: production
         run: |
+          # Force clean build without cache
+          rm -rf dist .vite
           npx vite build
           npx tsc --noEmit
+          echo "Build complete - listing dist files:"
+          ls -la dist/assets/ | head -10
 
       - name: Celery smoke test
         env:

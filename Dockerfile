@@ -15,8 +15,8 @@ RUN npm ci --prefer-offline --no-audit --legacy-peer-deps
 # Copy frontend source
 COPY frontend/ ./
 
-# Build React app
-RUN npm run build
+# Build React app - force clean build
+RUN rm -rf dist .vite && npm run build
 
 # Stage 2: Build Python Dependencies
 FROM python:3.11-slim as python-builder
