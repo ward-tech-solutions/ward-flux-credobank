@@ -1,0 +1,120 @@
+version: '3.8'
+
+# Production Setup Running Locally
+# This matches the production environment on 10.30.25.39
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: wardops-postgres-prod
+    environment:
+      POSTGRES_USER: ward_admin
+      POSTGRES_PASSWORD: ward_admin_password
+      POSTGRES_DB: ward_ops
+    ports:
+      - "5432:5432"  # Same as production
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ward_admin"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: wardops-redis-prod
+    command: redis-server --requirepass redispass --appendonly yes
+    ports:
+      - "6379:6379"  # Same as production
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wardops-api-prod
+    environment:
+      DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
+      REDIS_URL: redis://:redispass@redis:6379/0
+      DEFAULT_ADMIN_PASSWORD: admin123
+      SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ENVIRONMENT: production
+      MONITORING_MODE: snmp_only
+    ports:
+      - "5001:8000"  # Same as production (external 5001 → internal 8000)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - api_prod_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wardops-worker-prod
+    command: celery -A celery_app worker --loglevel=info --concurrency=60
+    environment:
+      DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
+      REDIS_URL: redis://:redispass@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ENVIRONMENT: production
+      MONITORING_MODE: snmp_only
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - celery_prod_data:/data
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wardops-beat-prod
+    command: celery -A celery_app beat --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
+      REDIS_URL: redis://:redispass@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
+      ENVIRONMENT: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - beat_prod_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+  api_prod_data:
+  celery_prod_data:
+  beat_prod_data:
