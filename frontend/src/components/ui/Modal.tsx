@@ -12,7 +12,7 @@ export interface ModalProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const Modal = forwardRef<HTMLDivElement, ModalProps>(
-  ({ className, open, onClose, size = 'md', closeOnOverlayClick = true, title, children }, _ref) => {
+  ({ className, open, onClose, size = 'md', closeOnOverlayClick = true, children }, _ref) => {
     const sizes = {
       sm: 'max-w-md',
       md: 'max-w-2xl',

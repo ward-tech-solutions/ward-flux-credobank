@@ -26,7 +26,7 @@ import {
   Package,
   type LucideIcon,
 } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 // Device type icons mapping
 const deviceIcons: Record<string, any> = {
@@ -152,17 +152,6 @@ export default function DashboardEnhanced() {
     { value: 'Warning', label: 'Warning' },
     { value: 'Information', label: 'Information' },
   ]
-
-  const getSeverityColor = (severity: string) => {
-    const colors: Record<string, string> = {
-      Disaster: 'bg-red-600 text-white',
-      High: 'bg-orange-600 text-white',
-      Average: 'bg-yellow-600 text-white',
-      Warning: 'bg-yellow-500 text-white',
-      Information: 'bg-blue-500 text-white',
-    }
-    return colors[severity] || 'bg-gray-500 text-white'
-  }
 
   if (statsLoading || devicesLoading) {
     return (
