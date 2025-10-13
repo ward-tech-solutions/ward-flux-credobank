@@ -129,7 +129,7 @@ jobs:
 
       - name: Build application image
         run: |
-          docker build -t ghcr.io/${{ github.repository }}/credobank:${{ github.sha }} \
+          docker build --no-cache -t ghcr.io/${{ github.repository }}/credobank:${{ github.sha }} \
                        -t ghcr.io/${{ github.repository }}/credobank:latest .
 
       - name: Generate PostgreSQL backup
