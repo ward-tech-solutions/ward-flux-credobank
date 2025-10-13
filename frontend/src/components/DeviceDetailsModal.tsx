@@ -185,11 +185,40 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
   }, [statusHistory])
 
   const copyIP = () => {
-    if (deviceData?.ip) {
+    if (!deviceData?.ip) return
+
+    // Try modern clipboard API first (HTTPS only)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(deviceData.ip)
+        .then(() => {
+          setCopiedIP(true)
+          setTimeout(() => setCopiedIP(false), 2000)
+        })
+        .catch(() => {
+          // Fallback for HTTP or older browsers
+          fallbackCopyIP(deviceData.ip)
+        })
+    } else {
+      // Fallback for HTTP or older browsers
+      fallbackCopyIP(deviceData.ip)
+    }
+  }
+
+  const fallbackCopyIP = (text: string) => {
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    document.body.appendChild(textArea)
+    textArea.select()
+    try {
+      document.execCommand('copy')
       setCopiedIP(true)
       setTimeout(() => setCopiedIP(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
     }
+    document.body.removeChild(textArea)
   }
 
   const openWebUI = () => {

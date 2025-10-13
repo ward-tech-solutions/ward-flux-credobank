@@ -535,32 +535,28 @@ export default function Monitor() {
   }, [uniqueRegions])
 
   useEffect(() => {
-    if (uniqueBranches.length === 0) {
-      if (branchFilters.length === 0) return
-      setBranchFilters([])
-      return
-    }
+    // Only validate filters if we have branches loaded, don't clear on initial load
+    if (uniqueBranches.length === 0) return
+
     setBranchFilters(prev => {
       if (prev.length === 0) return prev
       const allowed = new Set(uniqueBranches)
       const next = prev.filter(branch => allowed.has(branch))
       return next.length === prev.length ? prev : next
     })
-  }, [uniqueBranches, branchFilters.length])
+  }, [uniqueBranches])
 
   useEffect(() => {
-    if (uniqueTypes.length === 0) {
-      if (typeFilters.length === 0) return
-      setTypeFilters([])
-      return
-    }
+    // Only validate filters if we have types loaded, don't clear on initial load
+    if (uniqueTypes.length === 0) return
+
     setTypeFilters(prev => {
       if (prev.length === 0) return prev
       const allowed = new Set(uniqueTypes)
       const next = prev.filter(type => allowed.has(type))
       return next.length === prev.length ? prev : next
     })
-  }, [uniqueTypes, typeFilters.length])
+  }, [uniqueTypes])
 
   // Filter and sort devices with priority for recently down
   const filteredDevices = useMemo(() => {
