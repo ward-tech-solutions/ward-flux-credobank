@@ -36,15 +36,6 @@ import {
   Loader2,
   Activity,
 } from 'lucide-react'
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
 
 // Professional icon mapping using Lucide React icons
 const getDeviceIcon = (deviceType: string) => {
@@ -686,28 +677,6 @@ export default function Monitor() {
   const handleRefresh = () => {
     refetch()
   }
-
-  const _incidents = useMemo(() => {
-    // Count actual incidents (transitions from UP to DOWN)
-    if (!historicalData.length) return 0
-    let count = 0
-    for (let i = 1; i < historicalData.length; i++) {
-      if (historicalData[i].status === 0 && historicalData[i-1].status === 1) {
-        count++
-      }
-    }
-    return count
-  }, [historicalData])
-
-  const _uptimePercentage = useMemo(() => {
-    if (historicalData.length === 0) return "0"
-    const upPoints = historicalData.filter(d => d.status === 1).length
-    return ((upPoints / historicalData.length) * 100).toFixed(2)
-  }, [historicalData])
-
-  const _mttr = useMemo(() => {
-    return calculateMTTR(historicalData)
-  }, [historicalData])
 
   // Toggle region expansion
   const toggleRegion = (region: string) => {
