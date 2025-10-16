@@ -260,33 +260,6 @@ const fetchHistoricalData = async (device: Device, timeRange: '24h' | '7d' | '30
   }
 }
 
-const calculateMTTR = (historicalData: any[]) => {
-  // Calculate Mean Time To Recovery
-  let downtimeIncidents = 0
-  let totalRecoveryTime = 0
-  let inDowntime = false
-  let downtimeStart = 0
-
-  historicalData.forEach((point) => {
-    if (point.status === 0 && !inDowntime) {
-      inDowntime = true
-      downtimeStart = point.timestamp
-    } else if (point.status === 1 && inDowntime) {
-      inDowntime = false
-      downtimeIncidents++
-      totalRecoveryTime += point.timestamp - downtimeStart
-    }
-  })
-
-  if (downtimeIncidents === 0) return 'N/A'
-
-  const avgRecoveryMs = totalRecoveryTime / downtimeIncidents
-  const minutes = Math.floor(avgRecoveryMs / (1000 * 60))
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  return `${hours}h ${minutes % 60}m`
-}
-
 type ViewMode = 'grid' | 'regions' | 'table'
 
 export default function Monitor() {
@@ -295,7 +268,7 @@ export default function Monitor() {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [timeRange] = useState<'24h' | '7d' | '30d'>('24h')
   const [refreshCountdown, setRefreshCountdown] = useState(30)
-  const [historicalData, setHistoricalData] = useState<any[]>([])
+  const [_historicalData, setHistoricalData] = useState<any[]>([])
   const [_loadingHistory, setLoadingHistory] = useState(false)
 
   // View mode state
