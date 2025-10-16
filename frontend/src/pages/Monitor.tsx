@@ -35,7 +35,6 @@ import {
   ChevronUp,
   Loader2,
   Activity,
-  Clock,
 } from 'lucide-react'
 import {
   AreaChart,
@@ -45,7 +44,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceArea,
 } from 'recharts'
 
 // Professional icon mapping using Lucide React icons
@@ -304,10 +302,10 @@ export default function Monitor() {
   const { isRegionalManager, userRegion } = useAuth()
   const queryClient = useQueryClient()
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
-  const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d'>('24h')
+  const [timeRange] = useState<'24h' | '7d' | '30d'>('24h')
   const [refreshCountdown, setRefreshCountdown] = useState(30)
   const [historicalData, setHistoricalData] = useState<any[]>([])
-  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [_loadingHistory, setLoadingHistory] = useState(false)
 
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
@@ -450,8 +448,8 @@ export default function Monitor() {
   }, [selectedDevice, timeRange])
 
   // Fetch alert history for selected device
-  const [deviceAlerts, setDeviceAlerts] = useState<any[]>([])
-  const [loadingAlerts, setLoadingAlerts] = useState(false)
+  const [_deviceAlerts, setDeviceAlerts] = useState<any[]>([])
+  const [_loadingAlerts, setLoadingAlerts] = useState(false)
 
   useEffect(() => {
     if (selectedDevice) {
@@ -689,7 +687,7 @@ export default function Monitor() {
     refetch()
   }
 
-  const incidents = useMemo(() => {
+  const _incidents = useMemo(() => {
     // Count actual incidents (transitions from UP to DOWN)
     if (!historicalData.length) return 0
     let count = 0
@@ -701,13 +699,13 @@ export default function Monitor() {
     return count
   }, [historicalData])
 
-  const uptimePercentage = useMemo(() => {
+  const _uptimePercentage = useMemo(() => {
     if (historicalData.length === 0) return "0"
     const upPoints = historicalData.filter(d => d.status === 1).length
     return ((upPoints / historicalData.length) * 100).toFixed(2)
   }, [historicalData])
 
-  const mttr = useMemo(() => {
+  const _mttr = useMemo(() => {
     return calculateMTTR(historicalData)
   }, [historicalData])
 

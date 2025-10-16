@@ -10,6 +10,7 @@ export interface FeatureFlags {
   reports: boolean
   map: boolean
   regions: boolean
+  [key: string]: boolean
 }
 
 const DEFAULT_FEATURES: FeatureFlags = {
