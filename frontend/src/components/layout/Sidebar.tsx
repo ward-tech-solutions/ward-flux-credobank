@@ -14,23 +14,26 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
 import { useAuth } from '@/contexts/AuthContext'
+import { useFeatures } from '@/contexts/FeatureContext'
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin', 'regional_manager', 'technician', 'viewer'] },
-  { name: 'Discovery', href: '/discovery', icon: Scan, roles: ['admin', 'technician'] },
-  { name: 'Devices', href: '/devices', icon: Wifi, roles: ['admin', 'regional_manager', 'technician', 'viewer'] },
-  { name: 'Monitor', href: '/monitor', icon: Activity, roles: ['admin', 'regional_manager', 'technician'] },
-  { name: 'Map', href: '/map', icon: MapIcon, roles: ['admin', 'regional_manager', 'technician', 'viewer'] },
-  { name: 'Topology', href: '/topology', icon: Network, roles: ['admin', 'regional_manager', 'technician'] },
-  { name: 'Diagnostics', href: '/diagnostics', icon: Stethoscope, roles: ['admin', 'regional_manager', 'technician'] },
-  { name: 'Reports', href: '/reports', icon: BarChart3, roles: ['admin', 'regional_manager'] },
-  { name: 'Alert Rules', href: '/alert-rules', icon: Bell, roles: ['admin', 'regional_manager', 'technician'] },
-  { name: 'Regions', href: '/regions', icon: MapPin, roles: ['admin', 'regional_manager'] },
-  { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin'] },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin', 'regional_manager', 'technician', 'viewer'], feature: null },
+  { name: 'Discovery', href: '/discovery', icon: Scan, roles: ['admin', 'technician'], feature: 'discovery' },
+  { name: 'Devices', href: '/devices', icon: Wifi, roles: ['admin', 'regional_manager', 'technician', 'viewer'], feature: null },
+  { name: 'Monitor', href: '/monitor', icon: Activity, roles: ['admin', 'regional_manager', 'technician'], feature: null },
+  { name: 'Map', href: '/map', icon: MapIcon, roles: ['admin', 'regional_manager', 'technician', 'viewer'], feature: 'map' },
+  { name: 'Topology', href: '/topology', icon: Network, roles: ['admin', 'regional_manager', 'technician'], feature: 'topology' },
+  { name: 'Diagnostics', href: '/diagnostics', icon: Stethoscope, roles: ['admin', 'regional_manager', 'technician'], feature: 'diagnostics' },
+  { name: 'Reports', href: '/reports', icon: BarChart3, roles: ['admin', 'regional_manager'], feature: 'reports' },
+  { name: 'Alert Rules', href: '/alert-rules', icon: Bell, roles: ['admin', 'regional_manager', 'technician'], feature: null },
+  { name: 'Regions', href: '/regions', icon: MapPin, roles: ['admin', 'regional_manager'], feature: 'regions' },
+  { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin'], feature: null },
 ]
 
 export default function Sidebar() {
   const { user } = useAuth()
+  const { features } = useFeatures()
+
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
       <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 px-6 pb-4">
@@ -53,6 +56,7 @@ export default function Sidebar() {
               <ul role="list" className="-mx-2 space-y-1">
                 {navigation
                   .filter((item) => !user?.role || item.roles.includes(user.role))
+                  .filter((item) => !item.feature || user?.role === 'admin' || features[item.feature as keyof typeof features])
                   .map((item) => (
                     <li key={item.name}>
                       <NavLink

@@ -276,6 +276,8 @@ export const diagnosticsAPI = {
     api.post('/diagnostics/ping', null, { params: { ip, count } }),
   traceroute: (ip: string, maxHops = 30) =>
     api.post('/diagnostics/traceroute', null, { params: { ip, max_hops: maxHops } }),
+  mtr: (ip: string, count = 10) =>
+    api.post('/diagnostics/mtr', null, { params: { ip, count } }),
   dnsLookup: (hostname: string) =>
     api.post('/diagnostics/dns/lookup', null, { params: { hostname } }),
   portScan: (ip: string, ports: string) =>
@@ -288,6 +290,12 @@ export const diagnosticsAPI = {
 export const sshAPI = {
   connect: (params: { host: string; username: string; password: string; port?: number }) =>
     api.post('/ssh/connect', params),
+}
+
+// Settings
+export const settingsAPI = {
+  getFeatureToggles: () => api.get('/settings/features'),
+  saveFeatureToggles: (features: Record<string, boolean>) => api.post('/settings/features', features),
 }
 
 export default api

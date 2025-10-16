@@ -3,7 +3,7 @@ WARD Tech Solutions - Alerts Router
 Standalone alerts API for alert_history table
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy import and_, or_, desc, func
 from sqlalchemy.orm import Session
@@ -56,7 +56,7 @@ async def get_realtime_alerts(
 
     try:
         # Get latest ping result for each device (last 10 minutes)
-        recent_time = datetime.now() - timedelta(minutes=10)
+        recent_time = datetime.now(timezone.utc) - timedelta(minutes=10)
 
         # Subquery to get latest ping per device
         latest_pings = (
@@ -104,12 +104,29 @@ async def get_realtime_alerts(
                 last_ping_time = ping_result.timestamp
 
                 if is_down:
-                    # Calculate downtime
-                    downtime_seconds = int((datetime.now() - ping_result.timestamp).total_seconds())
+                    # Check if there was a previous successful ping to calculate real downtime
+                    last_success = (
+                        db.query(PingResult)
+                        .filter(
+                            PingResult.device_ip == device.ip,
+                            PingResult.is_reachable == True,
+                            PingResult.timestamp < ping_result.timestamp
+                        )
+                        .order_by(PingResult.timestamp.desc())
+                        .first()
+                    )
+
+                    if last_success:
+                        # Real downtime: time since last successful ping
+                        downtime_seconds = int((datetime.now(timezone.utc) - last_success.timestamp).total_seconds())
+                    else:
+                        # Never been up - this is first ping and it failed
+                        # Show as "unknown" or very recent
+                        downtime_seconds = int((datetime.now(timezone.utc) - ping_result.timestamp).total_seconds())
             else:
                 # No recent ping data = device is considered down
                 is_down = True
-                downtime_seconds = 600  # At least 10 minutes
+                downtime_seconds = None  # Unknown downtime
 
             # Only include down devices
             if not is_down:
@@ -142,10 +159,10 @@ async def get_realtime_alerts(
                 "branch_region": branch_region,
                 "rule_name": "Ping Unavailable",
                 "severity": severity,
-                "message": f"Device {device.name} ({device.ip}) is DOWN - unreachable for {int(downtime_seconds / 60) if downtime_seconds else '?'} minutes" if downtime_seconds else f"Device {device.name} ({device.ip}) is DOWN - no recent ping data",
+                "message": f"Device {device.name} ({device.ip}) is DOWN - unreachable for {int(downtime_seconds / 60)} minutes" if downtime_seconds else f"Device {device.name} ({device.ip}) is DOWN - never seen up",
                 "value": "Down",
                 "threshold": "Up",
-                "triggered_at": last_ping_time.isoformat() if last_ping_time else (datetime.now() - timedelta(minutes=10)).isoformat(),
+                "triggered_at": last_ping_time.isoformat() if last_ping_time else (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(),
                 "resolved_at": None,  # Active alerts have no resolved_at
                 "duration_seconds": downtime_seconds,
                 "acknowledged": False,
@@ -361,26 +378,69 @@ async def get_alert_rules(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Get all alert rules"""
+    """Get all alert rules with trigger statistics"""
     rules = db.query(AlertRule).order_by(AlertRule.created_at.desc()).all()
 
-    return {
-        "rules": [
-            {
-                "id": str(rule.id),
-                "name": rule.name,
-                "description": rule.description,
-                "expression": rule.expression,
-                "severity": rule.severity,
-                "enabled": rule.enabled,
-                "device_id": str(rule.device_id) if rule.device_id else None,
-                "branch_id": rule.branch_id if rule.branch_id else None,
-                "created_at": rule.created_at.isoformat() if rule.created_at else None,
-                "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
-            }
-            for rule in rules
-        ]
-    }
+    # Calculate trigger statistics for each rule
+    now = datetime.now(timezone.utc)
+    twentyfour_hours_ago = now - timedelta(hours=24)
+    seven_days_ago = now - timedelta(days=7)
+
+    result_rules = []
+    for rule in rules:
+        # Get last triggered time
+        last_alert = (
+            db.query(AlertHistory)
+            .filter(AlertHistory.rule_id == rule.id)
+            .order_by(AlertHistory.triggered_at.desc())
+            .first()
+        )
+
+        # Count triggers in last 24 hours
+        trigger_count_24h = (
+            db.query(func.count(AlertHistory.id))
+            .filter(
+                AlertHistory.rule_id == rule.id,
+                AlertHistory.triggered_at >= twentyfour_hours_ago
+            )
+            .scalar() or 0
+        )
+
+        # Count triggers in last 7 days
+        trigger_count_7d = (
+            db.query(func.count(AlertHistory.id))
+            .filter(
+                AlertHistory.rule_id == rule.id,
+                AlertHistory.triggered_at >= seven_days_ago
+            )
+            .scalar() or 0
+        )
+
+        # Count affected devices (unique devices that triggered this rule)
+        affected_devices_count = (
+            db.query(func.count(func.distinct(AlertHistory.device_id)))
+            .filter(AlertHistory.rule_id == rule.id)
+            .scalar() or 0
+        )
+
+        result_rules.append({
+            "id": str(rule.id),
+            "name": rule.name,
+            "description": rule.description,
+            "expression": rule.expression,
+            "severity": rule.severity,
+            "enabled": rule.enabled,
+            "device_id": str(rule.device_id) if rule.device_id else None,
+            "branch_id": rule.branch_id if rule.branch_id else None,
+            "created_at": rule.created_at.isoformat() if rule.created_at else None,
+            "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
+            "last_triggered_at": last_alert.triggered_at.isoformat() if last_alert else None,
+            "trigger_count_24h": trigger_count_24h,
+            "trigger_count_7d": trigger_count_7d,
+            "affected_devices_count": affected_devices_count,
+        })
+
+    return {"rules": result_rules}
 
 
 @rules_router.post("")

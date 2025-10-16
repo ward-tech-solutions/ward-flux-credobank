@@ -78,14 +78,52 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db), current
 @router.get("/auth/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_active_user)):
     """Get current user info"""
-    return current_user
+    import json
+    # Ensure regions is properly serialized as JSON string if it's a list
+    regions_value = current_user.regions
+    if isinstance(regions_value, list):
+        regions_value = json.dumps(regions_value)
+
+    return UserResponse(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        role=current_user.role,
+        region=current_user.region,
+        regions=regions_value,
+        branches=current_user.branches,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at,
+        last_login=current_user.last_login,
+    )
 
 
 @router.get("/users", response_model=List[UserResponse])
 async def list_users(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     """List all users (admin only)"""
+    import json
     users = db.query(User).all()
-    return users
+    # Serialize regions field properly
+    result = []
+    for user in users:
+        regions_value = user.regions
+        if isinstance(regions_value, list):
+            regions_value = json.dumps(regions_value)
+        result.append(UserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            full_name=user.full_name,
+            role=user.role,
+            region=user.region,
+            regions=regions_value,
+            branches=user.branches,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            last_login=user.last_login,
+        ))
+    return result
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
@@ -104,6 +142,7 @@ async def update_user(
     user.email = update_data.email
     user.role = update_data.role
     user.region = update_data.region
+    user.regions = update_data.regions  # Support multiple regions
     if update_data.password:
         user.hashed_password = get_password_hash(update_data.password)
 

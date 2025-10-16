@@ -6,10 +6,12 @@ import Select from '@/components/ui/Select'
 import MultiSelect from '@/components/ui/MultiSelect'
 import { Badge } from '@/components/ui/Badge'
 import { LoadingSpinner } from '@/components/ui/Loading'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/Modal'
+import Switch from '@/components/ui/Switch'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { Server, Bell, Mail, Shield, Users as UsersIcon, Plus, Edit2, Trash2, Search, Eye, EyeOff, Wrench, Save, MapPin } from 'lucide-react'
+import { Server, Bell, Mail, Shield, Users as UsersIcon, Plus, Edit2, Trash2, Search, Eye, EyeOff, Wrench, Save, MapPin, ToggleLeft, Scan, Map as MapIcon, Network, Stethoscope, BarChart3 } from 'lucide-react'
 import api, { authAPI } from '@/services/api'
+import { useFeatures } from '@/contexts/FeatureContext'
 
 interface User {
   id: string | number
@@ -55,6 +57,7 @@ const GEORGIAN_REGIONS = [
 ]
 
 export default function Settings() {
+  const { features, toggleFeature, resetFeatures } = useFeatures()
   const [activeSection, setActiveSection] = useState('notifications')
   const [emailSettings, setEmailSettings] = useState({
     smtp_server: '',
@@ -108,7 +111,12 @@ export default function Settings() {
     try {
       setLoadingUsers(true)
       const response = await authAPI.listUsers()
-      setUsers(response.data as User[])
+      // Parse regions from JSON string to array
+      const usersWithParsedRegions = response.data.map((user: any) => ({
+        ...user,
+        regions: user.regions ? (typeof user.regions === 'string' ? JSON.parse(user.regions) : user.regions) : []
+      }))
+      setUsers(usersWithParsedRegions as User[])
     } catch (error) {
       console.error('Failed to load users:', error)
     } finally {
@@ -118,7 +126,11 @@ export default function Settings() {
 
   const handleAddUser = async () => {
     try {
-      await authAPI.register(userForm)
+      const userData = {
+        ...userForm,
+        regions: userForm.regions.length > 0 ? JSON.stringify(userForm.regions) : null
+      }
+      await authAPI.register(userData)
       setShowAddModal(false)
       resetUserForm()
       loadUsers()
@@ -131,13 +143,16 @@ export default function Settings() {
     if (!selectedUser) return
     try {
       const updateData = userForm.password
-        ? userForm
+        ? {
+            ...userForm,
+            regions: userForm.regions.length > 0 ? JSON.stringify(userForm.regions) : null
+          }
         : {
             username: userForm.username,
             email: userForm.email,
             full_name: userForm.full_name,
             role: userForm.role,
-            regions: userForm.regions,
+            regions: userForm.regions.length > 0 ? JSON.stringify(userForm.regions) : null,
           }
       await authAPI.updateUser(Number(selectedUser.id), updateData)
       setShowEditModal(false)
@@ -339,6 +354,17 @@ export default function Settings() {
             >
               <Wrench className="h-4 w-4 inline-block mr-2" />
               Config
+            </button>
+            <button
+              onClick={() => setActiveSection('features')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeSection === 'features'
+                  ? 'bg-ward-green text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <ToggleLeft className="h-4 w-4 inline-block mr-2" />
+              Features
             </button>
           </div>
         </CardContent>
@@ -680,77 +706,120 @@ export default function Settings() {
               setShowAddModal(false)
               resetUserForm()
             }}
-            title="Add New User"
+            size="lg"
           >
-            <div className="space-y-4">
-              <Input
-                label="Username"
-                value={userForm.username}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, username: e.target.value })}
-                placeholder="Enter username"
-                required
-              />
-              <Input
-                label="Full Name"
-                value={userForm.full_name}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, full_name: e.target.value })}
-                placeholder="Enter full name"
-                required
-              />
-              <Input
-                label="Email"
-                type="email"
-                value={userForm.email}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, email: e.target.value })}
-                placeholder="Enter email"
-                required
-              />
-              <Input
-                label="Password"
-                type="password"
-                value={userForm.password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, password: e.target.value })}
-                placeholder="Enter password"
-                autoComplete="new-password"
-                required
-              />
-              <Select
-                label="Role"
-                value={userForm.role}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, role: e.target.value as any })}
-                options={[
-                  { value: 'technician', label: 'Technician' },
-                  { value: 'regional_manager', label: 'Regional Manager' },
-                  { value: 'admin', label: 'Administrator' },
-                  { value: 'viewer', label: 'Viewer' },
-                ]}
-              />
-              {userForm.role === 'regional_manager' && (
-                <MultiSelect
-                  label="Regions"
-                  options={GEORGIAN_REGIONS}
-                  selected={userForm.regions}
-                  onChange={(selected) => setUserForm({ ...userForm, regions: selected })}
-                  placeholder="Select regions"
-                  helperText="Regional managers only see devices in their selected regions"
-                />
-              )}
-              <div className="flex gap-3 pt-4">
-                <Button onClick={handleAddUser} className="flex-1">
-                  Add User
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowAddModal(false)
-                    resetUserForm()
-                  }}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
+            <ModalHeader onClose={() => { setShowAddModal(false); resetUserForm(); }} className="bg-gradient-to-r from-ward-green/10 to-emerald-50 dark:from-ward-green/20 dark:to-emerald-900/20">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-ward-green to-emerald-600 shadow-lg">
+                  <UsersIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <ModalTitle className="text-2xl">Add New User</ModalTitle>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Create a new system user with assigned role and permissions</p>
+                </div>
               </div>
-            </div>
+            </ModalHeader>
+            <ModalContent className="bg-gray-50/50 dark:bg-gray-900/20">
+              <div className="space-y-6">
+                {/* Basic Information Section */}
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-700 space-y-4">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
+                    <div className="w-1 h-4 bg-ward-green rounded-full"></div>
+                    Basic Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Username"
+                      value={userForm.username}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, username: e.target.value })}
+                      placeholder="Enter username"
+                      required
+                    />
+                    <Input
+                      label="Full Name"
+                      value={userForm.full_name}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, full_name: e.target.value })}
+                      placeholder="Enter full name"
+                      required
+                    />
+                  </div>
+                  <Input
+                    label="Email Address"
+                    type="email"
+                    value={userForm.email}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, email: e.target.value })}
+                    placeholder="user@example.com"
+                    required
+                  />
+                </div>
+
+                {/* Security Section */}
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-700 space-y-4">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
+                    <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
+                    Security
+                  </h3>
+                  <Input
+                    label="Password"
+                    type="password"
+                    value={userForm.password}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, password: e.target.value })}
+                    placeholder="Enter a strong password"
+                    autoComplete="new-password"
+                    helperText="Minimum 8 characters recommended"
+                    required
+                  />
+                </div>
+
+                {/* Permissions Section */}
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-700 space-y-4">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
+                    <div className="w-1 h-4 bg-orange-500 rounded-full"></div>
+                    Permissions & Access
+                  </h3>
+                  <Select
+                    label="User Role"
+                    value={userForm.role}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, role: e.target.value as any })}
+                    options={[
+                      { value: 'technician', label: 'Technician - Standard access to monitoring and diagnostics' },
+                      { value: 'regional_manager', label: 'Regional Manager - Regional oversight and reporting' },
+                      { value: 'admin', label: 'Administrator - Full system access' },
+                      { value: 'viewer', label: 'Viewer - Read-only access' },
+                    ]}
+                  />
+                  {userForm.role === 'regional_manager' && (
+                    <MultiSelect
+                      label="Assigned Regions"
+                      options={GEORGIAN_REGIONS}
+                      selected={userForm.regions}
+                      onChange={(selected) => setUserForm({ ...userForm, regions: selected })}
+                      placeholder="Select regions"
+                      helperText="Regional managers will only see devices in their assigned regions"
+                    />
+                  )}
+                </div>
+              </div>
+            </ModalContent>
+            <ModalFooter className="bg-gray-50/50 dark:bg-gray-900/20">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAddModal(false)
+                  resetUserForm()
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddUser}
+                className="bg-gradient-to-r from-ward-green to-emerald-600 hover:from-emerald-600 hover:to-ward-green"
+                disabled={!userForm.username || !userForm.email || !userForm.password || !userForm.full_name}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create User
+              </Button>
+            </ModalFooter>
           </Modal>
 
           {/* Edit User Modal */}
@@ -761,74 +830,118 @@ export default function Settings() {
               resetUserForm()
               setSelectedUser(null)
             }}
-            title="Edit User"
+            size="lg"
           >
-            <div className="space-y-4">
-              <Input
-                label="Username"
-                value={userForm.username}
-                disabled
-                className="bg-gray-50 dark:bg-gray-900"
-              />
-              <Input
-                label="Full Name"
-                value={userForm.full_name}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, full_name: e.target.value })}
-                placeholder="Enter full name"
-              />
-              <Input
-                label="Email"
-                type="email"
-                value={userForm.email}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, email: e.target.value })}
-                placeholder="Enter email"
-              />
-              <Input
-                label="New Password (leave empty to keep current)"
-                type="password"
-                value={userForm.password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, password: e.target.value })}
-                placeholder="Enter new password"
-                autoComplete="new-password"
-              />
-              <Select
-                label="Role"
-                value={userForm.role}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, role: e.target.value as any })}
-                options={[
-                  { value: 'technician', label: 'Technician' },
-                  { value: 'regional_manager', label: 'Regional Manager' },
-                  { value: 'admin', label: 'Administrator' },
-                  { value: 'viewer', label: 'Viewer' },
-                ]}
-              />
-              {userForm.role === 'regional_manager' && (
-                <MultiSelect
-                  label="Regions"
-                  options={GEORGIAN_REGIONS}
-                  selected={userForm.regions}
-                  onChange={(selected) => setUserForm({ ...userForm, regions: selected })}
-                  placeholder="Select regions"
-                  helperText="Regional managers only see devices in their selected regions"
-                />
-              )}
-              <div className="flex gap-3 pt-4">
-                <Button onClick={handleEditUser} className="flex-1">
-                  Save Changes
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowEditModal(false)
-                    resetUserForm()
-                    setSelectedUser(null)
-                  }}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
+            <ModalHeader onClose={() => { setShowEditModal(false); resetUserForm(); setSelectedUser(null); }} className="bg-gradient-to-r from-blue-500/10 to-blue-50 dark:from-blue-500/20 dark:to-blue-900/20">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
+                  <Edit2 className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <ModalTitle className="text-2xl">Edit User</ModalTitle>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Update user information and permissions</p>
+                </div>
               </div>
-            </div>
+            </ModalHeader>
+            <ModalContent className="bg-gray-50/50 dark:bg-gray-900/20">
+              <div className="space-y-6">
+                {/* Basic Information Section */}
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-700 space-y-4">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
+                    <div className="w-1 h-4 bg-ward-green rounded-full"></div>
+                    Basic Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Username"
+                      value={userForm.username}
+                      disabled
+                      className="bg-gray-50 dark:bg-gray-900"
+                      helperText="Username cannot be changed"
+                    />
+                    <Input
+                      label="Full Name"
+                      value={userForm.full_name}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, full_name: e.target.value })}
+                      placeholder="Enter full name"
+                    />
+                  </div>
+                  <Input
+                    label="Email Address"
+                    type="email"
+                    value={userForm.email}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, email: e.target.value })}
+                    placeholder="user@example.com"
+                  />
+                </div>
+
+                {/* Security Section */}
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-700 space-y-4">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
+                    <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
+                    Security
+                  </h3>
+                  <Input
+                    label="New Password"
+                    type="password"
+                    value={userForm.password}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserForm({ ...userForm, password: e.target.value })}
+                    placeholder="Leave empty to keep current password"
+                    autoComplete="new-password"
+                    helperText="Only fill this if you want to change the password"
+                  />
+                </div>
+
+                {/* Permissions Section */}
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-700 space-y-4">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
+                    <div className="w-1 h-4 bg-orange-500 rounded-full"></div>
+                    Permissions & Access
+                  </h3>
+                  <Select
+                    label="User Role"
+                    value={userForm.role}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setUserForm({ ...userForm, role: e.target.value as any })}
+                    options={[
+                      { value: 'technician', label: 'Technician - Standard access to monitoring and diagnostics' },
+                      { value: 'regional_manager', label: 'Regional Manager - Regional oversight and reporting' },
+                      { value: 'admin', label: 'Administrator - Full system access' },
+                      { value: 'viewer', label: 'Viewer - Read-only access' },
+                    ]}
+                  />
+                  {userForm.role === 'regional_manager' && (
+                    <MultiSelect
+                      label="Assigned Regions"
+                      options={GEORGIAN_REGIONS}
+                      selected={userForm.regions}
+                      onChange={(selected) => setUserForm({ ...userForm, regions: selected })}
+                      placeholder="Select regions"
+                      helperText="Regional managers will only see devices in their assigned regions"
+                    />
+                  )}
+                </div>
+              </div>
+            </ModalContent>
+            <ModalFooter className="bg-gray-50/50 dark:bg-gray-900/20">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowEditModal(false)
+                  resetUserForm()
+                  setSelectedUser(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleEditUser}
+                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-500"
+                disabled={!userForm.full_name || !userForm.email}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </Button>
+            </ModalFooter>
           </Modal>
         </>
       )}
@@ -956,6 +1069,180 @@ export default function Settings() {
             </CardContent>
           </Card>
         </>
+      )}
+
+      {/* Feature Toggles */}
+      {activeSection === 'features' && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-ward-green/10 rounded-lg">
+                <ToggleLeft className="h-6 w-6 text-ward-green" />
+              </div>
+              <div>
+                <CardTitle>Feature Toggles</CardTitle>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  System-wide feature toggles (affects all users) - Admin only
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Feature Toggle Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Discovery Feature */}
+              <Card variant="glass" className={features.discovery ? 'border-ward-green/50 bg-ward-green/5' : 'border-gray-200 dark:border-gray-700'}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${features.discovery ? 'bg-ward-green/20' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                        <Scan className={`h-5 w-5 ${features.discovery ? 'text-ward-green' : 'text-gray-400'}`} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Discovery</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          Network discovery and device scanning tools
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={features.discovery}
+                      onClick={() => toggleFeature('discovery')}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Topology Feature */}
+              <Card variant="glass" className={features.topology ? 'border-ward-green/50 bg-ward-green/5' : 'border-gray-200 dark:border-gray-700'}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${features.topology ? 'bg-ward-green/20' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                        <Network className={`h-5 w-5 ${features.topology ? 'text-ward-green' : 'text-gray-400'}`} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Topology</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          Network topology visualization and mapping
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={features.topology}
+                      onClick={() => toggleFeature('topology')}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Diagnostics Feature */}
+              <Card variant="glass" className={features.diagnostics ? 'border-ward-green/50 bg-ward-green/5' : 'border-gray-200 dark:border-gray-700'}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${features.diagnostics ? 'bg-ward-green/20' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                        <Stethoscope className={`h-5 w-5 ${features.diagnostics ? 'text-ward-green' : 'text-gray-400'}`} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Diagnostics</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          Advanced network diagnostics and troubleshooting
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={features.diagnostics}
+                      onClick={() => toggleFeature('diagnostics')}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Reports Feature */}
+              <Card variant="glass" className={features.reports ? 'border-ward-green/50 bg-ward-green/5' : 'border-gray-200 dark:border-gray-700'}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${features.reports ? 'bg-ward-green/20' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                        <BarChart3 className={`h-5 w-5 ${features.reports ? 'text-ward-green' : 'text-gray-400'}`} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Reports</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          Generate and view detailed reports and analytics
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={features.reports}
+                      onClick={() => toggleFeature('reports')}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Map Feature */}
+              <Card variant="glass" className={features.map ? 'border-ward-green/50 bg-ward-green/5' : 'border-gray-200 dark:border-gray-700'}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${features.map ? 'bg-ward-green/20' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                        <MapIcon className={`h-5 w-5 ${features.map ? 'text-ward-green' : 'text-gray-400'}`} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Map</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          Geographic map view of devices and branches
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={features.map}
+                      onClick={() => toggleFeature('map')}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Regions Feature */}
+              <Card variant="glass" className={features.regions ? 'border-ward-green/50 bg-ward-green/5' : 'border-gray-200 dark:border-gray-700'}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${features.regions ? 'bg-ward-green/20' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                        <MapPin className={`h-5 w-5 ${features.regions ? 'text-ward-green' : 'text-gray-400'}`} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Regions</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          Manage regions and geographic organization
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={features.regions}
+                      onClick={() => toggleFeature('regions')}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Reset Button */}
+            <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Reset to Defaults</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Enable all features and restore default settings
+                </p>
+              </div>
+              <Button onClick={resetFeatures} variant="outline">
+                Reset Features
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
     </div>

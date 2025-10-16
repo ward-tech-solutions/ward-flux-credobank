@@ -39,6 +39,15 @@ class NotificationSettings(BaseModel):
     slack_webhook: Optional[str] = None
 
 
+class FeatureToggles(BaseModel):
+    discovery: bool = True
+    topology: bool = True
+    diagnostics: bool = True
+    reports: bool = True
+    map: bool = True
+    regions: bool = True
+
+
 # In-memory storage for now (replace with database later)
 _settings_storage = {
     "zabbix": {
@@ -55,6 +64,14 @@ _settings_storage = {
         "email_enabled": True,
         "slack_enabled": False,
         "slack_webhook": "",
+    },
+    "features": {
+        "discovery": True,
+        "topology": True,
+        "diagnostics": True,
+        "reports": True,
+        "map": True,
+        "regions": True,
     }
 }
 
@@ -163,4 +180,25 @@ def save_notification_settings(
         return {"success": True, "message": "Notification settings saved"}
     except Exception as e:
         logger.error(f"Error saving notification settings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/features")
+def get_feature_toggles(current_user: User = Depends(get_current_active_user)):
+    """Get system-wide feature toggles (applies to all users) - READ access for all authenticated users"""
+    return _settings_storage["features"]
+
+
+@router.post("/features")
+def save_feature_toggles(
+    features: FeatureToggles,
+    current_user: User = Depends(require_admin)
+):
+    """Save system-wide feature toggles (admin only - affects all users)"""
+    try:
+        _settings_storage["features"] = features.dict()
+        logger.info(f"Admin {current_user.username} updated feature toggles: {features.dict()}")
+        return {"success": True, "message": "Feature toggles saved successfully"}
+    except Exception as e:
+        logger.error(f"Error saving feature toggles: {e}")
         raise HTTPException(status_code=500, detail=str(e))

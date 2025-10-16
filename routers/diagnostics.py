@@ -8,7 +8,7 @@ import io
 import re
 import socket
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List, Tuple
 
 import sqlite3
@@ -229,6 +229,127 @@ async def get_traceroute_history(
             for h in hops
         ],
     }
+
+
+@router.post("/mtr")
+async def run_mtr(
+    request: Request,
+    ip: str,
+    count: int = 10,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Execute MTR (My Traceroute) - combines traceroute and ping functionality
+    Shows packet loss and latency statistics for each hop
+    """
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Run MTR command with appropriate options
+        # -n: numeric (no DNS lookups)
+        # -c: count (number of pings per hop)
+        # -r: report mode (output after completion)
+        # -w: wide report (better for parsing)
+        cmd = ["mtr", "-n", "-r", "-c", str(count), "-w", ip]
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"MTR command failed: {result.stderr}")
+
+        # Parse MTR output
+        hops = []
+        lines = result.stdout.strip().split('\n')
+
+        # Skip header lines and parse hop data
+        for line in lines[1:]:  # Skip "HOST:" line
+            if not line.strip() or 'HOST:' in line or 'Start:' in line:
+                continue
+
+            # MTR report format: 1.|-- IP_ADDRESS Loss% Snt Last Avg Best Wrst StDev
+            # Split and remove the hop number prefix
+            parts = line.split()
+            if len(parts) < 8:
+                continue
+
+            # parts[0] is hop number (e.g., "1.|--")
+            # parts[1] is IP address
+            hop_ip = parts[1].strip()
+
+            # Skip internal/invalid IPs
+            if hop_ip == '???' or not hop_ip or '|--' in hop_ip:
+                continue
+
+            hop_number = len(hops) + 1
+
+            try:
+                loss_percent = float(parts[2].replace('%', ''))
+                packets_sent = int(parts[3])
+                last_ms = float(parts[4])
+                avg_ms = float(parts[5])
+                best_ms = float(parts[6])
+                worst_ms = float(parts[7])
+
+                hops.append({
+                    "hop_number": hop_number,
+                    "hop_ip": hop_ip,
+                    "hop_hostname": None,  # MTR with -n doesn't resolve hostnames
+                    "packets_sent": packets_sent,
+                    "packets_received": int(packets_sent * (1 - loss_percent / 100)),
+                    "packet_loss_percent": loss_percent,
+                    "last_ms": last_ms,
+                    "avg_ms": avg_ms,
+                    "best_ms": best_ms,
+                    "worst_ms": worst_ms,
+                })
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Failed to parse MTR line: {line} - {e}")
+                continue
+
+        # Store results in database
+        device_name = ip  # Could lookup from StandaloneDevice if needed
+        timestamp = datetime.now(timezone.utc)
+
+        for hop in hops:
+            mtr_record = MTRResult(
+                device_ip=ip,
+                device_name=device_name,
+                hop_number=hop["hop_number"],
+                hop_ip=hop["hop_ip"],
+                hop_hostname=hop["hop_hostname"],
+                packets_sent=hop["packets_sent"],
+                packets_received=hop["packets_received"],
+                packet_loss_percent=int(hop["packet_loss_percent"]),
+                latency_min=int(hop["best_ms"]),
+                latency_avg=int(hop["avg_ms"]),
+                latency_max=int(hop["worst_ms"]),
+                timestamp=timestamp,
+            )
+            db.add(mtr_record)
+
+        db.commit()
+
+        return {
+            "device_ip": ip,
+            "device_name": device_name,
+            "timestamp": timestamp.isoformat(),
+            "hops": hops,
+            "total_hops": len(hops),
+        }
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=408, detail="MTR command timed out")
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="MTR command not found - please install mtr package")
+    except Exception as e:
+        logger.error(f"MTR error for {ip}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================

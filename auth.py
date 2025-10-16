@@ -49,6 +49,7 @@ class UserCreate(BaseModel):
     password: str
     role: UserRole = UserRole.VIEWER
     region: Optional[str] = None
+    regions: Optional[str] = None  # JSON array of regions
     branches: Optional[str] = None  # Comma-separated branch names
 
 
@@ -58,14 +59,16 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     role: UserRole
-    region: Optional[str]
-    branches: Optional[str]
-    is_active: bool
+    region: Optional[str] = None
+    regions: Optional[str] = None  # JSON array of regions
+    branches: Optional[str] = None
+    is_active: bool = True
     created_at: datetime
-    last_login: Optional[datetime]
+    last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+        arbitrary_types_allowed = True
 
 
 # Password utilities
@@ -110,6 +113,7 @@ def create_user(db: Session, user_data: UserCreate) -> User:
         hashed_password=hashed_password,
         role=user_data.role,
         region=user_data.region,
+        regions=user_data.regions,  # Support multiple regions
         branches=user_data.branches,
     )
     db.add(db_user)

@@ -7,6 +7,7 @@ import { devicesAPI } from '@/services/api'
 import { Card, CardContent } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Select from '@/components/ui/Select'
+import MultiSelect from '@/components/ui/MultiSelect'
 import Input from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { LoadingSpinner } from '@/components/ui/Loading'
@@ -84,7 +85,7 @@ function MapBounds({ devices, filter, searchQuery }: { devices: Device[]; filter
 
 export default function Map() {
   const [filter, setFilter] = useState<'all' | 'online' | 'offline'>('all')
-  const [selectedRegion, setSelectedRegion] = useState<string>('')
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([])
   const [deviceTypeFilter, setDeviceTypeFilter] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const mapRef = useRef<L.Map | null>(null)
@@ -111,8 +112,8 @@ export default function Map() {
       if (!matchesSearch) return false
     }
 
-    // Region filter
-    if (selectedRegion && device.region !== selectedRegion) return false
+    // Region filter - support multiple regions
+    if (selectedRegions.length > 0 && !selectedRegions.includes(device.region)) return false
 
     // Device type filter
     if (deviceTypeFilter && device.device_type !== deviceTypeFilter) return false
@@ -229,7 +230,7 @@ export default function Map() {
 
   const clearFilters = () => {
     setFilter('all')
-    setSelectedRegion('')
+    setSelectedRegions([])
     setDeviceTypeFilter('')
     setSearchQuery('')
   }
@@ -298,13 +299,11 @@ export default function Map() {
             </div>
 
             {/* Region Filter */}
-            <Select
-              value={selectedRegion}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedRegion(e.target.value)}
-              options={[
-                { value: '', label: 'All Regions' },
-                ...regions.map(region => ({ value: region, label: region }))
-              ]}
+            <MultiSelect
+              options={regions}
+              selected={selectedRegions}
+              onChange={setSelectedRegions}
+              placeholder="All Regions"
             />
 
             {/* Device Type Filter */}
@@ -318,7 +317,7 @@ export default function Map() {
             />
 
             {/* Clear Filters */}
-            {(selectedRegion || deviceTypeFilter || searchQuery || filter !== 'all') && (
+            {(selectedRegions.length > 0 || deviceTypeFilter || searchQuery || filter !== 'all') && (
               <button
                 onClick={clearFilters}
                 className="px-4 py-2 text-sm font-medium text-ward-green hover:bg-ward-green/10 rounded-lg transition-colors"
@@ -336,24 +335,37 @@ export default function Map() {
           <CardContent className="p-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Regional Overview</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {regionStats.slice(0, 6).map(({ region, online, offline, uptime }) => (
-                <div
-                  key={region}
-                  className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                  onClick={() => setSelectedRegion(region)}
-                >
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{region}</div>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">{uptime}%</span>
-                    <span className="text-xs text-gray-500">uptime</span>
+              {regionStats.slice(0, 6).map(({ region, online, offline, uptime }) => {
+                const isSelected = selectedRegions.includes(region)
+                return (
+                  <div
+                    key={region}
+                    className={`p-3 rounded-lg border transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'border-ward-green bg-ward-green/10 dark:bg-ward-green/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedRegions(selectedRegions.filter(r => r !== region))
+                      } else {
+                        setSelectedRegions([...selectedRegions, region])
+                      }
+                    }}
+                  >
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{region}</div>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">{uptime}%</span>
+                      <span className="text-xs text-gray-500">uptime</span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-xs">
+                      <span className="text-green-600 dark:text-green-400">{online}</span>
+                      <span className="text-gray-400">/</span>
+                      <span className="text-red-600 dark:text-red-400">{offline}</span>
+                    </div>
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-xs">
-                    <span className="text-green-600 dark:text-green-400">{online}</span>
-                    <span className="text-gray-400">/</span>
-                    <span className="text-red-600 dark:text-red-400">{offline}</span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </CardContent>
         </Card>

@@ -52,7 +52,11 @@ RUN apt-get update && apt-get install -y \
     libpq5 \
     libsnmp40 \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    iputils-ping \
+    mtr-tiny \
+    traceroute \
+    && rm -rf /var/lib/apt/lists/* \
+    && chmod u+s /usr/bin/traceroute.db
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh

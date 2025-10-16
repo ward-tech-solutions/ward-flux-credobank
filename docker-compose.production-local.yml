@@ -51,7 +51,7 @@ services:
       ENVIRONMENT: production
       MONITORING_MODE: snmp_only
     ports:
-      - "5001:8000"  # Same as production (external 5001 → internal 8000)
+      - "5001:5001"
     depends_on:
       postgres:
         condition: service_healthy

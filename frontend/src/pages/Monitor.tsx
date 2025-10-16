@@ -8,7 +8,7 @@ import Select from '@/components/ui/Select'
 import MultiSelect from '@/components/ui/MultiSelect'
 import { Button } from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { Modal, ModalHeader, ModalTitle, ModalContent } from '@/components/ui/Modal'
+import DeviceDetailsModal from '@/components/DeviceDetailsModal'
 import { devicesAPI, type Device } from '@/services/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useResilientWebSocket } from '@/hooks/useResilientWebSocket'
@@ -62,9 +62,10 @@ const getDeviceIcon = (deviceType: string) => {
 }
 
 const calculateDowntime = (device: Device) => {
-  // If device has active triggers, use the lastchange from trigger
+  // Priority 1: Use triggers if available (most accurate for Zabbix-monitored devices)
   if (device.triggers && device.triggers.length > 0) {
     const oldestTrigger = device.triggers[0]
+    // lastchange is a Unix timestamp string in seconds
     const problemStart = parseInt(oldestTrigger.lastchange) * 1000
     const now = Date.now()
     const diff = now - problemStart
@@ -78,13 +79,30 @@ const calculateDowntime = (device: Device) => {
     return `${minutes}m`
   }
 
-  // Fallback to last_check if no triggers
-  const now = Date.now()
-  const downSince = device.last_check * 1000
-  const diff = now - downSince
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-  return `${hours}h ${minutes}m`
+  // Priority 2: If no triggers but device is down, this is a newly detected outage
+  // We can't determine exact downtime without historical data, so show a more accurate message
+  if (device.ping_status === 'Down') {
+    // Use last_check as an approximation, but be aware this may not be accurate
+    // for devices that have been down longer than the last check cycle
+    const now = Date.now()
+    const lastCheckTime = device.last_check * 1000
+    const diff = now - lastCheckTime
+
+    // If last check was very recent (< 2 minutes), it's truly a new outage
+    if (diff < 120000) {
+      return `< 2m`
+    }
+
+    // Otherwise, estimate based on last check (but this is unreliable)
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+
+    // Indicate this is an estimate
+    if (hours > 0) return `~${hours}h ${minutes}m`
+    return `~${minutes}m`
+  }
+
+  return 'Unknown'
 }
 
 const isRecentlyDown = (device: Device): boolean => {
@@ -712,6 +730,7 @@ export default function Monitor() {
     const isDown = device.ping_status === 'Down'
     const recentlyDown = isRecentlyDown(device)
     const DeviceIcon = getDeviceIcon(device.device_type)
+    const isPinging = pingLoading.has(device.hostid)
 
     return (
       <div
@@ -781,6 +800,16 @@ export default function Monitor() {
             )}
           </div>
         </div>
+
+        {/* Ping Now button */}
+        <button
+          onClick={(e) => handlePing(device.hostid, e)}
+          disabled={isPinging}
+          className="absolute bottom-3 right-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-200 dark:border-gray-600"
+          title="Ping Now"
+        >
+          <Activity className="h-4 w-4 text-ward-green" />
+        </button>
       </div>
     )
   }
@@ -1225,422 +1254,13 @@ export default function Monitor() {
         </Card>
       )}
 
-      {/* Device Status History Modal - MODERN DESIGN */}
-      {selectedDevice && (
-        <Modal
-          open={!!selectedDevice}
-          onClose={() => setSelectedDevice(null)}
-          size="xl"
-        >
-          <ModalHeader onClose={() => setSelectedDevice(null)} className="border-none pb-0">
-            <ModalTitle className="flex items-center gap-3">
-              <div className={`p-3 rounded-2xl ${
-                selectedDevice.ping_status === 'Down'
-                  ? 'bg-gradient-to-br from-red-400 to-red-600'
-                  : 'bg-gradient-to-br from-green-400 to-green-600'
-              } shadow-lg`}>
-                {(() => {
-                  const Icon = getDeviceIcon(selectedDevice.device_type)
-                  return <Icon className="h-8 w-8 text-white filter drop-shadow-lg" strokeWidth={2.5} />
-                })()}
-              </div>
-              <div>
-                <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                  {getCleanDeviceName(selectedDevice.display_name)}
-                </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                  {selectedDevice.ip}
-                </div>
-              </div>
-            </ModalTitle>
-          </ModalHeader>
-          <ModalContent className="max-h-[85vh] overflow-y-auto">
-            <div className="space-y-4 pb-6">
-              {/* Modern Time Range Selector */}
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Status History</h3>
-                <div className="flex items-center gap-2">
-                  {(['24h', '7d', '30d'] as const).map((range) => (
-                    <Button
-                      key={range}
-                      onClick={() => setTimeRange(range)}
-                      size="sm"
-                      variant={timeRange === range ? 'primary' : 'outline'}
-                      className={timeRange === range ? 'bg-gradient-to-r from-ward-green to-green-600 hover:from-green-600 hover:to-ward-green shadow-md' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}
-                    >
-                      {range === '24h' ? 'Last 24 Hours' : range === '7d' ? 'Last 7 Days' : 'Last 30 Days'}
-                    </Button>
-                  ))}
-                </div>
-              </div>
 
-              {loadingHistory ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 text-ward-green animate-spin" />
-                </div>
-              ) : (
-                <>
-                  {/* Modern Stats Cards with Gradients */}
-                  <div className="grid grid-cols-3 gap-3">
-                    {/* Uptime Card */}
-                    <div className={`relative overflow-hidden rounded-2xl p-4 ${
-                      parseFloat(uptimePercentage) > 99
-                        ? 'bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/30'
-                        : parseFloat(uptimePercentage) > 95
-                        ? 'bg-gradient-to-br from-yellow-50 to-orange-100 dark:from-yellow-900/20 dark:to-orange-900/30'
-                        : 'bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-900/20 dark:to-rose-900/30'
-                    }`}>
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Uptime</span>
-                          <Activity className={`h-4 w-4 ${
-                            parseFloat(uptimePercentage) > 99 ? 'text-green-600' :
-                            parseFloat(uptimePercentage) > 95 ? 'text-yellow-600' :
-                            'text-red-600'
-                          }`} />
-                        </div>
-                        <div className={`text-3xl font-black ${
-                          parseFloat(uptimePercentage) > 99 ? 'text-green-700 dark:text-green-400' :
-                          parseFloat(uptimePercentage) > 95 ? 'text-yellow-700 dark:text-yellow-400' :
-                          'text-red-700 dark:text-red-400'
-                        }`}>
-                          {uptimePercentage}%
-                        </div>
-                      </div>
-                      <div className={`absolute -right-6 -bottom-6 w-24 h-24 rounded-full ${
-                        parseFloat(uptimePercentage) > 99 ? 'bg-green-200/30' :
-                        parseFloat(uptimePercentage) > 95 ? 'bg-yellow-200/30' :
-                        'bg-red-200/30'
-                      }`} />
-                    </div>
-
-                    {/* Incidents Card */}
-                    <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-red-50 to-pink-100 dark:from-red-900/20 dark:to-pink-900/30">
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Incidents</span>
-                          <AlertTriangle className="h-4 w-4 text-red-600" />
-                        </div>
-                        <div className="text-3xl font-black text-red-700 dark:text-red-400">
-                          {incidents}
-                        </div>
-                      </div>
-                      <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-red-200/30" />
-                    </div>
-
-                    {/* MTTR Card */}
-                    <div className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/30">
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">MTTR</span>
-                          <Clock className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div className="text-3xl font-black text-blue-700 dark:text-blue-400">
-                          {mttr}
-                        </div>
-                      </div>
-                      <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-blue-200/30" />
-                    </div>
-                  </div>
-
-                  {/* Status Timeline Chart */}
-                  {historicalData.length > 0 ? (
-                    <>
-                      <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-2 mb-4">
-                          <div className="p-1.5 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500">
-                            <Activity className="h-4 w-4 text-white" />
-                          </div>
-                          <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                            Availability Timeline
-                          </h4>
-                        </div>
-                        <div className="w-full overflow-x-auto">
-                          <ResponsiveContainer width="100%" height={200}>
-                          <AreaChart data={historicalData}>
-                          <defs>
-                            <linearGradient id="colorUp" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                            </linearGradient>
-                          </defs>
-
-                          {/* Add red reference areas for DOWN periods */}
-                          {historicalData.map((point, index) => {
-                            if (point.status === 0 && index < historicalData.length - 1) {
-                              return (
-                                <ReferenceArea
-                                  key={`down-${index}`}
-                                  x1={point.time}
-                                  x2={historicalData[index + 1]?.time || point.time}
-                                  y1={0}
-                                  y2={1}
-                                  fill="#ef4444"
-                                  fillOpacity={0.3}
-                                  stroke="#ef4444"
-                                  strokeWidth={0}
-                                />
-                              )
-                            }
-                            return null
-                          })}
-
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-                          <XAxis
-                            dataKey="time"
-                            stroke="#6b7280"
-                            tick={{ fill: '#6b7280', fontSize: 12 }}
-                            tickFormatter={(value) => {
-                              const dataIndex = historicalData.findIndex(d => d.time === value)
-                              if (dataIndex === -1 || dataIndex % Math.ceil(historicalData.length / 8) !== 0) return ''
-                              return value
-                            }}
-                          />
-                          <YAxis
-                            stroke="#6b7280"
-                            tick={{ fill: '#6b7280', fontSize: 12 }}
-                            domain={[0, 1]}
-                            ticks={[0, 1]}
-                            tickFormatter={(value) => value === 1 ? 'Up' : 'Down'}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: '#1f2937',
-                              border: '1px solid #374151',
-                              borderRadius: '8px',
-                              color: '#f3f4f6'
-                            }}
-                            formatter={(value: any) => {
-                              const status = value === 1 ? 'Online' : 'Offline'
-                              return [status, 'Status']
-                            }}
-                            labelStyle={{ color: '#9ca3af' }}
-                          />
-                          <Area
-                            type="stepAfter"
-                            dataKey="status"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            fill="url(#colorUp)"
-                          />
-                        </AreaChart>
-                        </ResponsiveContainer>
-                        </div>
-                      </div>
-
-                      {/* Response Time Chart */}
-                      <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-2 mb-4">
-                          <div className="p-1.5 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500">
-                            <Clock className="h-4 w-4 text-white" />
-                          </div>
-                          <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                            Response Time (ms)
-                          </h4>
-                        </div>
-                        <div className="w-full overflow-x-auto">
-                          <ResponsiveContainer width="100%" height={200}>
-                            <AreaChart data={historicalData}>
-                              <defs>
-                                <linearGradient id="responseGradient" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#5EBBA8" stopOpacity={0.8}/>
-                                  <stop offset="95%" stopColor="#5EBBA8" stopOpacity={0.1}/>
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-                              <XAxis
-                                dataKey="time"
-                                stroke="#6b7280"
-                                tick={{ fill: '#6b7280', fontSize: 12 }}
-                                tickFormatter={(value) => {
-                                  const dataIndex = historicalData.findIndex(d => d.time === value)
-                                  if (dataIndex === -1 || dataIndex % Math.ceil(historicalData.length / 8) !== 0) return ''
-                                  return value
-                                }}
-                              />
-                              <YAxis
-                                stroke="#6b7280"
-                                tick={{ fill: '#6b7280', fontSize: 12 }}
-                              />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: '#1f2937',
-                                  border: '1px solid #374151',
-                                  borderRadius: '8px',
-                                  color: '#f3f4f6'
-                                }}
-                                formatter={(value: any) => {
-                                  if (typeof value === 'number') {
-                                    return [`${value.toFixed(2)} ms`, 'Response Time']
-                                  }
-                                  return ['0 ms', 'Response Time']
-                                }}
-                                labelStyle={{ color: '#9ca3af' }}
-                              />
-                              <Area
-                                type="monotone"
-                                dataKey="responseTime"
-                                stroke="#5EBBA8"
-                                strokeWidth={2}
-                                fill="url(#responseGradient)"
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-8 border border-gray-200 dark:border-gray-700 text-center">
-                      <p className="text-gray-500">No history data available for this time range</p>
-                    </div>
-                  )}
-
-                  {/* Device Info */}
-                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                      Device Information
-                    </h3>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-gray-600 dark:text-gray-400">Region:</span>
-                        <span className="ml-2 text-gray-900 dark:text-gray-100 font-medium">
-                          {getRegionFromBranch(selectedDevice.branch)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600 dark:text-gray-400">IP:</span>
-                        <span className="ml-2 text-gray-900 dark:text-gray-100 font-mono">
-                          {selectedDevice.ip}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600 dark:text-gray-400">Type:</span>
-                        <span className="ml-2 text-gray-900 dark:text-gray-100 font-medium">
-                          {selectedDevice.device_type}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600 dark:text-gray-400">Status:</span>
-                        <Badge
-                          variant={selectedDevice.ping_status === 'Down' ? 'danger' : 'success'}
-                          className="ml-2"
-                          dot
-                        >
-                          {selectedDevice.ping_status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Alert History */}
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5 text-ward-green" />
-                      Alert History
-                    </h3>
-
-                    {loadingAlerts ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 text-ward-green animate-spin" />
-                      </div>
-                    ) : deviceAlerts.length > 0 ? (
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {deviceAlerts.map((alert: any) => {
-                          const triggeredAt = new Date(alert.triggered_at)
-                          const resolvedAt = alert.resolved_at ? new Date(alert.resolved_at) : null
-                          const isActive = !alert.resolved_at
-
-                          const getDurationText = () => {
-                            if (alert.duration_seconds) {
-                              const minutes = Math.floor(alert.duration_seconds / 60)
-                              const hours = Math.floor(minutes / 60)
-                              const days = Math.floor(hours / 24)
-                              if (days > 0) return `${days}d ${hours % 24}h`
-                              if (hours > 0) return `${hours}h ${minutes % 60}m`
-                              return `${minutes}m`
-                            }
-                            if (isActive) {
-                              const diff = Date.now() - triggeredAt.getTime()
-                              const minutes = Math.floor(diff / (1000 * 60))
-                              const hours = Math.floor(minutes / 60)
-                              if (hours > 0) return `${hours}h ${minutes % 60}m`
-                              return `${minutes}m`
-                            }
-                            return 'N/A'
-                          }
-
-                          return (
-                            <div
-                              key={alert.id}
-                              className={`rounded-lg p-3 border transition-shadow ${
-                                isActive
-                                  ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-                                  : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                    <Badge
-                                      variant={
-                                        alert.severity === 'CRITICAL' ? 'danger' :
-                                        alert.severity === 'HIGH' ? 'warning' :
-                                        'default'
-                                      }
-                                      className="text-xs"
-                                    >
-                                      {alert.severity}
-                                    </Badge>
-                                    {isActive && (
-                                      <Badge variant="danger" className="text-xs">
-                                        <div className="flex items-center gap-1">
-                                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                                          Active
-                                        </div>
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-                                    {alert.rule_name}
-                                  </p>
-                                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                                    {alert.message}
-                                  </p>
-                                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                                    <span className="flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      {triggeredAt.toLocaleString()}
-                                    </span>
-                                    {resolvedAt && (
-                                      <span className="flex items-center gap-1">
-                                        <CheckCircle className="h-3 w-3 text-green-600" />
-                                        {resolvedAt.toLocaleString()}
-                                      </span>
-                                    )}
-                                    <span className="flex items-center gap-1">
-                                      <Activity className="h-3 w-3" />
-                                      {getDurationText()}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
-                        <p className="text-sm text-gray-500">No alerts recorded for this device</p>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </ModalContent>
-        </Modal>
-      )}
+      {/* Device Details Modal */}
+      <DeviceDetailsModal
+        open={!!selectedDevice}
+        onClose={() => setSelectedDevice(null)}
+        hostid={selectedDevice?.hostid || ''}
+      />
     </div>
   )
 }

@@ -22,9 +22,6 @@ sqlalchemy>=2.0.23
 alembic>=1.13.1
 psycopg2-binary>=2.9.9  # PostgreSQL adapter
 
-# Zabbix API
-pyzabbix==1.3.0
-
 # Standalone Monitoring Engine
 pysnmp-lextudio>=5.0.28  # Modern async SNMP library
 pyasn1>=0.5.1  # Required for SNMP

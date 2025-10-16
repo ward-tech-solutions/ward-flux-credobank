@@ -565,19 +565,66 @@ async def api_search_legacy(
 
 @app.get("/api/topology")
 async def api_topology_legacy(
-    request: Request, view: str = "hierarchical", limit: int = 200, region: Optional[str] = None
+    request: Request,
+    view: str = "hierarchical",
+    limit: int = 200,
+    region: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """Legacy route - now using interface-based topology discovery"""
-    zabbix = request.app.state.zabbix
-    groupids = get_monitored_groupids()
-    loop = asyncio.get_event_loop()
-    devices = await loop.run_in_executor(executor, lambda: zabbix.get_all_hosts(group_ids=groupids))
+    """Topology view - using standalone devices (no Zabbix)"""
+    from monitoring.models import StandaloneDevice
+    from database import PingResult
+    from sqlalchemy import func
 
+    # Get standalone devices
+    query = db.query(StandaloneDevice)
+
+    # Filter by region if specified
     if region:
-        devices = [d for d in devices if d["region"] == region]
+        query = query.filter(StandaloneDevice.custom_fields['region'].astext == region)
 
-    if len(devices) > limit:
-        devices = devices[:limit]
+    standalone_devices = query.limit(limit).all()
+
+    # Get latest ping results for all devices
+    ping_subquery = (
+        db.query(
+            PingResult.device_ip,
+            func.max(PingResult.timestamp).label('latest_timestamp')
+        )
+        .group_by(PingResult.device_ip)
+        .subquery()
+    )
+
+    latest_pings = (
+        db.query(PingResult)
+        .join(
+            ping_subquery,
+            (PingResult.device_ip == ping_subquery.c.device_ip) &
+            (PingResult.timestamp == ping_subquery.c.latest_timestamp)
+        )
+        .all()
+    )
+
+    # Create a lookup dict for ping status
+    ping_lookup = {pr.device_ip: ("up" if pr.is_reachable else "down") for pr in latest_pings}
+
+    # Convert to dict format expected by topology
+    devices = []
+    for sd in standalone_devices:
+        fields = sd.custom_fields or {}
+        ping_status = ping_lookup.get(sd.ip, "unknown")
+        devices.append({
+            "hostid": str(sd.id),
+            "display_name": sd.name,
+            "host": sd.ip,
+            "ip": sd.ip,
+            "region": fields.get("region", "Unknown"),
+            "branch": fields.get("branch", ""),
+            "device_type": sd.device_type or "unknown",
+            "ping_status": ping_status,
+            "status": ping_status,
+        })
 
     nodes = []
     edges = []

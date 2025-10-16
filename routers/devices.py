@@ -5,6 +5,7 @@ Handles device listing and details
 import logging
 import asyncio
 import uuid
+import json
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -22,6 +23,40 @@ logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/v1/devices", tags=["devices"])
+
+
+def get_user_regions(user: User) -> Optional[List[str]]:
+    """Get list of regions for a user, supporting both legacy region and regions array"""
+    if user.regions:
+        try:
+            return json.loads(user.regions) if isinstance(user.regions, str) else user.regions
+        except (json.JSONDecodeError, TypeError):
+            pass
+    if user.region:
+        return [user.region]
+    return None
+
+
+def user_can_access_device(user: User, device: dict) -> bool:
+    """Check if user has permission to access a device based on role and region/branch"""
+    if user.role == UserRole.ADMIN:
+        return True
+
+    # Check regions for regional managers
+    user_regions = get_user_regions(user)
+    if user_regions:
+        device_region = device.get("region")
+        if device_region and device_region not in user_regions:
+            return False
+
+    # Check branches if specified
+    if user.branches:
+        allowed_branches = [b.strip() for b in user.branches.split(",") if b.strip()]
+        device_branch = device.get("branch")
+        if allowed_branches and device_branch not in allowed_branches:
+            return False
+
+    return True
 
 
 @router.get("")
@@ -171,12 +206,8 @@ async def _get_zabbix_devices(
     else:
         devices = await run_in_executor(lambda: zabbix.get_all_hosts(group_ids=groupids))
 
-    if current_user.role != UserRole.ADMIN:
-        if current_user.region:
-            devices = [d for d in devices if d.get("region") == current_user.region]
-        if current_user.branches:
-            allowed = [b.strip() for b in current_user.branches.split(",") if b.strip()]
-            devices = [d for d in devices if d.get("branch") in allowed]
+    # Apply region/branch filtering based on user permissions
+    devices = [d for d in devices if user_can_access_device(current_user, d)]
 
     return devices
 
@@ -203,13 +234,12 @@ def _get_standalone_devices(
         if branch and fields.get("branch") != branch:
             continue
 
-        if current_user.role != UserRole.ADMIN:
-            if current_user.region and fields.get("region") != current_user.region:
-                continue
-            if current_user.branches:
-                allowed = [b.strip() for b in current_user.branches.split(",") if b.strip()]
-                if allowed and fields.get("branch") not in allowed:
-                    continue
+        # Apply region/branch filtering
+        if not user_can_access_device(current_user, {
+            "region": fields.get("region"),
+            "branch": fields.get("branch")
+        }):
+            continue
 
         payload.append(_standalone_device_to_payload(db, device))
 

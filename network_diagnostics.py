@@ -86,7 +86,8 @@ class NetworkDiagnostics:
 
         # Parse RTT statistics
         # Example: "round-trip min/avg/max/stddev = 10.5/12.3/15.2/1.8 ms"
-        rtt_match = re.search(r"(?:rtt|round-trip) min/avg/max(?:/stddev)? = ([\d.]+)/([\d.]+)/([\d.]+)", output)
+        # or "rtt min/avg/max/mdev = 10.5/12.3/15.2/1.8 ms"
+        rtt_match = re.search(r"(?:rtt|round-trip) min/avg/max(?:/(?:stddev|mdev))? = ([\d.]+)/([\d.]+)/([\d.]+)", output)
         if rtt_match:
             result["min_rtt_ms"] = float(rtt_match.group(1))
             result["avg_rtt_ms"] = float(rtt_match.group(2))
@@ -184,12 +185,15 @@ class NetworkDiagnostics:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
             output = result.stdout
+            logger.info(f"Traceroute raw output for {ip_address}:\n{output}")
 
             # Parse results
             if self.system == "Windows":
                 hops = self._parse_traceroute_windows(output)
             else:
                 hops = self._parse_traceroute_unix(output)
+
+            logger.info(f"Parsed {len(hops)} hops for {ip_address}: {hops}")
 
             return {
                 "target_ip": ip_address,
@@ -225,17 +229,47 @@ class NetworkDiagnostics:
 
         # Example line: " 1  192.168.1.1 (192.168.1.1)  1.234 ms  1.345 ms  1.456 ms"
         # Example line: " 2  10.0.0.1 (10.0.0.1)  5.123 ms  5.234 ms  5.345 ms"
-        pattern = r"^\s*(\d+)\s+(?:([\w\.\-]+)\s+)?\(([\d\.]+)\)\s+([\d\.]+)\s+ms"
+        # Example line: " 3  dns.google (8.8.8.8)  41.116 ms  40.759 ms  48.171 ms"
+        # Example line: " 4  * * *"
 
         for line in output.split("\n"):
-            match = re.search(pattern, line)
-            if match:
-                hop_num = int(match.group(1))
-                hostname = match.group(2) if match.group(2) else match.group(3)
-                ip = match.group(3)
-                latency = float(match.group(4))
+            # Skip header line
+            if "traceroute to" in line.lower() or not line.strip():
+                continue
 
-                hops.append({"hop_number": hop_num, "ip": ip, "hostname": hostname, "latency_ms": latency})
+            # Match hop number at start of line
+            hop_match = re.match(r'^\s*(\d+)\s+(.+)', line)
+            if not hop_match:
+                continue
+
+            hop_num = int(hop_match.group(1))
+            rest = hop_match.group(2).strip()
+
+            # Skip lines with all asterisks (no response)
+            if re.match(r'^[\s\*]+$', rest):
+                continue
+
+            # Try to extract IP from parentheses: "hostname (IP)"
+            ip_match = re.search(r'\(([\d\.]+)\)', rest)
+            if not ip_match:
+                continue
+
+            ip = ip_match.group(1)
+
+            # Extract hostname (everything before the IP in parentheses)
+            hostname_match = re.match(r'^(.+?)\s+\(', rest)
+            hostname = hostname_match.group(1).strip() if hostname_match else ip
+
+            # Extract first latency value
+            latency_match = re.search(r'([\d\.]+)\s+ms', rest)
+            latency = float(latency_match.group(1)) if latency_match else None
+
+            hops.append({
+                "hop_number": hop_num,
+                "ip": ip,
+                "hostname": hostname,
+                "latency_ms": latency
+            })
 
         return hops
 

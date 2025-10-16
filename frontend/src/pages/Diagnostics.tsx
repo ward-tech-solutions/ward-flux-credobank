@@ -42,7 +42,7 @@ L.Marker.prototype.options.icon = DefaultIcon
 
 const GEORGIA_CENTER: [number, number] = [42.3154, 43.3569]
 
-type DiagnosticTool = 'ping' | 'traceroute' | 'dns' | 'portscan'
+type DiagnosticTool = 'ping' | 'traceroute' | 'mtr' | 'dns' | 'portscan'
 
 type PingResult = {
   device_ip: string
@@ -188,6 +188,13 @@ const TOOL_OPTIONS: ToolOption[] = [
     helper: 'Surface routing shifts or bottlenecks.',
   },
   {
+    key: 'mtr',
+    title: 'MTR',
+    description: 'Traceroute + Ping combined',
+    icon: Activity,
+    helper: 'Shows packet loss and latency per hop.',
+  },
+  {
     key: 'dns',
     title: 'DNS Lookup',
     description: 'Forward and reverse resolution',
@@ -238,9 +245,10 @@ export default function Diagnostics() {
     isLoading: tracerouteLoading,
     refetch: refetchTracerouteMap,
   } = useQuery({
-    queryKey: ['diagnostics-traceroute-map', selectedRouteIp],
+    queryKey: ['diagnostics-traceroute-map', selectedTool === 'traceroute' ? selectedRouteIp : null],
     queryFn: () => diagnosticsAPI.tracerouteMap(selectedRouteIp!),
-    enabled: Boolean(selectedRouteIp),
+    enabled: Boolean(selectedTool === 'traceroute' && selectedRouteIp && selectedRouteIp.trim().length > 0),
+    retry: false, // Don't retry on 404 - traceroute may not exist yet
   })
 
   const tracerouteMap: TracerouteMap | undefined = tracerouteMapResponse?.data
@@ -438,6 +446,21 @@ export default function Diagnostics() {
     }
   }
 
+  const handleMTR = async () => {
+    if (!targetIP) return
+    setLoading(true)
+    try {
+      const response = await diagnosticsAPI.mtr(targetIP, 10)
+      setTracerouteResult(response.data)
+      setSelectedRouteIp(targetIP)
+      await refetchSummary()
+    } catch (error) {
+      console.error('MTR failed:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleDNSLookup = async () => {
     if (!targetHostname) return
     setLoading(true)
@@ -472,6 +495,9 @@ export default function Diagnostics() {
       case 'traceroute':
         handleTraceroute()
         break
+      case 'mtr':
+        handleMTR()
+        break
       case 'dns':
         handleDNSLookup()
         break
@@ -500,136 +526,191 @@ export default function Diagnostics() {
           : 'At Risk'
 
   return (
-    <div className="space-y-8">
-      <Card variant="glass" className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute -right-24 top-0 h-56 w-56 rounded-full bg-ward-green/20 blur-3xl dark:bg-ward-green/10"
-          aria-hidden="true"
-        />
-        <CardHeader className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <CardTitle className="text-3xl">Network Diagnostics</CardTitle>
-            <CardDescription className="max-w-2xl text-gray-600 dark:text-gray-300">
-              Monitor reachability, visualize routing paths, and launch targeted checks without leaving the
-              command center.
-            </CardDescription>
+    <div className="space-y-6">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-ward-green via-emerald-600 to-teal-700 p-8 shadow-2xl">
+        {/* Decorative elements */}
+        <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" aria-hidden="true" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-emerald-400/20 blur-3xl" aria-hidden="true" />
+
+        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                <Terminal className="h-7 w-7 text-white" />
+              </div>
+              <h1 className="text-3xl font-bold text-white">Network Diagnostics</h1>
+            </div>
+            <p className="text-emerald-50 text-base max-w-2xl leading-relaxed">
+              Monitor reachability, visualize routing paths, and launch targeted checks without leaving the command center. Real-time insights into your network infrastructure.
+            </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Badge variant={overallStatusVariant} size="sm" dot>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Badge
+              variant={overallStatusVariant}
+              size="sm"
+              dot
+              className="bg-white/20 backdrop-blur-sm border-white/30 text-white text-base px-4 py-2"
+            >
               {overallStatusText}
             </Badge>
             <Button
               onClick={handleRunDiagnostic}
               loading={loading}
               icon={<Terminal className="h-4 w-4" />}
+              className="bg-white text-ward-green hover:bg-gray-50 font-semibold shadow-lg"
             >
               Run {selectedToolConfig?.title ?? 'Diagnostic'}
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="relative z-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        </div>
+
+        {/* Metrics Cards */}
+        <div className="relative z-10 mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {highlightMetrics.map(metric => {
             const Icon = metric.icon
             return (
               <div
                 key={metric.key}
-                className="rounded-xl border border-gray-100 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/70"
+                className="group rounded-xl border border-white/20 bg-white/10 backdrop-blur-md p-5 shadow-lg transition-all duration-300 hover:bg-white/15 hover:shadow-xl hover:scale-105"
               >
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-ward-green/10 p-2 text-ward-green">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{metric.title}</h2>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="rounded-lg bg-white/20 p-2">
+                    <Icon className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-emerald-50 uppercase tracking-wide">{metric.title}</h3>
                 </div>
-                <p className="mt-3 text-2xl font-semibold text-gray-900 dark:text-gray-100">{metric.value}</p>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{metric.subtext}</p>
+                <p className="text-2xl font-bold text-white mb-1">{metric.value}</p>
+                <p className="text-sm text-emerald-100">{metric.subtext}</p>
               </div>
             )
           })}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
+      {/* Health Snapshot Section */}
       <div className="space-y-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Health Snapshot</h2>
-          <Badge variant="info" size="sm">
-            Data from the latest diagnostics rollup
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-ward-green/10 dark:bg-ward-green/20">
+              <Gauge className="h-5 w-5 text-ward-green" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Health Snapshot</h2>
+          </div>
+          <Badge variant="info" size="sm" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+            Live diagnostics data
           </Badge>
         </div>
 
         {summaryLoading ? (
-          <Card>
-            <CardContent className="flex items-center justify-center py-12">
-              <LoadingSpinner />
+          <Card className="border-gray-200 dark:border-gray-700">
+            <CardContent className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <LoadingSpinner />
+                <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading diagnostics data...</p>
+              </div>
             </CardContent>
           </Card>
         ) : summary ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {snapshotCards.map(card => {
               const Icon = card.icon
+              const variantColors = {
+                success: 'from-emerald-500/10 to-green-500/10 dark:from-emerald-500/20 dark:to-green-500/20 border-emerald-200 dark:border-emerald-800',
+                warning: 'from-yellow-500/10 to-orange-500/10 dark:from-yellow-500/20 dark:to-orange-500/20 border-yellow-200 dark:border-yellow-800',
+                danger: 'from-red-500/10 to-rose-500/10 dark:from-red-500/20 dark:to-rose-500/20 border-red-200 dark:border-red-800',
+                info: 'from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20 border-blue-200 dark:border-blue-800',
+                default: 'from-gray-500/10 to-slate-500/10 dark:from-gray-500/20 dark:to-slate-500/20 border-gray-200 dark:border-gray-700',
+              }
               return (
-                <Card key={card.key} hover className="border border-gray-100 dark:border-gray-700">
-                  <CardContent className="flex flex-col gap-4 p-5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="rounded-xl bg-gray-100 p-2 text-ward-green dark:bg-gray-900/60">
-                          <Icon className="h-5 w-5" />
-                        </span>
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{card.title}</p>
+                <div
+                  key={card.key}
+                  className={clsx(
+                    'group relative overflow-hidden rounded-2xl border bg-gradient-to-br p-6 shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-105',
+                    variantColors[card.variant]
+                  )}
+                >
+                  <div className="relative z-10">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="p-3 rounded-xl bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+                        <Icon className="h-6 w-6 text-ward-green" />
                       </div>
-                      <Badge variant={card.variant} size="sm">
+                      <Badge variant={card.variant} size="sm" dot className="shadow-sm">
                         {card.badge}
                       </Badge>
                     </div>
-                    <p className="text-3xl font-semibold text-gray-900 dark:text-gray-100">{card.primary}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{card.meta}</p>
-                  </CardContent>
-                </Card>
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">
+                      {card.title}
+                    </p>
+                    <p className="text-4xl font-bold text-gray-900 dark:text-white mb-3">{card.primary}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{card.meta}</p>
+                  </div>
+                  {/* Decorative corner accent */}
+                  <div className="absolute -right-8 -bottom-8 h-24 w-24 rounded-full bg-ward-green/10 dark:bg-ward-green/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </div>
               )
             })}
           </div>
         ) : (
-          <Card>
-            <CardContent className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              Run a diagnostic to populate this dashboard.
+          <Card className="border-gray-200 dark:border-gray-700">
+            <CardContent className="py-16 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="p-4 rounded-full bg-gray-100 dark:bg-gray-800">
+                  <Activity className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-gray-900 dark:text-white mb-1">No diagnostics data yet</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Run a diagnostic to populate this dashboard</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
       </div>
 
+      {/* Traceroute Map & Regional Latency */}
       <div className="grid grid-cols-1 gap-6 2xl:grid-cols-3">
-        <Card className="2xl:col-span-2">
-          <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-ward-green" />
-                Traceroute Map
-              </CardTitle>
-              <CardDescription>Visualize path latency for the most recent traces.</CardDescription>
-            </div>
-            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <Select
-                value={selectedRouteIp}
-                onChange={event => setSelectedRouteIp(event.target.value)}
-                options={tracerouteOptions}
-                fullWidth
-                disabled={(summary?.recent_traceroutes?.length ?? 0) === 0}
-              />
-              <Badge variant="info" size="sm" dot>
-                {summary?.recent_traceroutes?.length ?? 0} saved paths
-              </Badge>
+        <Card className="2xl:col-span-2 border-gray-200 dark:border-gray-700 shadow-lg">
+          <CardHeader className="border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-ward-green/10 dark:bg-ward-green/20">
+                  <MapPin className="h-5 w-5 text-ward-green" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Traceroute Map</CardTitle>
+                  <CardDescription className="text-xs">Visualize network path latency for recent traces</CardDescription>
+                </div>
+              </div>
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto">
+                <Select
+                  value={selectedRouteIp}
+                  onChange={event => setSelectedRouteIp(event.target.value)}
+                  options={tracerouteOptions}
+                  fullWidth
+                  disabled={(summary?.recent_traceroutes?.length ?? 0) === 0}
+                  className="min-w-[200px]"
+                />
+                <Badge variant="info" size="sm" dot className="whitespace-nowrap">
+                  {summary?.recent_traceroutes?.length ?? 0} saved paths
+                </Badge>
+              </div>
             </div>
           </CardHeader>
-          <CardContent className="h-[26rem]">
+          <CardContent className="h-[28rem] p-0">
             {tracerouteLoading ? (
               <div className="flex h-full items-center justify-center">
-                <LoadingSpinner />
+                <div className="text-center">
+                  <LoadingSpinner />
+                  <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading traceroute data...</p>
+                </div>
               </div>
             ) : tracerouteMap && traceroutePositions.length > 0 ? (
               <MapContainer
                 center={mapCenter}
                 zoom={7}
-                className="h-full w-full overflow-hidden rounded-xl"
+                className="h-full w-full"
               >
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -654,80 +735,133 @@ export default function Diagnostics() {
                 )}
               </MapContainer>
             ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                <MapPin className="h-8 w-8 text-gray-400" />
-                No traceroute coordinates available yet.
+              <div className="flex h-full flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-gray-900/30">
+                <div className="p-4 rounded-full bg-gray-200 dark:bg-gray-800">
+                  <MapPin className="h-10 w-10 text-gray-400 dark:text-gray-600" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-gray-700 dark:text-gray-300">No traceroute data available</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Run a traceroute to visualize network paths</p>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-ward-green" />
-              Latency by Region
-            </CardTitle>
-            <CardDescription>Rolling window from the latest diagnostics.</CardDescription>
+        <Card className="border-gray-200 dark:border-gray-700 shadow-lg">
+          <CardHeader className="border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-ward-green/10 dark:bg-ward-green/20">
+                <TrendingUp className="h-5 w-5 text-ward-green" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Regional Latency</CardTitle>
+                <CardDescription className="text-xs">Rolling window from latest diagnostics</CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 max-h-[25rem] overflow-y-auto">
             {(summary?.region_latency?.length ?? 0) === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Run diagnostics to populate regional metrics.
-              </p>
-            ) : (
-              summary?.region_latency?.map(region => (
-                <div
-                  key={region.region}
-                  className="space-y-2 rounded-xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
-                >
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">{region.region}</span>
-                    <Badge variant="info" size="sm">
-                      {region.samples} samples
-                    </Badge>
+              <div className="py-12 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="p-3 rounded-full bg-gray-100 dark:bg-gray-800">
+                    <TrendingUp className="h-6 w-6 text-gray-400 dark:text-gray-500" />
                   </div>
-                  <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                    <span className={latencyColor(region.avg_latency)}>
-                      {region.avg_latency !== null ? `${Math.round(region.avg_latency)} ms` : 'n/a'}
-                    </span>
-                    <span>{region.avg_packet_loss.toFixed(1)}% loss</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                    <div
-                      className="h-full rounded-full bg-ward-green"
-                      style={{
-                        width: `${Math.max(
-                          8,
-                          Math.round((region.samples / maxRegionSamples) * 100)
-                        )}%`,
-                      }}
-                    />
-                  </div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No regional data yet</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Run diagnostics to populate metrics</p>
                 </div>
-              ))
+              </div>
+            ) : (
+              summary?.region_latency?.map(region => {
+                const latencyPercentage = region.avg_latency ? Math.min((region.avg_latency / 200) * 100, 100) : 0
+                const latencyClass = region.avg_latency && region.avg_latency < 50
+                  ? 'bg-ward-green dark:bg-ward-green'
+                  : region.avg_latency && region.avg_latency < 120
+                    ? 'bg-yellow-500 dark:bg-yellow-600'
+                    : 'bg-red-500 dark:bg-red-600'
+
+                return (
+                  <div
+                    key={region.region}
+                    className="group relative space-y-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 transition-all duration-200 hover:shadow-md hover:border-ward-green/50 dark:hover:border-ward-green/50"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-gray-900 dark:text-white">{region.region}</span>
+                      <Badge variant="info" size="sm" className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                        {region.samples} samples
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-gray-400" />
+                        <span className={clsx('font-bold', latencyColor(region.avg_latency))}>
+                          {region.avg_latency !== null ? `${Math.round(region.avg_latency)} ms` : 'n/a'}
+                        </span>
+                      </div>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        {region.avg_packet_loss.toFixed(1)}% loss
+                      </span>
+                    </div>
+
+                    {/* Latency bar */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <span>Latency</span>
+                        <span>{region.avg_latency ? `${Math.round(latencyPercentage)}%` : '—'}</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                        <div
+                          className={clsx('h-full rounded-full transition-all duration-300', latencyClass)}
+                          style={{
+                            width: `${Math.max(8, latencyPercentage)}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sample size bar */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <span>Sample Size</span>
+                        <span>{Math.round((region.samples / maxRegionSamples) * 100)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-ward-green to-emerald-600 transition-all duration-300"
+                          style={{
+                            width: `${Math.max(8, Math.round((region.samples / maxRegionSamples) * 100))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
             )}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <CardTitle>Diagnostics Workbench</CardTitle>
-              <CardDescription>
-                Select a tool, provide a target, and launch on-demand checks. Results render instantly for quick triage.
-              </CardDescription>
+      {/* Diagnostics Workbench */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <Card className="xl:col-span-2 border-gray-200 dark:border-gray-700">
+          <CardHeader className="border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Terminal className="h-4 w-4 text-ward-green" />
+                <CardTitle className="text-base">Diagnostics Workbench</CardTitle>
+              </div>
+              {selectedToolConfig?.helper && (
+                <Badge variant="info" size="sm" className="text-xs">
+                  {selectedToolConfig.helper}
+                </Badge>
+              )}
             </div>
-            {selectedToolConfig?.helper && (
-              <Badge variant="info" size="sm">
-                {selectedToolConfig.helper}
-              </Badge>
-            )}
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <CardContent className="space-y-4 p-4">
+            {/* Tool Selection */}
+            <div className="grid grid-cols-5 gap-2">
               {TOOL_OPTIONS.map(tool => {
                 const Icon = tool.icon
                 const isActive = selectedTool === tool.key
@@ -736,146 +870,174 @@ export default function Diagnostics() {
                     key={tool.key}
                     onClick={() => setSelectedTool(tool.key)}
                     className={clsx(
-                      'rounded-xl border-2 p-4 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ward-green/60',
+                      'rounded-lg border p-3 text-left transition-all',
                       isActive
-                        ? 'border-ward-green bg-ward-green/5 text-ward-green shadow-sm'
-                        : 'border-gray-200 text-gray-700 hover:border-ward-green/60 hover:text-ward-green dark:border-gray-700 dark:text-gray-200'
+                        ? 'border-ward-green bg-ward-green/10 dark:bg-ward-green/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-ward-green/50'
                     )}
                   >
-                    <Icon className={clsx('mb-3 h-6 w-6', isActive ? 'text-ward-green' : 'text-gray-400')} />
-                    <p className="text-sm font-semibold">{tool.title}</p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{tool.description}</p>
+                    <Icon className={clsx(
+                      'h-4 w-4 mb-1',
+                      isActive ? 'text-ward-green' : 'text-gray-400'
+                    )} />
+                    <p className={clsx(
+                      'text-xs font-semibold',
+                      isActive ? 'text-ward-green' : 'text-gray-900 dark:text-white'
+                    )}>
+                      {tool.title}
+                    </p>
                   </button>
                 )
               })}
             </div>
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="space-y-4 lg:col-span-1">
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
                 <Input
                   label="Target IP"
-                  placeholder="192.0.2.10"
+                  placeholder="8.8.8.8"
                   value={targetIP}
                   onChange={event => setTargetIP(event.target.value)}
-                  helperText="IPv4 or IPv6 address"
                   icon={<Server className="h-4 w-4" />}
                 />
-                {selectedTool === 'dns' && (
+              </div>
+              {selectedTool === 'dns' && (
+                <div className="flex-1">
                   <Input
                     label="Hostname"
                     placeholder="router.example.com"
                     value={targetHostname}
                     onChange={event => setTargetHostname(event.target.value)}
-                    helperText="FQDN or short hostname to resolve"
                     icon={<Globe className="h-4 w-4" />}
                   />
-                )}
-                {selectedTool === 'portscan' && (
+                </div>
+              )}
+              {selectedTool === 'portscan' && (
+                <div className="flex-1">
                   <Input
                     label="Ports"
                     placeholder="22,80,443"
                     value={ports}
                     onChange={event => setPorts(event.target.value)}
-                    helperText="Comma-separated list or ranges (e.g. 1-1024)"
                     icon={<Terminal className="h-4 w-4" />}
                   />
-                )}
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button
-                    onClick={handleRunDiagnostic}
-                    loading={loading}
-                    icon={<Terminal className="h-4 w-4" />}
-                  >
-                    Run {selectedToolConfig?.title ?? 'Diagnostic'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      void refetchSummary()
-                      void refetchTracerouteMap()
-                    }}
-                    icon={<TrendingUp className="h-4 w-4" />}
-                  >
-                    Refresh Insights
-                  </Button>
                 </div>
-              </div>
+              )}
+              <Button
+                onClick={handleRunDiagnostic}
+                loading={loading}
+                icon={<Terminal className="h-4 w-4" />}
+              >
+                Run {selectedToolConfig?.title ?? 'Diagnostic'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void refetchSummary()
+                  if (selectedTool === 'traceroute') {
+                    void refetchTracerouteMap()
+                  }
+                }}
+                icon={<TrendingUp className="h-4 w-4" />}
+              >
+                Refresh
+              </Button>
+            </div>
 
-              <div className="lg:col-span-2 space-y-4">
+            {/* Results Display */}
+            <div className="space-y-3">
                 {selectedTool === 'ping' && pingResult && (
-                  <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          {pingResult.device_name || pingResult.device_ip}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{pingResult.device_ip}</p>
+                  <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Activity className={clsx(
+                          'h-5 w-5',
+                          pingResult.is_reachable ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                        )} />
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {pingResult.device_name || pingResult.device_ip}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{pingResult.device_ip}</p>
+                        </div>
                       </div>
-                      <Badge variant={pingResult.is_reachable ? 'success' : 'danger'} dot>
+                      <Badge
+                        variant={pingResult.is_reachable ? 'success' : 'danger'}
+                        size="sm"
+                      >
                         {pingResult.is_reachable ? 'Reachable' : 'Unreachable'}
                       </Badge>
                     </div>
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-                      <div className="rounded-lg bg-gray-50 p-3 text-gray-700 dark:bg-gray-900/60 dark:text-gray-200">
-                        <p className="text-xs uppercase text-gray-500 dark:text-gray-400">Packets</p>
-                        <p className="mt-2 font-semibold">
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                        <p className="text-[10px] font-semibold uppercase text-gray-500 dark:text-gray-400 mb-1">Packets</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">
                           {pingResult.packets_received}/{pingResult.packets_sent}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-gray-50 p-3 text-gray-700 dark:bg-gray-900/60 dark:text-gray-200">
-                        <p className="text-xs uppercase text-gray-500 dark:text-gray-400">Loss</p>
-                        <p className="mt-2 font-semibold">{pingResult.packet_loss_percent}%</p>
+                      <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                        <p className="text-[10px] font-semibold uppercase text-gray-500 dark:text-gray-400 mb-1">Loss</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{pingResult.packet_loss_percent}%</p>
                       </div>
-                      <div className="rounded-lg bg-gray-50 p-3 text-gray-700 dark:bg-gray-900/60 dark:text-gray-200">
-                        <p className="text-xs uppercase text-gray-500 dark:text-gray-400">Avg RTT</p>
-                        <p className={clsx('mt-2 font-semibold', latencyColor(pingResult.avg_rtt_ms))}>
+                      <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                        <p className="text-[10px] font-semibold uppercase text-gray-500 dark:text-gray-400 mb-1">Avg RTT</p>
+                        <p className={clsx('text-lg font-bold', latencyColor(pingResult.avg_rtt_ms))}>
                           {pingResult.avg_rtt_ms !== null && pingResult.avg_rtt_ms !== undefined
                             ? `${Math.round(pingResult.avg_rtt_ms)} ms`
                             : 'n/a'}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-gray-50 p-3 text-gray-700 dark:bg-gray-900/60 dark:text-gray-200">
-                        <p className="text-xs uppercase text-gray-500 dark:text-gray-400">Min / Max</p>
-                        <p className="mt-2 font-semibold">
+                      <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                        <p className="text-[10px] font-semibold uppercase text-gray-500 dark:text-gray-400 mb-1">Min / Max</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">
                           {pingResult.min_rtt_ms !== undefined && pingResult.max_rtt_ms !== undefined
-                            ? `${pingResult.min_rtt_ms} / ${pingResult.max_rtt_ms} ms`
+                            ? `${pingResult.min_rtt_ms} / ${pingResult.max_rtt_ms}`
                             : 'n/a'}
                         </p>
+                        <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">ms</p>
                       </div>
                     </div>
                   </div>
                 )}
 
                 {selectedTool === 'traceroute' && tracerouteResult && (
-                  <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          {tracerouteResult.device_name || tracerouteResult.device_ip}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(tracerouteResult.timestamp).toLocaleString()}
-                        </p>
+                  <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Network className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {tracerouteResult.device_name || tracerouteResult.device_ip}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(tracerouteResult.timestamp).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
                       <Badge variant="info" size="sm">
                         {tracerouteResult.hops.length} hops
                       </Badge>
                     </div>
-                    <div className="mt-4 max-h-56 space-y-2 overflow-y-auto pr-2 text-sm text-gray-600 dark:text-gray-300">
+                    <div className="max-h-64 space-y-1.5 overflow-y-auto">
                       {tracerouteResult.hops.map(hop => (
                         <div
                           key={hop.hop_number}
-                          className="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:bg-gray-900/60"
+                          className="flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-800 p-3"
                         >
-                          <div>
-                            <p className="text-xs uppercase text-gray-500 dark:text-gray-400">
-                              Hop {hop.hop_number}
-                            </p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {hop.hostname || hop.ip || 'Unknown'}
-                            </p>
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-6 w-6 items-center justify-center rounded bg-ward-green/10 dark:bg-ward-green/20 text-[10px] font-bold text-ward-green">
+                              {hop.hop_number}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white text-xs">
+                                {hop.hostname || hop.ip || 'Unknown'}
+                              </p>
+                              {hop.ip && hop.hostname && (
+                                <p className="text-[10px] text-gray-500 dark:text-gray-400">{hop.ip}</p>
+                              )}
+                            </div>
                           </div>
-                          <span className={clsx('text-sm font-semibold', latencyColor(hop.latency_ms))}>
+                          <span className={clsx('text-sm font-bold', latencyColor(hop.latency_ms))}>
                             {hop.latency_ms !== undefined ? `${hop.latency_ms} ms` : '—'}
                           </span>
                         </div>
@@ -885,98 +1047,176 @@ export default function Diagnostics() {
                 )}
 
                 {selectedTool === 'dns' && dnsResult && (
-                  <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">DNS Lookup</p>
-                      <Badge variant={dnsResult.success ? 'success' : 'danger'} dot>
+                  <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Globe className={clsx(
+                          'h-5 w-5',
+                          dnsResult.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                        )} />
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">DNS Lookup</p>
+                      </div>
+                      <Badge
+                        variant={dnsResult.success ? 'success' : 'danger'}
+                        size="sm"
+                      >
                         {dnsResult.success ? 'Resolved' : 'Failed'}
                       </Badge>
                     </div>
-                    <div className="mt-3 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                      {dnsResult.success ? (
-                        <>
-                          <p>Hostname: {dnsResult.hostname}</p>
-                          <p>IP Address: {dnsResult.ip_address}</p>
-                          {dnsResult.all_ips && dnsResult.all_ips.length > 0 && (
-                            <p>All IPs: {dnsResult.all_ips.join(', ')}</p>
-                          )}
-                          {dnsResult.reverse_hostname && (
-                            <p>Reverse: {dnsResult.reverse_hostname}</p>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-red-500 dark:text-red-400">
-                          {dnsResult.error || 'Lookup failed'}
-                        </p>
-                      )}
-                    </div>
+                    {dnsResult.success ? (
+                      <div className="space-y-2">
+                        <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                          <p className="text-[10px] font-semibold uppercase text-gray-500 dark:text-gray-400 mb-1">Hostname</p>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white">{dnsResult.hostname}</p>
+                        </div>
+                        <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                          <p className="text-[10px] font-semibold uppercase text-gray-500 dark:text-gray-400 mb-1">IP Address</p>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white font-mono">{dnsResult.ip_address}</p>
+                        </div>
+                        {dnsResult.all_ips && dnsResult.all_ips.length > 1 && (
+                          <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                            <p className="text-[10px] font-semibold uppercase text-gray-500 dark:text-gray-400 mb-1">All IP Addresses</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {dnsResult.all_ips.map((ip, idx) => (
+                                <Badge key={idx} variant="info" size="sm" className="font-mono text-xs">
+                                  {ip}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {dnsResult.reverse_hostname && (
+                          <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                            <p className="text-[10px] font-semibold uppercase text-gray-500 dark:text-gray-400 mb-1">Reverse Lookup</p>
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">{dnsResult.reverse_hostname}</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                          <p className="text-sm font-semibold text-red-900 dark:text-red-100">
+                            {dnsResult.error || 'DNS lookup failed'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {selectedTool === 'portscan' && portScanResult && (
-                  <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Port Scan</p>
-                      <Badge variant="info" size="sm">
+                  <div className="rounded-2xl border-2 border-gray-200 bg-gradient-to-br from-white to-gray-50 p-6 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800 shadow-lg">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/30">
+                          <Server className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="text-base font-bold text-gray-900 dark:text-white">Port Scan Results</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {portScanResult.ports_scanned} ports scanned
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="info" size="sm" className="text-sm px-3 py-1">
                         {portScanResult.open_ports} open
                       </Badge>
                     </div>
-                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      {portScanResult.ports_scanned} ports scanned
-                    </p>
-                    <div className="mt-4 grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                       {portScanResult.results.map(result => (
-                        <Badge
+                        <div
                           key={result.port}
-                          variant={result.is_open ? 'success' : 'default'}
                           className={clsx(
-                            'justify-center py-2 font-semibold',
-                            !result.is_open && 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                            'group relative rounded-lg p-3 text-center font-bold transition-all duration-200',
+                            result.is_open
+                              ? 'bg-emerald-100 dark:bg-emerald-900/30 border-2 border-emerald-500 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300 hover:shadow-lg hover:scale-110'
+                              : 'bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 dark:text-gray-400'
                           )}
                         >
-                          {result.port}
-                        </Badge>
+                          <span className="text-sm">{result.port}</span>
+                          {result.is_open && (
+                            <div className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
-            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Ping Observations</CardTitle>
-            <CardDescription>Snapshot from the rolling diagnostics summary.</CardDescription>
+        <Card className="border-gray-200 dark:border-gray-700 shadow-lg">
+          <CardHeader className="border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-ward-green/10 dark:bg-ward-green/20">
+                <Activity className="h-5 w-5 text-ward-green" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Recent Ping Observations</CardTitle>
+                <CardDescription className="text-xs">Rolling window from diagnostics summary</CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 max-h-[28rem] overflow-y-auto">
             {(summary?.recent_pings?.length ?? 0) === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                No diagnostics recorded yet.
-              </p>
+              <div className="py-12 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="p-3 rounded-full bg-gray-100 dark:bg-gray-800">
+                    <Activity className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No ping data yet</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Run ping diagnostics to see results</p>
+                </div>
+              </div>
             ) : (
               summary?.recent_pings?.map(result => (
                 <div
                   key={`${result.device_ip}-${result.timestamp}`}
-                  className="rounded-xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
+                  className="group relative rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 transition-all duration-200 hover:shadow-md hover:border-ward-green/50 dark:hover:border-ward-green/50"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-gray-100">{result.device_name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{result.device_ip}</p>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className={clsx(
+                        'p-2 rounded-lg',
+                        result.is_reachable
+                          ? 'bg-emerald-100 dark:bg-emerald-900/30'
+                          : 'bg-red-100 dark:bg-red-900/30'
+                      )}>
+                        <Activity className={clsx(
+                          'h-4 w-4',
+                          result.is_reachable
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-red-600 dark:text-red-400'
+                        )} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900 dark:text-white text-sm">{result.device_name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{result.device_ip}</p>
+                      </div>
                     </div>
-                    <Badge variant={result.is_reachable ? 'success' : 'danger'} dot>
-                      {result.is_reachable ? 'Reachable' : 'Down'}
+                    <Badge variant={result.is_reachable ? 'success' : 'danger'} dot size="sm">
+                      {result.is_reachable ? 'Up' : 'Down'}
                     </Badge>
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                    <span className={latencyColor(result.avg_rtt_ms)}>
-                      Latency {result.avg_rtt_ms ? `${Math.round(result.avg_rtt_ms)} ms` : 'n/a'}
-                    </span>
-                    <span>Loss {result.packet_loss_percent}%</span>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Latency</p>
+                      <p className={clsx('text-sm font-bold', latencyColor(result.avg_rtt_ms))}>
+                        {result.avg_rtt_ms ? `${Math.round(result.avg_rtt_ms)} ms` : 'n/a'}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Packet Loss</p>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">
+                        {result.packet_loss_percent}%
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-2 text-xs text-gray-400">
+
+                  <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
                     {new Date(result.timestamp).toLocaleString()}
                   </p>
                 </div>
@@ -986,53 +1226,128 @@ export default function Diagnostics() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <History className="h-5 w-5 text-ward-green" />
-            Diagnostics Timeline
-          </CardTitle>
-          <CardDescription>Latest activity across ping, traceroute, DNS, and port scans.</CardDescription>
+      {/* Diagnostics Timeline */}
+      <Card className="border-gray-200 dark:border-gray-700 shadow-lg">
+        <CardHeader className="border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-ward-green/10 dark:bg-ward-green/20">
+              <History className="h-5 w-5 text-ward-green" />
+            </div>
+            <div>
+              <CardTitle className="text-xl">Diagnostics Timeline</CardTitle>
+              <CardDescription className="text-xs">
+                Latest activity across ping, traceroute, DNS, and port scans
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           {(summary?.timeline?.length ?? 0) === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">No timeline entries yet.</p>
-          ) : (
-            <div className="space-y-5">
-              {summary?.timeline?.map(entry => (
-                <div
-                  key={`${entry.type}-${entry.timestamp}-${entry.device_ip}`}
-                  className="relative border-l-2 border-gray-100 pl-5 dark:border-gray-800"
-                >
-                  <span
-                    className={clsx(
-                      'absolute -left-[5px] top-2 h-3 w-3 rounded-full',
-                      entry.status === 'success' ? 'bg-ward-green' : 'bg-red-500'
-                    )}
-                  />
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-3">
-                      <p className="font-semibold text-gray-900 dark:text-gray-100">
-                        {entry.device_name}
-                      </p>
-                      <Badge variant={entry.status === 'success' ? 'success' : 'danger'} size="sm">
-                        {entry.type.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {new Date(entry.timestamp).toLocaleString()} • {entry.device_ip}
-                    </p>
-                    {entry.type === 'ping' && entry.avg_rtt_ms !== undefined && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Avg latency {entry.avg_rtt_ms ? `${Math.round(entry.avg_rtt_ms)} ms` : 'n/a'}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-400">
-                      Status: {entry.status === 'success' ? 'Successful' : 'Attention required'}
-                    </p>
-                  </div>
+            <div className="py-12 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="p-3 rounded-full bg-gray-100 dark:bg-gray-800">
+                  <History className="h-6 w-6 text-gray-400 dark:text-gray-500" />
                 </div>
-              ))}
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No timeline entries yet</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Start running diagnostics to see activity</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {summary?.timeline?.map((entry, index) => {
+                const isSuccess = entry.status === 'success'
+                const typeIcons = {
+                  ping: Activity,
+                  traceroute: Network,
+                  dns: Globe,
+                  portscan: Server,
+                }
+                const TypeIcon = typeIcons[entry.type as keyof typeof typeIcons] || Activity
+
+                return (
+                  <div
+                    key={`${entry.type}-${entry.timestamp}-${entry.device_ip}`}
+                    className="group relative"
+                  >
+                    {/* Timeline line */}
+                    {index < (summary?.timeline?.length ?? 0) - 1 && (
+                      <div className="absolute left-[21px] top-12 h-[calc(100%+0.5rem)] w-0.5 bg-gray-200 dark:bg-gray-700" />
+                    )}
+
+                    {/* Timeline item */}
+                    <div className="relative flex gap-4">
+                      {/* Icon */}
+                      <div
+                        className={clsx(
+                          'relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 shadow-sm transition-all duration-200 group-hover:scale-110',
+                          isSuccess
+                            ? 'border-emerald-500 bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-900/30'
+                            : 'border-red-500 bg-red-100 dark:border-red-600 dark:bg-red-900/30'
+                        )}
+                      >
+                        <TypeIcon
+                          className={clsx(
+                            'h-5 w-5',
+                            isSuccess
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-red-600 dark:text-red-400'
+                          )}
+                        />
+                        {isSuccess && (
+                          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white dark:border-gray-900 bg-ward-green" />
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 transition-all duration-200 group-hover:shadow-md group-hover:border-ward-green/50">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-2">
+                          <div>
+                            <p className="font-bold text-gray-900 dark:text-white text-base mb-1">
+                              {entry.device_name}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                              {entry.device_ip}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={isSuccess ? 'success' : 'danger'}
+                            size="sm"
+                            className="self-start sm:self-center"
+                          >
+                            {entry.type.toUpperCase()}
+                          </Badge>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <div className="h-1.5 w-1.5 rounded-full bg-gray-400 dark:bg-gray-500" />
+                            <span>{new Date(entry.timestamp).toLocaleString()}</span>
+                          </div>
+                          {entry.type === 'ping' && entry.avg_rtt_ms !== undefined && (
+                            <div className="flex items-center gap-1">
+                              <div className="h-1.5 w-1.5 rounded-full bg-ward-green" />
+                              <span className={latencyColor(entry.avg_rtt_ms)}>
+                                {entry.avg_rtt_ms ? `${Math.round(entry.avg_rtt_ms)} ms latency` : 'latency n/a'}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <div
+                              className={clsx(
+                                'h-1.5 w-1.5 rounded-full',
+                                isSuccess ? 'bg-emerald-500' : 'bg-red-500'
+                              )}
+                            />
+                            <span className={isSuccess ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+                              {isSuccess ? 'Successful' : 'Attention required'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </CardContent>

@@ -76,7 +76,8 @@ class User(Base):
     role = Column(SQLEnum(UserRole), default=UserRole.VIEWER)
     organization_id = Column(Integer, nullable=True)  # For multi-tenant support
     is_superuser = Column(Boolean, default=False)  # For admin users
-    region = Column(String(50), nullable=True)  # For regional managers
+    region = Column(String(50), nullable=True)  # Legacy: For regional managers (single region)
+    regions = Column(String(1000), nullable=True)  # JSON array of regions for multi-region support
     branches = Column(String(500), nullable=True)  # Comma-separated branch names
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
