@@ -1,0 +1,239 @@
+{
+  "name": "Cisco IOS/IOS-XE Standard",
+  "description": "Standard monitoring template for Cisco routers and switches running IOS/IOS-XE",
+  "vendor": "Cisco",
+  "device_types": ["router", "switch", "l3_switch"],
+  "is_default": true,
+  "items": [
+    {
+      "name": "System Description",
+      "oid_name": "sysDescr",
+      "oid": "1.3.6.1.2.1.1.1.0",
+      "interval": 300,
+      "value_type": "string",
+      "units": "",
+      "description": "Device model and IOS version"
+    },
+    {
+      "name": "System Uptime",
+      "oid_name": "sysUpTime",
+      "oid": "1.3.6.1.2.1.1.3.0",
+      "interval": 60,
+      "value_type": "integer",
+      "units": "timeticks",
+      "description": "Time since last reboot"
+    },
+    {
+      "name": "CPU 5sec Average",
+      "oid_name": "cpu_5sec",
+      "oid": "1.3.6.1.4.1.9.2.1.56.0",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "%",
+      "description": "CPU utilization over last 5 seconds"
+    },
+    {
+      "name": "CPU 1min Average",
+      "oid_name": "cpu_1min",
+      "oid": "1.3.6.1.4.1.9.2.1.57.0",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "%",
+      "description": "CPU utilization over last 1 minute"
+    },
+    {
+      "name": "CPU 5min Average",
+      "oid_name": "cpu_5min",
+      "oid": "1.3.6.1.4.1.9.2.1.58.0",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "%",
+      "description": "CPU utilization over last 5 minutes"
+    },
+    {
+      "name": "Memory Pool Used",
+      "oid_name": "mem_pool_used",
+      "oid": "1.3.6.1.4.1.9.9.48.1.1.1.5.1",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "bytes",
+      "description": "Processor memory in use"
+    },
+    {
+      "name": "Memory Pool Free",
+      "oid_name": "mem_pool_free",
+      "oid": "1.3.6.1.4.1.9.9.48.1.1.1.6.1",
+      "interval": 60,
+      "value_type": "gauge",
+      "units": "bytes",
+      "description": "Processor memory free"
+    },
+    {
+      "name": "Interface Count",
+      "oid_name": "ifNumber",
+      "oid": "1.3.6.1.2.1.2.1.0",
+      "interval": 300,
+      "value_type": "integer",
+      "units": "",
+      "description": "Total number of interfaces"
+    },
+    {
+      "name": "Interface Descriptions",
+      "oid_name": "ifDescr",
+      "oid": "1.3.6.1.2.1.2.2.1.2",
+      "interval": 300,
+      "value_type": "string",
+      "units": "",
+      "description": "Interface names (table)",
+      "is_table": true
+    },
+    {
+      "name": "Interface Operational Status",
+      "oid_name": "ifOperStatus",
+      "oid": "1.3.6.1.2.1.2.2.1.8",
+      "interval": 60,
+      "value_type": "integer",
+      "units": "",
+      "description": "Interface up/down status (1=up, 2=down)",
+      "is_table": true
+    },
+    {
+      "name": "Interface Admin Status",
+      "oid_name": "ifAdminStatus",
+      "oid": "1.3.6.1.2.1.2.2.1.7",
+      "interval": 300,
+      "value_type": "integer",
+      "units": "",
+      "description": "Interface admin status (1=up, 2=down)",
+      "is_table": true
+    },
+    {
+      "name": "Interface Input Octets",
+      "oid_name": "ifInOctets",
+      "oid": "1.3.6.1.2.1.2.2.1.10",
+      "interval": 60,
+      "value_type": "counter64",
+      "units": "bytes",
+      "description": "Total bytes received per interface",
+      "is_table": true
+    },
+    {
+      "name": "Interface Output Octets",
+      "oid_name": "ifOutOctets",
+      "oid": "1.3.6.1.2.1.2.2.1.16",
+      "interval": 60,
+      "value_type": "counter64",
+      "units": "bytes",
+      "description": "Total bytes transmitted per interface",
+      "is_table": true
+    },
+    {
+      "name": "Interface Input Errors",
+      "oid_name": "ifInErrors",
+      "oid": "1.3.6.1.2.1.2.2.1.14",
+      "interval": 60,
+      "value_type": "counter32",
+      "units": "errors",
+      "description": "Input errors per interface",
+      "is_table": true
+    },
+    {
+      "name": "Interface Output Errors",
+      "oid_name": "ifOutErrors",
+      "oid": "1.3.6.1.2.1.2.2.1.20",
+      "interval": 60,
+      "value_type": "counter32",
+      "units": "errors",
+      "description": "Output errors per interface",
+      "is_table": true
+    },
+    {
+      "name": "BGP Peer State",
+      "oid_name": "bgp_peer_state",
+      "oid": "1.3.6.1.2.1.15.3.1.2",
+      "interval": 120,
+      "value_type": "integer",
+      "units": "",
+      "description": "BGP peer state (6=Established)",
+      "is_table": true
+    },
+    {
+      "name": "BGP Peer Admin Status",
+      "oid_name": "bgp_peer_admin_status",
+      "oid": "1.3.6.1.2.1.15.3.1.3",
+      "interval": 300,
+      "value_type": "integer",
+      "units": "",
+      "description": "BGP peer admin status",
+      "is_table": true
+    },
+    {
+      "name": "Temperature Sensor",
+      "oid_name": "temp_sensor",
+      "oid": "1.3.6.1.4.1.9.9.13.1.3.1.3",
+      "interval": 120,
+      "value_type": "gauge",
+      "units": "celsius",
+      "description": "Chassis temperature",
+      "is_table": true
+    }
+  ],
+  "triggers": [
+    {
+      "name": "High CPU Usage",
+      "expression": "cpu_5sec > 90",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "CPU utilization above 90% for 5 minutes"
+    },
+    {
+      "name": "Critical CPU Usage",
+      "expression": "cpu_5sec > 95",
+      "severity": "critical",
+      "for_duration": 120,
+      "description": "CPU utilization above 95% for 2 minutes"
+    },
+    {
+      "name": "Low Memory",
+      "expression": "(mem_pool_free / (mem_pool_used + mem_pool_free)) * 100 < 10",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "Less than 10% memory available"
+    },
+    {
+      "name": "Interface Down",
+      "expression": "ifOperStatus == 2 AND ifAdminStatus == 1",
+      "severity": "error",
+      "for_duration": 60,
+      "description": "Interface is admin up but operationally down"
+    },
+    {
+      "name": "High Interface Errors",
+      "expression": "rate(ifInErrors) > 100 OR rate(ifOutErrors) > 100",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "More than 100 errors/sec on interface"
+    },
+    {
+      "name": "BGP Peer Down",
+      "expression": "bgp_peer_state != 6",
+      "severity": "critical",
+      "for_duration": 180,
+      "description": "BGP peer not in Established state"
+    },
+    {
+      "name": "High Temperature",
+      "expression": "temp_sensor > 65",
+      "severity": "warning",
+      "for_duration": 300,
+      "description": "Chassis temperature above 65°C"
+    },
+    {
+      "name": "Critical Temperature",
+      "expression": "temp_sensor > 75",
+      "severity": "critical",
+      "for_duration": 60,
+      "description": "Chassis temperature above 75°C"
+    }
+  ]
+}

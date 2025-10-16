@@ -1,0 +1,8 @@
+[
+  {
+    "name": "CredoBank Standalone",
+    "mode": "standalone",
+    "description": "Standalone monitoring for CredoBank network using internal SNMP polling.",
+    "is_active": true
+  }
+]

@@ -1,0 +1,200 @@
+# ═══════════════════════════════════════════════════════════════════
+# WARD TECH SOLUTIONS - Git Ignore File
+# ═══════════════════════════════════════════════════════════════════
+
+# Environment Variables (CRITICAL - Never commit!)
+.env
+.env.local
+.env.*.local
+
+# Database Files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+data/*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+!frontend/src/lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# Logs
+*.log
+logs/
+server_new.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.legacy
+*.unused
+
+# Build artifacts
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Documentation builds (allow docs/internal/ for dev logs)
+docs/_build/
+!docs/internal/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Internal/sensitive documentation
+docs/*
+!docs/internal/
+TOPOLOGY_IMPLEMENTATION_GUIDE.md
+NEXT_STEPS.md
+IMPLEMENTATION_COMPLETE.md
+PRIORITY_RECOMMENDATIONS.md
+ICON_FIX_EMERGENCY_GUIDE.md
+UI_FIXES_SUMMARY.md
+QA_TESTING_CHECKLIST.md
+REFACTORING_SUMMARY.md
+README.md.old
+CLEANUP_SENSITIVE.md
+PUSH_TO_GITHUB.md
+*.old
+
+# Unused/development files
+auth_endpoints.txt
+test_zabbix.py
+tests.py
+requirements_new.txt
+setup.sh
+IMPLEMENTATION_VERIFIED.md
+GITHUB_ACTIONS_STATUS.md
+FINAL_STATUS.md
+GITHUB_SUCCESS.md
+*.backup
+*.backup2
+
+# Archives and compressed files
+*.tar.gz
+*.zip
+*.tar
+*.gz
+
+# All markdown documentation (keeping only README.md in root)
+CLEANUP_SENSITIVE.md
+CUSTOMER_ONBOARDING.md
+DEPLOYMENT.md
+DEPLOYMENT_GUIDE.md
+DEPLOYMENT_READY.md
+DEPLOYMENT_SUCCESS.md
+FINAL_DEPLOYMENT_STATUS.md
+FINAL_STATUS.md
+GITHUB_ACTIONS_STATUS.md
+GITHUB_DEPLOYMENT.md
+GITHUB_READY.md
+GITHUB_SUCCESS.md
+ICON_FIX_EMERGENCY_GUIDE.md
+IMPLEMENTATION_COMPLETE.md
+IMPLEMENTATION_VERIFIED.md
+NEXT_STEPS.md
+PRIORITY_RECOMMENDATIONS.md
+PUSH_TO_GITHUB.md
+QA_TESTING_CHECKLIST.md
+QUICK_START.md
+REFACTORING_SUMMARY.md
+REPOSITORY_CLEAN.md
+SAAS_TRANSFORMATION_COMPLETE.md
+TOPOLOGY_IMPLEMENTATION_GUIDE.md
+UI_FIXES_SUMMARY.md
+
+# Claude workspace
+.claude/
+
+# Organized folders (keep locally but don't commit)
+archive/
+docs/guides/
+logs/
+PROJECT_STRUCTURE.md
+project_structure.md
+KnowledgeBase/
+DisasterRecovery/
+
+# Development/temporary files (don't commit)
+main.py.pre-refactor
+*.pre-refactor
+ORGANIZATION_SUMMARY.txt
+
+# QA and bug tracking artifacts (internal use only)
+BUG_REPORT.md
+CRITICAL_BUGS_AND_FIXES.md
+QA_SUMMARY_REPORT.md
+qa_bug_finder.py
+fix_*.py
+*_COMPLETE.md
+
+# Old/unused folders
+app/
+
+# Frontend build artifacts (keep source, ignore builds)
+frontend/dist/
+frontend/node_modules/
+frontend/.vite/
+static_new/
+
+*storybook.log
+storybook-static
+prod_backup.dump

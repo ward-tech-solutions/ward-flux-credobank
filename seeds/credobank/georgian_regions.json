@@ -1,0 +1,90 @@
+[
+  {
+    "id": 1,
+    "name_en": "Tbilisi",
+    "name_ka": "\u10d7\u10d1\u10d8\u10da\u10d8\u10e1\u10d8",
+    "latitude": 41.7151,
+    "longitude": 44.8271,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 2,
+    "name_en": "Adjara",
+    "name_ka": "\u10d0\u10ed\u10d0\u10e0\u10d0",
+    "latitude": 41.6168,
+    "longitude": 41.6367,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 3,
+    "name_en": "Guria",
+    "name_ka": "\u10d2\u10e3\u10e0\u10d8\u10d0",
+    "latitude": 41.9517,
+    "longitude": 42.0403,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 4,
+    "name_en": "Imereti",
+    "name_ka": "\u10d8\u10db\u10d4\u10e0\u10d4\u10d7\u10d8",
+    "latitude": 42.2708,
+    "longitude": 42.7089,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 5,
+    "name_en": "Kakheti",
+    "name_ka": "\u10d9\u10d0\u10ee\u10d4\u10d7\u10d8",
+    "latitude": 41.6488,
+    "longitude": 45.697,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 6,
+    "name_en": "Kvemo Kartli",
+    "name_ka": "\u10e5\u10d5\u10d4\u10db\u10dd \u10e5\u10d0\u10e0\u10d7\u10da\u10d8",
+    "latitude": 41.5489,
+    "longitude": 44.7717,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 7,
+    "name_en": "Mtskheta-Mtianeti",
+    "name_ka": "\u10db\u10ea\u10ee\u10d4\u10d7\u10d0-\u10db\u10d7\u10d8\u10d0\u10dc\u10d4\u10d7\u10d8",
+    "latitude": 42.0669,
+    "longitude": 44.7211,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 8,
+    "name_en": "Racha-Lechkhumi",
+    "name_ka": "\u10e0\u10d0\u10ed\u10d0-\u10da\u10d4\u10e9\u10ee\u10e3\u10db\u10d8",
+    "latitude": 42.6708,
+    "longitude": 43.0403,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 9,
+    "name_en": "Samegrelo-Zemo Svaneti",
+    "name_ka": "\u10e1\u10d0\u10db\u10d4\u10d2\u10e0\u10d4\u10da\u10dd-\u10d6\u10d4\u10db\u10dd \u10e1\u10d5\u10d0\u10dc\u10d4\u10d7\u10d8",
+    "latitude": 42.7389,
+    "longitude": 42.1708,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 10,
+    "name_en": "Samtskhe-Javakheti",
+    "name_ka": "\u10e1\u10d0\u10db\u10ea\u10ee\u10d4-\u10ef\u10d0\u10d5\u10d0\u10ee\u10d4\u10d7\u10d8",
+    "latitude": 41.5489,
+    "longitude": 43.2717,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  },
+  {
+    "id": 11,
+    "name_en": "Shida Kartli",
+    "name_ka": "\u10e8\u10d8\u10d3\u10d0 \u10e5\u10d0\u10e0\u10d7\u10da\u10d8",
+    "latitude": 42.0756,
+    "longitude": 44.1028,
+    "created_at": "2025-10-04T18:45:11+04:00"
+  }
+]

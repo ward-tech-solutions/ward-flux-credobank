@@ -1,0 +1,12 @@
+[
+  {
+    "key": "platform.name",
+    "value": "WARD FLUX Monitoring",
+    "description": "Display name used across the UI and notification templates."
+  },
+  {
+    "key": "platform.support_email",
+    "value": "support@wardops.tech",
+    "description": "Support contact shown in the footer and incident notifications."
+  }
+]

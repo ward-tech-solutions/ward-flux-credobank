@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ward-postgres
+    environment:
+      POSTGRES_DB: ward_flux
+      POSTGRES_USER: ward
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - ward-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ward"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis - Task Queue & Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ward-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - ward-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # WARD FLUX API Server
+  # Supports BOTH standalone SNMP and Zabbix integration
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ward-api
+    environment:
+      # Database & Cache
+      - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+
+      # Security
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+
+      # Monitoring Mode: "snmp_only", "zabbix_only", or "hybrid"
+      - MONITORING_MODE=${MONITORING_MODE:-snmp_only}
+
+      # Zabbix Integration (optional - only needed if MONITORING_MODE is "zabbix_only" or "hybrid")
+      - ZABBIX_URL=${ZABBIX_URL:-}
+      - ZABBIX_USER=${ZABBIX_USER:-}
+      - ZABBIX_PASSWORD=${ZABBIX_PASSWORD:-}
+    volumes:
+      - ./logs:/app/logs
+      - api-data:/data
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ward-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Celery Worker - SNMP Polling & Background Tasks
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ward-celery-worker
+    command: celery -A celery_app worker --loglevel=info --concurrency=60
+    environment:
+      - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - MONITORING_MODE=${MONITORING_MODE:-snmp_only}
+      - ZABBIX_URL=${ZABBIX_URL:-}
+      - ZABBIX_USER=${ZABBIX_USER:-}
+      - ZABBIX_PASSWORD=${ZABBIX_PASSWORD:-}
+    volumes:
+      - ./logs:/app/logs
+      - celery-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ward-network
+    restart: unless-stopped
+
+  # Celery Beat - Task Scheduler
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ward-celery-beat
+    command: celery -A celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://ward:${POSTGRES_PASSWORD}@postgres:5432/ward_flux
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - MONITORING_MODE=${MONITORING_MODE:-snmp_only}
+    volumes:
+      - ./logs:/app/logs
+      - beat-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ward-network
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  api-data:
+  celery-data:
+  beat-data:
+
+networks:
+  ward-network:
+    driver: bridge

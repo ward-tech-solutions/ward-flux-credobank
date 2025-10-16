@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+    font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Dark mode */
+  .dark body {
+    @apply bg-gray-900 text-gray-50;
+  }
+
+  /* Fix gray text visibility in dark mode */
+  .dark .text-gray-500 {
+    @apply text-gray-400;
+  }
+
+  .dark .text-gray-600 {
+    @apply text-gray-300;
+  }
+
+  .dark .text-gray-700 {
+    @apply text-gray-200;
+  }
+
+  .dark .text-gray-900 {
+    @apply text-gray-100;
+  }
+}
+
+@layer components {
+  /* WARD Brand Button */
+  .btn-ward {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-ward-green text-white font-medium rounded-lg hover:bg-ward-green-dark active:scale-95 transition-all duration-200 shadow-ward;
+  }
+
+  .btn-ward-outline {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 border-2 border-ward-green text-ward-green font-medium rounded-lg hover:bg-ward-green hover:text-white active:scale-95 transition-all duration-200;
+  }
+
+  /* Card with WARD shadow */
+  .card-ward {
+    @apply bg-white rounded-xl shadow-ward-lg border border-gray-100 p-6;
+  }
+
+  .dark .card-ward {
+    @apply bg-gray-800 border-gray-700;
+  }
+
+  /* Smooth animations */
+  .animate-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Pulsing glow animation for recently-down devices */
+  .animate-pulse-glow {
+    animation: pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% {
+      box-shadow: 0 4px 14px 0 rgba(220, 38, 38, 0.4);
+    }
+    50% {
+      box-shadow: 0 8px 20px 0 rgba(220, 38, 38, 0.65);
+    }
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-ward-green/30 rounded-full hover:bg-ward-green/50;
+}
+
+.dark ::-webkit-scrollbar-track {
+  @apply bg-gray-800;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  @apply bg-ward-green/40 hover:bg-ward-green/60;
+}
+
+/* Leaflet marker cluster custom styles */
+.leaflet-cluster-anim .leaflet-marker-icon,
+.leaflet-cluster-anim .leaflet-marker-shadow {
+  transition: transform 0.3s ease-out, opacity 0.3s ease-in;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  min-width: 200px;
+}
+
+.leaflet-popup-tip {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
