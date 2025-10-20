@@ -88,6 +88,9 @@ class StandaloneDevice(Base):
     snmp_version = Column(String(10))  # SNMP version (v1, v2c, v3)
     snmp_port = Column(Integer, default=161)  # SNMP port (default 161)
 
+    # Downtime tracking
+    down_since = Column(DateTime)  # When the device first went down (set when Up -> Down, cleared when Down -> Up)
+
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

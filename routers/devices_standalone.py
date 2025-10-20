@@ -87,6 +87,7 @@ class StandaloneDeviceResponse(BaseModel):
     ping_status: Optional[str] = None
     ping_response_time: Optional[float] = None
     last_ping_timestamp: Optional[str] = None
+    down_since: Optional[str] = None  # ISO timestamp when device first went down
     problems: int = 0
     ssh_port: Optional[int] = 22
     ssh_username: Optional[str] = None
@@ -155,6 +156,7 @@ class StandaloneDeviceResponse(BaseModel):
             'ping_status': ping_status,
             'ping_response_time': ping_response_time,
             'last_ping_timestamp': last_ping_timestamp,
+            'down_since': obj.down_since.isoformat() if obj.down_since else None,
             'problems': problems,
             'ssh_port': obj.ssh_port or 22,
             'ssh_username': obj.ssh_username,

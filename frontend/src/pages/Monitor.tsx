@@ -68,27 +68,25 @@ const calculateDowntime = (device: Device) => {
     return `${minutes}m`
   }
 
-  // Priority 2: If no triggers but device is down, this is a newly detected outage
-  // We can't determine exact downtime without historical data, so show a more accurate message
-  if (device.ping_status === 'Down') {
-    // Use last_check as an approximation, but be aware this may not be accurate
-    // for devices that have been down longer than the last check cycle
+  // Priority 2: Use down_since timestamp (accurate for standalone devices)
+  if (device.ping_status === 'Down' && device.down_since) {
+    const downSinceTime = new Date(device.down_since).getTime()
     const now = Date.now()
-    const lastCheckTime = device.last_check * 1000
-    const diff = now - lastCheckTime
+    const diff = now - downSinceTime
 
-    // If last check was very recent (< 2 minutes), it's truly a new outage
-    if (diff < 120000) {
-      return `< 2m`
-    }
-
-    // Otherwise, estimate based on last check (but this is unreliable)
-    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
 
-    // Indicate this is an estimate
-    if (hours > 0) return `~${hours}h ${minutes}m`
-    return `~${minutes}m`
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    if (minutes > 0) return `${minutes}m`
+    return '< 1m'
+  }
+
+  // Priority 3: Device is down but no down_since timestamp yet
+  if (device.ping_status === 'Down') {
+    return ''  // Return empty string - will show just "Down" in the UI
   }
 
   return 'Unknown'
@@ -107,11 +105,16 @@ const isRecentlyDown = (device: Device): boolean => {
     return (now - problemStart) < tenMinutes
   }
 
-  // Fallback: check last_check if no triggers (recently went down)
-  const now = Date.now()
-  const lastCheck = device.last_check * 1000
-  const tenMinutes = 10 * 60 * 1000
-  return (now - lastCheck) < tenMinutes
+  // Check down_since timestamp
+  if (device.down_since) {
+    const downSinceTime = new Date(device.down_since).getTime()
+    const now = Date.now()
+    const tenMinutes = 10 * 60 * 1000
+    return (now - downSinceTime) < tenMinutes
+  }
+
+  // Without timestamp data, assume not recent
+  return false
 }
 
 const getRegionFromBranch = (branch: string): string => {

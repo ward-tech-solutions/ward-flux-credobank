@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: ward_admin_password
       POSTGRES_DB: ward_ops
     ports:
-      - "5432:5432"  # Same as production
+      - "5433:5432"  # Changed from 5432 to avoid conflict with VMware
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +27,7 @@ services:
     container_name: wardops-redis-prod
     command: redis-server --requirepass redispass --appendonly yes
     ports:
-      - "6379:6379"  # Same as production
+      - "6380:6379"  # Changed from 6379 to avoid conflict with VMware
     volumes:
       - redis_prod_data:/data
     healthcheck:

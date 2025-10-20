@@ -199,6 +199,19 @@ def ping_device(device_id: str, device_ip: str):
             timestamp=datetime.utcnow()
         )
         db.add(ping_result)
+
+        # Update down_since timestamp for downtime tracking
+        if device:
+            if not host.is_alive and device.down_since is None:
+                # Device just went down (Up -> Down transition)
+                device.down_since = datetime.utcnow()
+                logger.info(f"Device {device.name} ({device_ip}) went DOWN")
+            elif host.is_alive and device.down_since is not None:
+                # Device just came back up (Down -> Up transition)
+                downtime_duration = datetime.utcnow() - device.down_since
+                logger.info(f"Device {device.name} ({device_ip}) came back UP after {downtime_duration}")
+                device.down_since = None
+
         db.commit()
 
         # Write metrics to VictoriaMetrics (optional)

@@ -47,6 +47,7 @@ export interface Device {
   ping_status: string  // "Up" or "Down"
   ping_response_time: number | null
   last_check: number
+  down_since?: string  // ISO timestamp when device first went down
   groups: string[]
   problems: number
   triggers?: Trigger[]
