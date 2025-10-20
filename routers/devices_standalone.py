@@ -148,7 +148,7 @@ class StandaloneDeviceResponse(BaseModel):
             'updated_at': obj.updated_at,
             'region': region,
             'branch': branch_name,
-            'branch_id': obj.branch_id,
+            'branch_id': str(obj.branch_id) if obj.branch_id else None,
             'latitude': latitude,
             'longitude': longitude,
             'available': available or ("Available" if obj.enabled else "Unavailable"),
