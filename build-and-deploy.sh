@@ -18,7 +18,8 @@ git pull origin main
 
 echo ""
 echo "2. Rebuilding all containers (includes frontend build)..."
-docker-compose -f docker-compose.production-local.yml build
+echo "   Using --no-cache to ensure fresh build with latest code..."
+docker-compose -f docker-compose.production-local.yml build --no-cache
 
 echo ""
 echo "3. Stopping all containers..."
