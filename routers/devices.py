@@ -308,6 +308,7 @@ def _standalone_device_to_payload(db: Session, device: StandaloneDevice) -> Dict
         "ping_status": ping_status,
         "ping_response_time": ping_response_time,
         "last_check": last_check or 0,
+        "down_since": device.down_since.isoformat() if device.down_since else None,
         "groups": device.tags or [],
         "problems": alert_count,
         "triggers": [],
