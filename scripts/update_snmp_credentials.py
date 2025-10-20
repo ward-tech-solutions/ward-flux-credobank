@@ -63,13 +63,15 @@ def main():
             if snmp_community and snmp_community.strip():
                 device.snmp_community = snmp_community
                 device.snmp_version = snmp_version or 'v2c'
+                device.snmp_port = device_data.get('snmp_port', 161)  # Default SNMP port
                 updated_count += 1
                 snmp_count += 1
-                print(f"  Updated SNMP for: {device_name} ({device_ip}) - {snmp_version}")
+                print(f"  Updated SNMP for: {device_name} ({device_ip}) - {snmp_version}:161")
             else:
                 # Explicitly set to None for non-SNMP devices
                 device.snmp_community = None
                 device.snmp_version = None
+                device.snmp_port = None
                 updated_count += 1
 
         # Commit changes

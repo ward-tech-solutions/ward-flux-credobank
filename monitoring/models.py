@@ -86,6 +86,7 @@ class StandaloneDevice(Base):
     # SNMP Configuration (denormalized for quick access)
     snmp_community = Column(String(255))  # SNMP community string (v2c)
     snmp_version = Column(String(10))  # SNMP version (v1, v2c, v3)
+    snmp_port = Column(Integer, default=161)  # SNMP port (default 161)
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
