@@ -48,6 +48,13 @@ def poll_device_snmp(self, device_id: str):
             db.close()
             return
 
+        # Get device
+        device = db.query(StandaloneDevice).filter_by(id=device_id).first()
+        if not device:
+            logger.error(f"Device {device_id} not found")
+            db.close()
+            return
+
         # Get device monitoring items
         items = db.query(MonitoringItem).filter_by(device_id=device_id, enabled=True).all()
 
@@ -56,20 +63,21 @@ def poll_device_snmp(self, device_id: str):
             db.close()
             return
 
-        # Get SNMP credentials
-        snmp_cred = db.query(SNMPCredential).filter_by(device_id=device_id).first()
-
-        if not snmp_cred:
-            logger.error(f"No SNMP credentials found for device {device_id}")
+        # Check for SNMP credentials (denormalized in standalone_devices table)
+        if not device.snmp_community or not device.snmp_community.strip():
+            logger.error(f"No SNMP credentials found for device {device.name} ({device.ip})")
             db.close()
             return
 
-        # Build credential data
-        credentials = _build_credential_data(snmp_cred)
+        # Build credential data from denormalized fields
+        credentials = SNMPCredentialData(
+            version=device.snmp_version or "v2c",
+            community=device.snmp_community,
+        )
 
         # Get device info
-        device = items[0].device
         device_ip = device.ip
+        snmp_port = device.snmp_port or 161
 
         # Initialize clients
         snmp_poller = get_snmp_poller()
@@ -83,31 +91,31 @@ def poll_device_snmp(self, device_id: str):
                 # Run async SNMP GET
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                result = loop.run_until_complete(snmp_poller.get(device_ip, item.oid, credentials))
+                result = loop.run_until_complete(snmp_poller.get(device_ip, item.oid, credentials, port=snmp_port))
                 loop.close()
 
                 if result.success and result.value is not None:
                     # Prepare metric for VictoriaMetrics
                     metric = {
-                        "metric_name": _sanitize_metric_name(item.name),
+                        "metric_name": _sanitize_metric_name(item.oid_name),
                         "value": float(result.value) if result.value_type in ["integer", "gauge", "counter32", "counter64"] else 0,
                         "labels": {
                             "device": device.name or device_ip,
                             "device_id": str(device_id),
                             "ip": device_ip,
-                            "item": item.name,
+                            "item": item.oid_name,
                             "oid": item.oid,
                         },
                         "timestamp": datetime.utcnow(),
                     }
 
                     metrics_to_write.append(metric)
-                    logger.debug(f"Polled {device_ip} - {item.name}: {result.value}")
+                    logger.debug(f"Polled {device_ip} - {item.oid_name}: {result.value}")
                 else:
-                    logger.warning(f"Failed to poll {device_ip} - {item.name}: {result.error}")
+                    logger.warning(f"Failed to poll {device_ip} - {item.oid_name}: {result.error}")
 
             except Exception as e:
-                logger.error(f"Error polling item {item.name} for device {device_id}: {e}")
+                logger.error(f"Error polling item {item.oid_name} for device {device_id}: {e}")
 
         # Write metrics to VictoriaMetrics in bulk
         if metrics_to_write:
