@@ -37,6 +37,24 @@ services:
       retries: 5
     restart: unless-stopped
 
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: wardops-victoriametrics-prod
+    ports:
+      - "8428:8428"  # HTTP API for metrics storage
+    volumes:
+      - victoriametrics_prod_data:/victoria-metrics-data
+    command:
+      - '--storageDataPath=/victoria-metrics-data'
+      - '--httpListenAddr=:8428'
+      - '--retentionPeriod=12'  # 12 months retention for SNMP metrics
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8428/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
   api:
     build:
       context: .
@@ -45,6 +63,7 @@ services:
     environment:
       DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
       REDIS_URL: redis://:redispass@redis:6379/0
+      VICTORIA_URL: http://victoriametrics:8428
       DEFAULT_ADMIN_PASSWORD: admin123
       SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
@@ -56,6 +75,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      victoriametrics:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
@@ -77,6 +98,7 @@ services:
     environment:
       DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
       REDIS_URL: redis://:redispass@redis:6379/0
+      VICTORIA_URL: http://victoriametrics:8428
       SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       ENVIRONMENT: production
@@ -85,6 +107,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      victoriametrics:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
@@ -115,6 +139,7 @@ services:
 volumes:
   postgres_prod_data:
   redis_prod_data:
+  victoriametrics_prod_data:
   api_prod_data:
   celery_prod_data:
   beat_prod_data:
