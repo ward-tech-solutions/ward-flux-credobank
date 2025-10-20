@@ -159,7 +159,7 @@ export const devicesAPI = {
     ssh_username?: string;
     ssh_enabled?: boolean;
   }) =>
-    api.put(`/devices/${hostid}`, data),
+    api.put(`/devices/standalone/${hostid}`, data),
 
   // Get device ping history
   getHistory: (hostid: string, timeRange: '24h' | '7d' | '30d' = '24h') =>
