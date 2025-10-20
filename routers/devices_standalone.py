@@ -318,10 +318,26 @@ def update_device(
                 detail=f"Device with IP {device_update.ip} already exists"
             )
 
-    # Update fields
+    # Update fields - handle region/branch specially since they're not direct columns
     update_data = device_update.model_dump(exclude_unset=True)
+
+    # Extract region and branch if present
+    region = update_data.pop('region', None)
+    branch = update_data.pop('branch', None)
+
+    # Update custom_fields with region/branch if provided
+    if region is not None or branch is not None:
+        custom_fields = device.custom_fields or {}
+        if region is not None:
+            custom_fields['region'] = region
+        if branch is not None:
+            custom_fields['branch'] = branch
+        device.custom_fields = custom_fields
+
+    # Update remaining fields
     for field, value in update_data.items():
-        setattr(device, field, value)
+        if hasattr(device, field):
+            setattr(device, field, value)
 
     device.updated_at = datetime.utcnow()
     db.commit()
