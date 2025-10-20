@@ -312,7 +312,7 @@ def update_device(
     # Check for IP conflict if IP is being changed
     if device_update.ip and device_update.ip != device.ip:
         existing = db.query(StandaloneDevice).filter_by(ip=device_update.ip).first()
-        if existing:
+        if existing and str(existing.id) != device_id:
             raise HTTPException(
                 status_code=400,
                 detail=f"Device with IP {device_update.ip} already exists"
