@@ -722,6 +722,17 @@ export default function Monitor() {
             <p className="text-xs font-mono text-gray-600 dark:text-gray-500 mt-1">
               {device.ip}
             </p>
+            {/* Monitoring Type Badges */}
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                📶 ICMP
+              </span>
+              {device.snmp_community && device.snmp_community.trim() !== '' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                  📡 SNMP
+                </span>
+              )}
+            </div>
             {isDown ? (
               <div className="flex items-center gap-1 mt-2 text-red-600 dark:text-red-400">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0" />
@@ -1085,6 +1096,9 @@ export default function Monitor() {
                       IP Address
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Monitoring
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Response Time
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -1143,6 +1157,18 @@ export default function Monitor() {
                         </td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-gray-400">
                           {device.ip}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                              📶 ICMP
+                            </span>
+                            {device.snmp_community && device.snmp_community.trim() !== '' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                                📡 SNMP
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           {isDown ? (
