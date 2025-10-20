@@ -270,6 +270,7 @@ export default function Monitor() {
   const [refreshCountdown, setRefreshCountdown] = useState(30)
   const [_historicalData, setHistoricalData] = useState<any[]>([])
   const [_loadingHistory, setLoadingHistory] = useState(false)
+  const [, setCurrentTime] = useState(Date.now()) // Force re-render for downtime updates
 
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
@@ -445,6 +446,14 @@ export default function Monitor() {
         if (prev <= 1) return 30
         return prev - 1
       })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Update downtime display every second for real-time countdown
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now()) // Force re-render to update downtime calculations
     }, 1000)
     return () => clearInterval(timer)
   }, [])

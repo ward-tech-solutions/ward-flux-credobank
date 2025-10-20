@@ -851,7 +851,7 @@ export default function Devices() {
         open={addDeviceModalOpen}
         onClose={handleAddDeviceModalClose}
         title="Add New Device"
-        size="md"
+        size="lg"
       >
         <div className="flex flex-col" style={{ maxHeight: 'calc(90vh - 200px)' }}>
           {/* Scrollable Body */}
