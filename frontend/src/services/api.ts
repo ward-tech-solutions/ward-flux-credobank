@@ -60,6 +60,8 @@ export interface Device {
   ssh_port?: number
   ssh_username?: string
   ssh_enabled?: boolean
+  snmp_community?: string  // SNMP community string for monitoring
+  snmp_version?: string    // SNMP version (1, 2c, or 3)
 }
 
 export interface User {

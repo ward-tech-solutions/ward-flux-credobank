@@ -851,79 +851,125 @@ export default function Devices() {
         open={addDeviceModalOpen}
         onClose={handleAddDeviceModalClose}
         title="Add New Device"
-        size="md"
+        size="lg"
       >
         <div className="flex flex-col" style={{ maxHeight: 'calc(90vh - 200px)' }}>
           {/* Scrollable Body */}
-          <div className="overflow-y-auto flex-1 pr-2 space-y-4">
-            <Input
-              label="Hostname"
-              value={addDeviceForm.hostname}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, hostname: e.target.value })}
-              placeholder="Enter device hostname"
-              required
-            />
+          <div className="overflow-y-auto flex-1 pr-2 space-y-6">
+            {/* Basic Information Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Basic Information</h3>
+              </div>
 
-            <Input
-              label="IP Address"
-              value={addDeviceForm.ip}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, ip: e.target.value })}
-              placeholder="192.168.1.1"
-              required
-            />
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Region
-              </label>
-              <select
-                value={addDeviceForm.region}
-                onChange={(e) => setAddDeviceForm({ ...addDeviceForm, region: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-              >
-                <option value="">Select Region</option>
-                {regions.map((region) => (
-                  <option key={region} value={region}>
-                    {region}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
               <Input
-                label="Branch (City)"
-                value={addDeviceForm.branch}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, branch: e.target.value })}
-                placeholder="Enter branch/city name"
+                label="Hostname"
+                value={addDeviceForm.hostname}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, hostname: e.target.value })}
+                placeholder="Enter device hostname"
+                required
               />
-              {addDeviceForm.hostname && addDeviceForm.branch && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Auto-extracted from hostname
-                </p>
-              )}
+
+              <Input
+                label="IP Address"
+                value={addDeviceForm.ip}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, ip: e.target.value })}
+                placeholder="192.168.1.1"
+                required
+              />
             </div>
 
-            <Input
-              label="SNMP Community"
-              value={addDeviceForm.snmp_community}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, snmp_community: e.target.value })}
-              placeholder="public"
-            />
+            {/* Location Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Location</h3>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                SNMP Version
-              </label>
-              <select
-                value={addDeviceForm.snmp_version}
-                onChange={(e) => setAddDeviceForm({ ...addDeviceForm, snmp_version: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-              >
-                <option value="1">SNMPv1</option>
-                <option value="2c">SNMPv2c</option>
-                <option value="3">SNMPv3</option>
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Region
+                </label>
+                <select
+                  value={addDeviceForm.region}
+                  onChange={(e) => setAddDeviceForm({ ...addDeviceForm, region: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
+                >
+                  <option value="">Select Region</option>
+                  {regions.map((region) => (
+                    <option key={region} value={region}>
+                      {region}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Input
+                  label="Branch (City)"
+                  value={addDeviceForm.branch}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, branch: e.target.value })}
+                  placeholder="Enter branch/city name"
+                />
+                {addDeviceForm.hostname && addDeviceForm.branch && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Auto-extracted from hostname
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Monitoring Configuration Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Monitoring Configuration</h3>
+              </div>
+
+              {/* Monitoring Type Info */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <span className="text-blue-600 dark:text-blue-400">ℹ️</span>
+                  </div>
+                  <div className="text-xs text-blue-800 dark:text-blue-300">
+                    <p className="font-medium mb-1">Monitoring Types:</p>
+                    <ul className="space-y-1 list-disc list-inside">
+                      <li><strong>ICMP (Ping)</strong> - Always enabled for all devices</li>
+                      <li><strong>SNMP</strong> - Optional, enter community string below to enable</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <Input
+                label="SNMP Community (Optional)"
+                value={addDeviceForm.snmp_community}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, snmp_community: e.target.value })}
+                placeholder="public"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
+                Leave empty for ICMP-only monitoring
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  SNMP Version
+                </label>
+                <select
+                  value={addDeviceForm.snmp_version}
+                  onChange={(e) => setAddDeviceForm({ ...addDeviceForm, snmp_version: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
+                  disabled={!addDeviceForm.snmp_community}
+                >
+                  <option value="1">SNMPv1</option>
+                  <option value="2c">SNMPv2c</option>
+                  <option value="3">SNMPv3</option>
+                </select>
+                {!addDeviceForm.snmp_community && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Enter SNMP community to enable SNMP version selection
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
