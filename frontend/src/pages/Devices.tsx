@@ -10,7 +10,7 @@ import Badge from '@/components/ui/Badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import DeviceDetailsModal from '@/components/DeviceDetailsModal'
 import SSHTerminalModal from '@/components/SSHTerminalModal'
-import { devicesAPI } from '@/services/api'
+import { devicesAPI, branchesAPI } from '@/services/api'
 import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus, MapPin, Info, Activity } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 
@@ -94,6 +94,17 @@ export default function Devices() {
     queryKey: ['devices'],
     queryFn: () => devicesAPI.getAll(),
   })
+
+  // Fetch available regions from database
+  const { data: regionsData } = useQuery({
+    queryKey: ['regions'],
+    queryFn: async () => {
+      const response = await branchesAPI.getRegions()
+      return response.data
+    },
+  })
+
+  const availableRegions = regionsData?.regions || []
 
   // Save view mode to localStorage whenever it changes
   useEffect(() => {
@@ -738,9 +749,9 @@ export default function Devices() {
                         className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent transition-colors"
                       >
                         <option value="">Select Region</option>
-                        <option value="Tbilisi">Tbilisi</option>
-                        <option value="Batumi">Batumi</option>
-                        <option value="Kutaisi">Kutaisi</option>
+                        {availableRegions.map((region) => (
+                          <option key={region} value={region}>{region}</option>
+                        ))}
                       </select>
                     </div>
 
@@ -912,9 +923,9 @@ export default function Devices() {
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent transition-colors"
                     >
                       <option value="">Select Region</option>
-                      <option value="Tbilisi">Tbilisi</option>
-                      <option value="Batumi">Batumi</option>
-                      <option value="Kutaisi">Kutaisi</option>
+                      {availableRegions.map((region) => (
+                        <option key={region} value={region}>{region}</option>
+                      ))}
                     </select>
                   </div>
 

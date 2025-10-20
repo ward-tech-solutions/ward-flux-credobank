@@ -92,6 +92,25 @@ async def get_branches(
     }
 
 
+@router.get("/regions")
+async def get_regions(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Get all unique regions"""
+
+    regions = db.execute("""
+        SELECT DISTINCT region
+        FROM branches
+        WHERE region IS NOT NULL AND region != ''
+        ORDER BY region
+    """).fetchall()
+
+    return {
+        "regions": [row[0] for row in regions]
+    }
+
+
 @router.get("/stats")
 async def get_branch_stats(
     current_user: User = Depends(get_current_active_user),

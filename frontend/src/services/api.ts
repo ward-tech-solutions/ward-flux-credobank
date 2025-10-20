@@ -247,6 +247,7 @@ export const branchesAPI = {
   getById: (id: string) => api.get(`/branches/${id}`),
   getDevices: (id: string) => api.get(`/branches/${id}/devices`),
   getStats: () => api.get('/branches/stats'),
+  getRegions: () => api.get<{ regions: string[] }>('/branches/regions'),
   create: (data: {
     name: string
     display_name: string
