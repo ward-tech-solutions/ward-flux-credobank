@@ -144,7 +144,21 @@ export const devicesAPI = {
   getById: (hostid: string) => api.get<Device>(`/devices/${hostid}`),
 
   // Update device (region/branch assignment)
-  updateDevice: (hostid: string, data: { region?: string; branch?: string }) =>
+  updateDevice: (hostid: string, data: {
+    name?: string;
+    ip?: string;
+    hostname?: string;
+    vendor?: string;
+    device_type?: string;
+    model?: string;
+    location?: string;
+    description?: string;
+    region?: string;
+    branch?: string;
+    ssh_port?: number;
+    ssh_username?: string;
+    ssh_enabled?: boolean;
+  }) =>
     api.put(`/devices/${hostid}`, data),
 
   // Get device ping history
