@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel
 
 from database import get_db
@@ -99,12 +100,12 @@ async def get_regions(
 ):
     """Get all unique regions"""
 
-    regions = db.execute("""
+    regions = db.execute(text("""
         SELECT DISTINCT region
         FROM branches
         WHERE region IS NOT NULL AND region != ''
         ORDER BY region
-    """).fetchall()
+    """)).fetchall()
 
     return {
         "regions": [row[0] for row in regions]
@@ -122,13 +123,13 @@ async def get_branch_stats(
     active_branches = db.query(Branch).filter(Branch.is_active == True).count()
 
     # Get region distribution
-    regions = db.execute("""
+    regions = db.execute(text("""
         SELECT region, COUNT(*) as count
         FROM branches
         WHERE region IS NOT NULL
         GROUP BY region
         ORDER BY count DESC
-    """).fetchall()
+    """)).fetchall()
 
     return {
         "total_branches": total_branches,
@@ -156,8 +157,8 @@ async def get_branch(
 
     # Get device count from standalone_devices
     device_count = db.execute(
-        "SELECT COUNT(*) FROM standalone_devices WHERE branch_id = ?",
-        (branch_id,)
+        text("SELECT COUNT(*) FROM standalone_devices WHERE branch_id = :branch_id"),
+        {"branch_id": branch_id}
     ).fetchone()[0]
 
     return {
@@ -189,14 +190,12 @@ async def get_branch_devices(
         raise HTTPException(status_code=404, detail="Branch not found")
 
     # Build query
-    query = "SELECT * FROM standalone_devices WHERE branch_id = ?"
-    params = [branch_id]
-
     if device_type:
-        query += " AND device_type = ?"
-        params.append(device_type)
-
-    query += " ORDER BY normalized_name"
+        query = text("SELECT * FROM standalone_devices WHERE branch_id = :branch_id AND device_type = :device_type ORDER BY normalized_name")
+        params = {"branch_id": branch_id, "device_type": device_type}
+    else:
+        query = text("SELECT * FROM standalone_devices WHERE branch_id = :branch_id ORDER BY normalized_name")
+        params = {"branch_id": branch_id}
 
     devices = db.execute(query, params).fetchall()
 
@@ -331,8 +330,8 @@ async def delete_branch(
 
     # Check for assigned devices
     device_count = db.execute(
-        "SELECT COUNT(*) FROM standalone_devices WHERE branch_id = ?",
-        (branch_id,)
+        text("SELECT COUNT(*) FROM standalone_devices WHERE branch_id = :branch_id"),
+        {"branch_id": branch_id}
     ).fetchone()[0]
 
     if device_count > 0 and not force:
@@ -344,8 +343,8 @@ async def delete_branch(
     # If force delete, unassign devices
     if force and device_count > 0:
         db.execute(
-            "UPDATE standalone_devices SET branch_id = NULL WHERE branch_id = ?",
-            (branch_id,)
+            text("UPDATE standalone_devices SET branch_id = NULL WHERE branch_id = :branch_id"),
+            {"branch_id": branch_id}
         )
         logger.warning(f"Force deleted branch {branch.display_name}, unassigned {device_count} devices")
 
