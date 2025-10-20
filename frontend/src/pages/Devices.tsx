@@ -659,177 +659,165 @@ export default function Devices() {
         size="lg"
       >
         {editingDevice && (
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Device Name
-                </label>
-                <Input
-                  value={editForm.name}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, name: e.target.value })}
-                />
-              </div>
+          <div className="flex flex-col" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+            {/* Scrollable Body */}
+            <div className="overflow-y-auto flex-1 pr-2">
+              <div className="space-y-6">
+                {/* Basic Information Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Basic Information</h3>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  IP Address
-                </label>
-                <Input
-                  value={editForm.ip}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, ip: e.target.value })}
-                  className="font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Hostname
-                </label>
-                <Input
-                  value={editForm.hostname}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, hostname: e.target.value })}
-                  placeholder="Enter hostname"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Vendor
-                </label>
-                <Input
-                  value={editForm.vendor}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, vendor: e.target.value })}
-                  placeholder="e.g., Cisco, Fortinet"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Device Type
-                </label>
-                <Input
-                  value={editForm.device_type}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, device_type: e.target.value })}
-                  placeholder="e.g., Switch, Router, Paybox"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Model
-                </label>
-                <Input
-                  value={editForm.model}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, model: e.target.value })}
-                  placeholder="Device model"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Location
-                </label>
-                <Input
-                  value={editForm.location}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, location: e.target.value })}
-                  placeholder="Physical location"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Region
-                </label>
-                <select
-                  value={editForm.region}
-                  onChange={(e) => setEditForm({ ...editForm, region: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-                >
-                  <option value="">Select Region</option>
-                  {regions.map((region) => (
-                    <option key={region} value={region}>
-                      {region}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Branch (City)
-                </label>
-                <Input
-                  value={editForm.branch}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, branch: e.target.value })}
-                  placeholder="Enter branch/city name"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
-                  rows={3}
-                  placeholder="Device description"
-                />
-              </div>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-              <h4 className="text-md font-semibold mb-3 text-gray-900 dark:text-gray-100">SSH Configuration</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    SSH Port
-                  </label>
-                  <Input
-                    type="number"
-                    value={editForm.ssh_port}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, ssh_port: parseInt(e.target.value) || 22 })}
-                    placeholder="22"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    SSH Username
-                  </label>
-                  <Input
-                    value={editForm.ssh_username}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, ssh_username: e.target.value })}
-                    placeholder="admin"
-                  />
-                </div>
-
-                <div className="flex items-end pb-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editForm.ssh_enabled}
-                      onChange={(e) => setEditForm({ ...editForm, ssh_enabled: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-ward-green focus:ring-ward-green"
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Device Name"
+                      value={editForm.name}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, name: e.target.value })}
+                      placeholder="Enter device name"
                     />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      SSH Enabled
-                    </span>
-                  </label>
+
+                    <Input
+                      label="IP Address"
+                      value={editForm.ip}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, ip: e.target.value })}
+                      placeholder="192.168.1.1"
+                      className="font-mono"
+                    />
+
+                    <Input
+                      label="Hostname"
+                      value={editForm.hostname}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, hostname: e.target.value })}
+                      placeholder="Enter hostname"
+                    />
+
+                    <Input
+                      label="Vendor"
+                      value={editForm.vendor}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, vendor: e.target.value })}
+                      placeholder="e.g., Cisco, Fortinet"
+                    />
+
+                    <Input
+                      label="Device Type"
+                      value={editForm.device_type}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, device_type: e.target.value })}
+                      placeholder="Biostar"
+                    />
+
+                    <Input
+                      label="Model"
+                      value={editForm.model}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, model: e.target.value })}
+                      placeholder="Device model"
+                    />
+                  </div>
+                </div>
+
+                {/* Location Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Location</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        Region
+                      </label>
+                      <select
+                        value={editForm.region}
+                        onChange={(e) => setEditForm({ ...editForm, region: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent transition-colors"
+                      >
+                        <option value="">Select Region</option>
+                        <option value="Tbilisi">Tbilisi</option>
+                        <option value="Batumi">Batumi</option>
+                        <option value="Kutaisi">Kutaisi</option>
+                      </select>
+                    </div>
+
+                    <Input
+                      label="Branch (City)"
+                      value={editForm.branch}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, branch: e.target.value })}
+                      placeholder="Enter branch/city name"
+                    />
+
+                    <div className="md:col-span-2">
+                      <Input
+                        label="Location"
+                        value={editForm.location}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, location: e.target.value })}
+                        placeholder="Physical location"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Description</h3>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Device Description
+                    </label>
+                    <textarea
+                      value={editForm.description}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent transition-colors resize-none"
+                      rows={3}
+                      placeholder="Device description"
+                    />
+                  </div>
+                </div>
+
+                {/* SSH Configuration Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">SSH Configuration</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Input
+                      label="SSH Port"
+                      type="number"
+                      value={editForm.ssh_port}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, ssh_port: parseInt(e.target.value) || 22 })}
+                      placeholder="22"
+                    />
+
+                    <Input
+                      label="SSH Username"
+                      value={editForm.ssh_username}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, ssh_username: e.target.value })}
+                      placeholder="admin"
+                    />
+
+                    <div className="flex items-end pb-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editForm.ssh_enabled}
+                          onChange={(e) => setEditForm({ ...editForm, ssh_enabled: e.target.checked })}
+                          className="h-4 w-4 rounded border-gray-300 text-ward-green focus:ring-ward-green"
+                        />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          SSH Enabled
+                        </span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <Button
-                onClick={handleSaveDeviceEdit}
-                disabled={savingDevice}
-                className="flex-1"
-              >
-                {savingDevice ? 'Saving...' : 'Save Changes'}
-              </Button>
+            {/* Fixed Footer */}
+            <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -840,6 +828,13 @@ export default function Devices() {
                 className="flex-1"
               >
                 Cancel
+              </Button>
+              <Button
+                onClick={handleSaveDeviceEdit}
+                disabled={savingDevice}
+                className="flex-1"
+              >
+                {savingDevice ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </div>
@@ -859,7 +854,7 @@ export default function Devices() {
             {/* Basic Information Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Basic Information</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Basic Information</h3>
               </div>
 
               <Input
@@ -882,7 +877,7 @@ export default function Devices() {
             {/* Location Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Location</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Location</h3>
               </div>
 
               <div>
@@ -892,14 +887,12 @@ export default function Devices() {
                 <select
                   value={addDeviceForm.region}
                   onChange={(e) => setAddDeviceForm({ ...addDeviceForm, region: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent transition-colors"
                 >
                   <option value="">Select Region</option>
-                  {regions.map((region) => (
-                    <option key={region} value={region}>
-                      {region}
-                    </option>
-                  ))}
+                  <option value="Tbilisi">Tbilisi</option>
+                  <option value="Batumi">Batumi</option>
+                  <option value="Kutaisi">Kutaisi</option>
                 </select>
               </div>
 
@@ -911,8 +904,8 @@ export default function Devices() {
                   placeholder="Enter branch/city name"
                 />
                 {addDeviceForm.hostname && addDeviceForm.branch && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Auto-extracted from hostname
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
+                    <span className="text-green-500">✓</span> Auto-extracted from hostname
                   </p>
                 )}
               </div>
@@ -921,34 +914,39 @@ export default function Devices() {
             {/* Monitoring Configuration Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Monitoring Configuration</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Monitoring Configuration</h3>
               </div>
 
               {/* Monitoring Type Info */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                <div className="flex items-start gap-2">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
-                    <span className="text-blue-600 dark:text-blue-400">ℹ️</span>
+                    <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
                   </div>
-                  <div className="text-xs text-blue-800 dark:text-blue-300">
-                    <p className="font-medium mb-1">Monitoring Types:</p>
-                    <ul className="space-y-1 list-disc list-inside">
-                      <li><strong>ICMP (Ping)</strong> - Always enabled for all devices</li>
-                      <li><strong>SNMP</strong> - Optional, enter community string below to enable</li>
+                  <div className="text-sm text-blue-800 dark:text-blue-200">
+                    <p className="font-semibold mb-2">Monitoring Types:</p>
+                    <ul className="space-y-1.5">
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                        <span><strong className="font-semibold">ICMP (Ping)</strong> - Always enabled for all devices</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                        <span><strong className="font-semibold">SNMP</strong> - Optional, enter community string below to enable</span>
+                      </li>
                     </ul>
                   </div>
                 </div>
               </div>
 
               <Input
-                label="SNMP Community (Optional)"
+                label="SNMP Community String (Optional)"
                 value={addDeviceForm.snmp_community}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, snmp_community: e.target.value })}
-                placeholder="public"
+                placeholder="Leave empty for ICMP-only monitoring"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
-                Leave empty for ICMP-only monitoring
-              </p>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
@@ -957,7 +955,7 @@ export default function Devices() {
                 <select
                   value={addDeviceForm.snmp_version}
                   onChange={(e) => setAddDeviceForm({ ...addDeviceForm, snmp_version: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green"
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!addDeviceForm.snmp_community}
                 >
                   <option value="1">SNMPv1</option>
@@ -965,8 +963,8 @@ export default function Devices() {
                   <option value="3">SNMPv3</option>
                 </select>
                 {!addDeviceForm.snmp_community && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Enter SNMP community to enable SNMP version selection
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                    Enter SNMP community string to enable version selection
                   </p>
                 )}
               </div>
