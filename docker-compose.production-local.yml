@@ -48,12 +48,6 @@ services:
       - '--storageDataPath=/victoria-metrics-data'
       - '--httpListenAddr=:8428'
       - '--retentionPeriod=12'  # 12 months retention for SNMP metrics
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8428/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
     restart: unless-stopped
 
   api:
@@ -78,7 +72,7 @@ services:
       redis:
         condition: service_healthy
       victoriametrics:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - ./logs:/app/logs
       - api_prod_data:/data
@@ -110,7 +104,7 @@ services:
       redis:
         condition: service_healthy
       victoriametrics:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - ./logs:/app/logs
       - celery_prod_data:/data
