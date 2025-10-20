@@ -48,6 +48,8 @@ class StandaloneDeviceUpdate(BaseModel):
     device_type: Optional[str] = Field(None, max_length=100)
     model: Optional[str] = Field(None, max_length=100)
     location: Optional[str] = Field(None, max_length=200)
+    region: Optional[str] = Field(None, max_length=100)
+    branch: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = None
     enabled: Optional[bool] = None
     tags: Optional[List[str]] = None

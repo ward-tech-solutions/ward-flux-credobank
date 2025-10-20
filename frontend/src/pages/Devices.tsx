@@ -656,12 +656,12 @@ export default function Devices() {
           setEditingDevice(null)
         }}
         title="Edit Device"
-        size="lg"
+        size="xl"
       >
         {editingDevice && (
-          <div className="flex flex-col" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+          <div className="flex flex-col" style={{ minHeight: '600px', maxHeight: 'calc(85vh - 120px)' }}>
             {/* Scrollable Body */}
-            <div className="overflow-y-auto flex-1 pr-2">
+            <div className="overflow-y-auto flex-1 pr-3" style={{ paddingBottom: '1rem' }}>
               <div className="space-y-6">
                 {/* Basic Information Section */}
                 <div className="space-y-4">
@@ -846,11 +846,11 @@ export default function Devices() {
         open={addDeviceModalOpen}
         onClose={handleAddDeviceModalClose}
         title="Add New Device"
-        size="lg"
+        size="xl"
       >
-        <div className="flex flex-col" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+        <div className="flex flex-col" style={{ minHeight: '500px', maxHeight: 'calc(85vh - 120px)' }}>
           {/* Scrollable Body */}
-          <div className="overflow-y-auto flex-1 pr-2 space-y-6">
+          <div className="overflow-y-auto flex-1 pr-3 space-y-6" style={{ paddingBottom: '1rem' }}>
             {/* Basic Information Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
