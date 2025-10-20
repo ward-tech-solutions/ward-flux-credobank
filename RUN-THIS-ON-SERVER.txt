@@ -1,0 +1,43 @@
+=====================================================
+  DEPLOY ALL FIXES TO PRODUCTION SERVER
+=====================================================
+
+The website is showing OLD code from Oct 20.
+All fixes are ready in GitHub but need to be deployed.
+
+RUN THESE COMMANDS ON 10.30.25.39:
+-----------------------------------------------------
+
+ssh wardops@10.30.25.39
+
+cd /home/wardops/ward-flux-credobank
+
+git pull origin main
+
+./build-and-deploy.sh
+
+
+WAIT 5-10 MINUTES FOR BUILD TO COMPLETE
+-----------------------------------------------------
+
+Then verify the fixes:
+
+./verify-fixes-complete.sh
+
+
+WHAT THIS FIXES:
+-----------------------------------------------------
+✅ Downtime display (shows "2h 15m" style durations)
+✅ Recent down devices sorted to top
+✅ Device edit working (no more 400 errors)
+✅ Regions dropdown populated
+✅ All SQLAlchemy errors fixed
+
+
+ACCESS AFTER DEPLOYMENT:
+-----------------------------------------------------
+http://10.30.25.39:5001
+
+
+For detailed info, read: DEPLOY-FIXES.md
+=====================================================
