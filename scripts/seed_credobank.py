@@ -130,6 +130,8 @@ def seed_devices(session, devices_path: Path) -> None:
             ssh_port=record.get("ssh_port", 22),
             ssh_username=record.get("ssh_username"),
             ssh_enabled=record.get("ssh_enabled", True),
+            snmp_community=record.get("snmp_community"),  # SNMP community string
+            snmp_version=record.get("snmp_version"),  # SNMP version
             created_at=convert_value(record.get("created_at")),
             updated_at=convert_value(record.get("updated_at")),
         )
