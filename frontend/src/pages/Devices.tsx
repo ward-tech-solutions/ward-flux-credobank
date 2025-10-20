@@ -11,7 +11,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import DeviceDetailsModal from '@/components/DeviceDetailsModal'
 import SSHTerminalModal from '@/components/SSHTerminalModal'
 import { devicesAPI } from '@/services/api'
-import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus } from 'lucide-react'
+import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus, MapPin, Info, Activity } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 
 export default function Devices() {
@@ -662,11 +662,14 @@ export default function Devices() {
           <div className="flex flex-col" style={{ minHeight: '600px', maxHeight: 'calc(85vh - 120px)' }}>
             {/* Scrollable Body */}
             <div className="overflow-y-auto flex-1 pr-3" style={{ paddingBottom: '1rem' }}>
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {/* Basic Information Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Basic Information</h3>
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500">
+                      <Wifi className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Basic Information</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -716,9 +719,12 @@ export default function Devices() {
                 </div>
 
                 {/* Location Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Location</h3>
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500">
+                      <MapPin className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Location</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -757,9 +763,12 @@ export default function Devices() {
                 </div>
 
                 {/* Description Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Description</h3>
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-400 to-pink-500">
+                      <Info className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Description</h3>
                   </div>
 
                   <div>
@@ -777,9 +786,12 @@ export default function Devices() {
                 </div>
 
                 {/* SSH Configuration Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">SSH Configuration</h3>
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-400 to-red-500">
+                      <Terminal className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">SSH Configuration</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -832,7 +844,7 @@ export default function Devices() {
               <Button
                 onClick={handleSaveDeviceEdit}
                 disabled={savingDevice}
-                className="flex-1"
+                className="flex-1 bg-ward-green hover:bg-ward-green-dark"
               >
                 {savingDevice ? 'Saving...' : 'Save Changes'}
               </Button>
@@ -850,123 +862,140 @@ export default function Devices() {
       >
         <div className="flex flex-col" style={{ minHeight: '500px', maxHeight: 'calc(85vh - 120px)' }}>
           {/* Scrollable Body */}
-          <div className="overflow-y-auto flex-1 pr-3 space-y-6" style={{ paddingBottom: '1rem' }}>
-            {/* Basic Information Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Basic Information</h3>
-              </div>
-
-              <Input
-                label="Hostname"
-                value={addDeviceForm.hostname}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, hostname: e.target.value })}
-                placeholder="Enter device hostname"
-                required
-              />
-
-              <Input
-                label="IP Address"
-                value={addDeviceForm.ip}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, ip: e.target.value })}
-                placeholder="192.168.1.1"
-                required
-              />
-            </div>
-
-            {/* Location Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Location</h3>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Region
-                </label>
-                <select
-                  value={addDeviceForm.region}
-                  onChange={(e) => setAddDeviceForm({ ...addDeviceForm, region: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent transition-colors"
-                >
-                  <option value="">Select Region</option>
-                  <option value="Tbilisi">Tbilisi</option>
-                  <option value="Batumi">Batumi</option>
-                  <option value="Kutaisi">Kutaisi</option>
-                </select>
-              </div>
-
-              <div>
-                <Input
-                  label="Branch (City)"
-                  value={addDeviceForm.branch}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, branch: e.target.value })}
-                  placeholder="Enter branch/city name"
-                />
-                {addDeviceForm.hostname && addDeviceForm.branch && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
-                    <span className="text-green-500">✓</span> Auto-extracted from hostname
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Monitoring Configuration Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Monitoring Configuration</h3>
-              </div>
-
-              {/* Monitoring Type Info */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 mt-0.5">
-                    <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
+          <div className="overflow-y-auto flex-1 pr-3" style={{ paddingBottom: '1rem' }}>
+            <div className="space-y-5">
+              {/* Basic Information Section */}
+              <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500">
+                    <Wifi className="h-4 w-4 text-white" />
                   </div>
-                  <div className="text-sm text-blue-800 dark:text-blue-200">
-                    <p className="font-semibold mb-2">Monitoring Types:</p>
-                    <ul className="space-y-1.5">
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                        <span><strong className="font-semibold">ICMP (Ping)</strong> - Always enabled for all devices</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                        <span><strong className="font-semibold">SNMP</strong> - Optional, enter community string below to enable</span>
-                      </li>
-                    </ul>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Basic Information</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <Input
+                    label="Hostname"
+                    value={addDeviceForm.hostname}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, hostname: e.target.value })}
+                    placeholder="Enter device hostname"
+                    required
+                  />
+
+                  <Input
+                    label="IP Address"
+                    value={addDeviceForm.ip}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, ip: e.target.value })}
+                    placeholder="192.168.1.1"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Location Section */}
+              <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500">
+                    <MapPin className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Location</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Region
+                    </label>
+                    <select
+                      value={addDeviceForm.region}
+                      onChange={(e) => setAddDeviceForm({ ...addDeviceForm, region: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent transition-colors"
+                    >
+                      <option value="">Select Region</option>
+                      <option value="Tbilisi">Tbilisi</option>
+                      <option value="Batumi">Batumi</option>
+                      <option value="Kutaisi">Kutaisi</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <Input
+                      label="Branch (City)"
+                      value={addDeviceForm.branch}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, branch: e.target.value })}
+                      placeholder="Enter branch/city name"
+                    />
+                    {addDeviceForm.hostname && addDeviceForm.branch && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
+                        <span className="text-green-500">✓</span> Auto-extracted from hostname
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <Input
-                label="SNMP Community String (Optional)"
-                value={addDeviceForm.snmp_community}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, snmp_community: e.target.value })}
-                placeholder="Leave empty for ICMP-only monitoring"
-              />
+              {/* Monitoring Configuration Section */}
+              <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500">
+                    <Info className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Monitoring Configuration</h3>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  SNMP Version
-                </label>
-                <select
-                  value={addDeviceForm.snmp_version}
-                  onChange={(e) => setAddDeviceForm({ ...addDeviceForm, snmp_version: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!addDeviceForm.snmp_community}
-                >
-                  <option value="1">SNMPv1</option>
-                  <option value="2c">SNMPv2c</option>
-                  <option value="3">SNMPv3</option>
-                </select>
-                {!addDeviceForm.snmp_community && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-                    Enter SNMP community string to enable version selection
-                  </p>
-                )}
+                <div className="space-y-4">
+                  {/* Monitoring Type Info */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="text-sm text-blue-800 dark:text-blue-200">
+                        <p className="font-semibold mb-2">Monitoring Types:</p>
+                        <ul className="space-y-1.5">
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                            <span><strong className="font-semibold">ICMP (Ping)</strong> - Always enabled for all devices</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                            <span><strong className="font-semibold">SNMP</strong> - Optional, enter community string below to enable</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Input
+                    label="SNMP Community String (Optional)"
+                    value={addDeviceForm.snmp_community}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, snmp_community: e.target.value })}
+                    placeholder="Leave empty for ICMP-only monitoring"
+                  />
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      SNMP Version
+                    </label>
+                    <select
+                      value={addDeviceForm.snmp_version}
+                      onChange={(e) => setAddDeviceForm({ ...addDeviceForm, snmp_version: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-ward-green focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!addDeviceForm.snmp_community}
+                    >
+                      <option value="1">SNMPv1</option>
+                      <option value="2c">SNMPv2c</option>
+                      <option value="3">SNMPv3</option>
+                    </select>
+                    {!addDeviceForm.snmp_community && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                        Enter SNMP community string to enable version selection
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -984,7 +1013,7 @@ export default function Devices() {
             <Button
               onClick={handleAddDevice}
               disabled={addingDevice}
-              className="flex-1"
+              className="flex-1 bg-ward-green hover:bg-ward-green-dark"
             >
               {addingDevice ? 'Adding...' : 'Add Device'}
             </Button>
