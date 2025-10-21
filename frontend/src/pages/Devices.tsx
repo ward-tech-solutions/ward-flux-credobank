@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Loading'
@@ -11,8 +11,9 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import DeviceDetailsModal from '@/components/DeviceDetailsModal'
 import SSHTerminalModal from '@/components/SSHTerminalModal'
 import { devicesAPI, branchesAPI } from '@/services/api'
-import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus, MapPin, Info, Activity } from 'lucide-react'
+import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus, MapPin, Info, Activity, Trash2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
+import { toast } from 'sonner'
 
 export default function Devices() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -35,6 +36,8 @@ export default function Devices() {
   const [sshDeviceIP, setSSHDeviceIP] = useState('')
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingDevice, setEditingDevice] = useState<any>(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deviceToDelete, setDeviceToDelete] = useState<any>(null)
   const [editForm, setEditForm] = useState({
     name: '',
     ip: '',
@@ -90,18 +93,35 @@ export default function Devices() {
     return city.trim()
   }
 
+  const queryClient = useQueryClient()
+
   const { data: devices, isLoading } = useQuery({
     queryKey: ['devices'],
     queryFn: () => devicesAPI.getAll(),
   })
 
   // Fetch available regions from database
-  const { data: regionsData } = useQuery({
+  const { data: regionsData} = useQuery({
     queryKey: ['regions'],
     queryFn: async () => {
       const response = await branchesAPI.getRegions()
       return response.data
     },
+  })
+
+  // Delete device mutation
+  const deleteMutation = useMutation({
+    mutationFn: (deviceId: string) => devicesAPI.deleteDevice(deviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+      toast.success('Device deleted successfully')
+      setDeleteModalOpen(false)
+      setDeviceToDelete(null)
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || 'Failed to delete device'
+      toast.error(message)
+    }
   })
 
   const availableRegions = regionsData?.regions || []
@@ -203,14 +223,15 @@ export default function Devices() {
     setSavingDevice(true)
     try {
       await devicesAPI.updateDevice(editingDevice.hostid, editForm)
-      alert('Device updated successfully!')
+      toast.success('Device updated successfully!')
       setEditModalOpen(false)
       setEditingDevice(null)
       // Refresh the devices list
-      window.location.reload()
-    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+    } catch (error: any) {
       console.error('Failed to update device:', error)
-      alert('Failed to update device')
+      const message = error.response?.data?.detail || 'Failed to update device'
+      toast.error(message)
     } finally {
       setSavingDevice(false)
     }
@@ -226,7 +247,7 @@ export default function Devices() {
 
   const handleAddDevice = async () => {
     if (!addDeviceForm.hostname || !addDeviceForm.ip) {
-      alert('Please fill in all required fields')
+      toast.error('Please fill in all required fields')
       return
     }
 
@@ -244,7 +265,7 @@ export default function Devices() {
           snmp_version: addDeviceForm.snmp_version,
         }
       })
-      alert('Device added successfully!')
+      toast.success('Device added successfully!')
 
       setAddDeviceModalOpen(false)
       setAddDeviceForm({
@@ -256,10 +277,11 @@ export default function Devices() {
         snmp_version: '2c',
       })
       // Refresh the devices list
-      window.location.reload()
-    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+    } catch (error: any) {
       console.error('Failed to add device:', error)
-      alert('Failed to add device. Please check the form and try again.')
+      const message = error.response?.data?.detail || 'Failed to add device. Please check the form and try again.'
+      toast.error(message)
     } finally {
       setAddingDevice(false)
     }
@@ -547,6 +569,19 @@ export default function Devices() {
                     >
                       <Terminal className="h-4 w-4" />
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeviceToDelete(device)
+                        setDeleteModalOpen(true)
+                      }}
+                      title="Delete Device"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -629,6 +664,19 @@ export default function Devices() {
                             title="SSH Access"
                           >
                             <Terminal className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDeviceToDelete(device)
+                              setDeleteModalOpen(true)
+                            }}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            title="Delete Device"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -1031,6 +1079,44 @@ export default function Devices() {
           </div>
         </div>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && deviceToDelete && (
+        <Modal
+          isOpen={deleteModalOpen}
+          onClose={() => {
+            setDeleteModalOpen(false)
+            setDeviceToDelete(null)
+          }}
+          title="Delete Device"
+        >
+          <div className="space-y-4">
+            <p className="text-gray-600 dark:text-gray-300">
+              Are you sure you want to delete <strong>{deviceToDelete.name || deviceToDelete.display_name}</strong>?
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteModalOpen(false)
+                  setDeviceToDelete(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteMutation.mutate(deviceToDelete.hostid || deviceToDelete.id)}
+                disabled={deleteMutation.isPending}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
