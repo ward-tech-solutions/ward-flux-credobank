@@ -6,7 +6,7 @@ Background tasks for distributed monitoring.
 
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 from sqlalchemy import text
 from celery import shared_task
@@ -27,6 +27,11 @@ from monitoring.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def utcnow():
+    """Get current UTC time with timezone awareness"""
+    return datetime.now(timezone.utc)
 
 
 @shared_task(bind=True, name="monitoring.tasks.poll_device_snmp")
@@ -186,6 +191,17 @@ def ping_device(device_id: str, device_ip: str):
         device_uuid = UUID(device_id) if isinstance(device_id, str) else device_id
         device = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
 
+        # Get previous ping result to detect state transitions
+        previous_ping = (
+            db.query(PingResult)
+            .filter(PingResult.device_ip == device_ip)
+            .order_by(PingResult.timestamp.desc())
+            .first()
+        )
+
+        current_state = host.is_alive  # True = UP, False = DOWN
+        previous_state = previous_ping.is_reachable if previous_ping else True  # Assume UP if no history
+
         ping_result = PingResult(
             device_ip=device_ip,
             device_name=device.name if device else None,
@@ -196,21 +212,33 @@ def ping_device(device_id: str, device_ip: str):
             avg_rtt_ms=int(host.avg_rtt) if host.avg_rtt else 0,
             max_rtt_ms=int(host.max_rtt) if host.max_rtt else 0,
             is_reachable=host.is_alive,
-            timestamp=datetime.utcnow()
+            timestamp=utcnow()
         )
         db.add(ping_result)
 
-        # Update down_since timestamp for downtime tracking
+        # Update down_since timestamp based on ACTUAL state transitions
         if device:
-            if not host.is_alive and device.down_since is None:
-                # Device just went down (Up -> Down transition)
-                device.down_since = datetime.utcnow()
-                logger.info(f"Device {device.name} ({device_ip}) went DOWN")
-            elif host.is_alive and device.down_since is not None:
-                # Device just came back up (Down -> Up transition)
-                downtime_duration = datetime.utcnow() - device.down_since
-                logger.info(f"Device {device.name} ({device_ip}) came back UP after {downtime_duration}")
+            # State transition: UP -> DOWN (device just went down)
+            if previous_state and not current_state:
+                device.down_since = utcnow()
+                logger.info(f"Device {device.name} ({device_ip}) went DOWN (UP->DOWN transition)")
+
+            # State transition: DOWN -> UP (device came back up)
+            elif not previous_state and current_state:
+                if device.down_since:
+                    downtime_duration = utcnow() - device.down_since
+                    logger.info(f"Device {device.name} ({device_ip}) came back UP after {downtime_duration} (DOWN->UP transition)")
                 device.down_since = None
+
+            # Device is currently UP - ensure down_since is cleared (handle stale data)
+            elif current_state and device.down_since is not None:
+                logger.warning(f"Device {device.name} ({device_ip}) is UP but has stale down_since timestamp - clearing it")
+                device.down_since = None
+
+            # Device is currently DOWN - ensure down_since is set (handle missing timestamp)
+            elif not current_state and device.down_since is None:
+                logger.warning(f"Device {device.name} ({device_ip}) is DOWN but missing down_since timestamp - setting it now")
+                device.down_since = utcnow()
 
         db.commit()
 
