@@ -59,6 +59,11 @@ const calculateDowntime = (device: Device) => {
     const now = Date.now()
     const diff = now - problemStart
 
+    // Debug logging
+    console.log(`[${device.name}] Trigger lastchange:`, oldestTrigger.lastchange,
+                'Date:', new Date(problemStart).toISOString(),
+                'Diff hours:', (diff / (1000 * 60 * 60)).toFixed(2))
+
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
@@ -73,6 +78,11 @@ const calculateDowntime = (device: Device) => {
     const downSinceTime = new Date(device.down_since).getTime()
     const now = Date.now()
     const diff = now - downSinceTime
+
+    // Debug logging
+    console.log(`[${device.name}] down_since:`, device.down_since,
+                'Date:', new Date(downSinceTime).toISOString(),
+                'Diff hours:', (diff / (1000 * 60 * 60)).toFixed(2))
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
