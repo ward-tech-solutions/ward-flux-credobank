@@ -15,8 +15,12 @@ RUN npm ci --prefer-offline --no-audit --legacy-peer-deps
 # Copy frontend source
 COPY frontend/ ./
 
-# Build React app - force clean build
-RUN rm -rf dist .vite && npm run build
+# Build React app - force clean build with cache bust
+# Using BUILD_DATE as cache buster to ensure fresh builds
+ARG BUILD_DATE=unknown
+RUN echo "Build date: ${BUILD_DATE}" && \
+    rm -rf dist .vite node_modules/.vite && \
+    npm run build
 
 # Stage 2: Build Python Dependencies
 FROM python:3.11-slim as python-builder
