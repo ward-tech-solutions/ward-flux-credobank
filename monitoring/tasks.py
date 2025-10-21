@@ -177,8 +177,8 @@ def ping_device(device_id: str, device_ip: str):
         from database import PingResult
         from datetime import datetime
 
-        # Perform ping
-        host = ping(device_ip, count=5, interval=0.2, timeout=2, privileged=False)
+        # Perform ping (optimized: reduced from 5 to 2 pings, timeout from 2s to 1s)
+        host = ping(device_ip, count=2, interval=0.2, timeout=1, privileged=False)
 
         # Save to database
         db = SessionLocal()

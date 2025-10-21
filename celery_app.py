@@ -48,16 +48,16 @@ app.conf.update(
 
 # Periodic task schedule
 app.conf.beat_schedule = {
-    # Poll all enabled monitoring items every minute
+    # Poll all enabled monitoring items every 5 minutes (optimized from 60s)
     'poll-all-devices-snmp': {
         'task': 'monitoring.tasks.poll_all_devices_snmp',
-        'schedule': 60.0,  # Every 60 seconds
+        'schedule': 300.0,  # Every 5 minutes (was 60 seconds)
     },
 
-    # Ping all devices every 30 seconds
+    # Ping all devices every 60 seconds (optimized from 30s)
     'ping-all-devices': {
         'task': 'monitoring.tasks.ping_all_devices',
-        'schedule': 30.0,
+        'schedule': 60.0,  # Every 60 seconds (was 30 seconds)
     },
 
     # Cleanup old metrics every hour
