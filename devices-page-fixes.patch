@@ -1,0 +1,162 @@
+## Devices.tsx Changes for Delete Button and Toast Notifications
+
+### 1. Add imports at the top (line 14)
+
+CHANGE FROM:
+```typescript
+import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus, MapPin, Info, Activity } from 'lucide-react'
+```
+
+TO:
+```typescript
+import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus, MapPin, Info, Activity, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+```
+
+### 2. Add delete state variables (after line 36, where other modal states are)
+
+ADD:
+```typescript
+const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+const [deviceToDelete, setDeviceToDelete] = useState<any>(null)
+```
+
+### 3. Add queryClient and delete mutation (after the useState declarations, around line 60)
+
+ADD:
+```typescript
+const queryClient = useQueryClient()
+
+// Delete device mutation
+const deleteMutation = useMutation({
+  mutationFn: (deviceId: string) => devicesAPI.deleteDevice(deviceId),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['devices'] })
+    toast.success('Device deleted successfully')
+    setDeleteModalOpen(false)
+    setDeviceToDelete(null)
+  },
+  onError: (error: any) => {
+    const message = error.response?.data?.detail || 'Failed to delete device'
+    toast.error(message)
+  }
+})
+```
+
+### 4. Find where device cards/rows are rendered
+
+Search for where device actions (Edit, Terminal, etc.) are rendered.
+This is typically in a grid card or table row section.
+
+ADD a delete button next to the existing action buttons:
+
+```typescript
+<Button
+  variant="ghost"
+  size="sm"
+  onClick={() => {
+    setDeviceToDelete(device)
+    setDeleteModalOpen(true)
+  }}
+  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+  title="Delete device"
+>
+  <Trash2 className="h-4 w-4" />
+</Button>
+```
+
+### 5. Add delete confirmation modal (at the end of the component, before the closing tag)
+
+ADD:
+```typescript
+{/* Delete Confirmation Modal */}
+{deleteModalOpen && deviceToDelete && (
+  <Modal
+    isOpen={deleteModalOpen}
+    onClose={() => {
+      setDeleteModalOpen(false)
+      setDeviceToDelete(null)
+    }}
+    title="Delete Device"
+  >
+    <div className="space-y-4">
+      <p className="text-gray-600">
+        Are you sure you want to delete <strong>{deviceToDelete.name || deviceToDelete.display_name}</strong>?
+        This action cannot be undone.
+      </p>
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setDeleteModalOpen(false)
+            setDeviceToDelete(null)
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="destructive"
+          onClick={() => deleteMutation.mutate(deviceToDelete.hostid || deviceToDelete.id)}
+          disabled={deleteMutation.isPending}
+          className="bg-red-600 hover:bg-red-700 text-white"
+        >
+          {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+        </Button>
+      </div>
+    </div>
+  </Modal>
+)}
+```
+
+### 6. Add toast notifications to existing mutations
+
+Find the form submission handlers (for add/edit device) and add toast notifications:
+
+FOR ADD DEVICE (in the add device mutation):
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['devices'] })
+  toast.success('Device added successfully')
+  // ... close modal, reset form
+},
+onError: (error: any) => {
+  const message = error.response?.data?.detail || 'Failed to add device'
+  toast.error(message)
+}
+```
+
+FOR EDIT DEVICE (in the edit device mutation):
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['devices'] })
+  toast.success('Device updated successfully')
+  setEditModalOpen(false)
+},
+onError: (error: any) => {
+  const message = error.response?.data?.detail || 'Failed to update device'
+  toast.error(message)
+}
+```
+
+---
+
+## Implementation Notes:
+
+1. The file is large (1036 lines), so search for specific sections
+2. Make sure to import `useMutation` and `useQueryClient` if not already imported
+3. The `devicesAPI.deleteDevice()` function already exists in the API service
+4. Test with a non-critical device first
+5. The duplicate IP error will automatically show via the toast.error() when backend returns the error
+
+---
+
+## Testing Steps:
+
+After applying changes:
+1. Rebuild frontend: `npm run build` in frontend directory
+2. Or restart container: `docker-compose restart api`
+3. Test delete button appears
+4. Test delete confirmation dialog
+5. Test success/error toasts
+6. Try adding duplicate IP to see error toast
