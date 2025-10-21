@@ -130,13 +130,12 @@ def create_monitoring_items_for_device(db, device: StandaloneDevice, snmp_cred: 
                 monitoring_item = MonitoringItem(
                     id=uuid4(),
                     device_id=device.id,
-                    name=oid_def.name,
+                    oid_name=oid_def.name,  # Changed from 'name' to 'oid_name'
                     oid=oid_def.oid,
                     value_type=oid_def.value_type,
                     units=oid_def.units,
-                    description=oid_def.description,
+                    interval=60,  # Changed from 'poll_interval' to 'interval'
                     enabled=True,
-                    poll_interval=60,  # Poll every 60 seconds
                     created_at=datetime.utcnow(),
                 )
                 db.add(monitoring_item)
