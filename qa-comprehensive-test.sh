@@ -479,7 +479,8 @@ STATE_TRANSITIONS=$(docker logs --since 1h wardops-worker-prod 2>&1 | grep -c "w
 log_test "Worker state transition logging" "PASS" "$STATE_TRANSITIONS transitions logged in last hour"
 
 # Test 5.5: Worker errors
-WORKER_ERRORS=$(docker logs --since 1h wardops-worker-prod 2>&1 | grep -c "ERROR" || echo "0")
+WORKER_ERRORS=$(docker logs --since 1h wardops-worker-prod 2>&1 | grep -E "^\[.*\] ERROR" | wc -l || echo "0")
+WORKER_ERRORS=$(echo "$WORKER_ERRORS" | tr -d ' ')
 if [ "$WORKER_ERRORS" -lt 10 ]; then
     log_test "Worker error rate" "PASS" "$WORKER_ERRORS errors in last hour"
 elif [ "$WORKER_ERRORS" -lt 100 ]; then
@@ -497,7 +498,7 @@ else
 fi
 
 # Test 5.7: Redis connectivity
-REDIS_PING=$(docker exec wardops-redis-prod redis-cli ping 2>/dev/null)
+REDIS_PING=$(docker exec wardops-redis-prod redis-cli -a redispass ping 2>/dev/null)
 if [ "$REDIS_PING" = "PONG" ]; then
     log_test "Redis connectivity" "PASS" ""
 else
@@ -505,11 +506,11 @@ else
 fi
 
 # Test 5.8: Redis memory usage
-REDIS_MEM=$(docker exec wardops-redis-prod redis-cli INFO memory 2>/dev/null | grep "used_memory_human" | cut -d':' -f2 | tr -d '\r')
+REDIS_MEM=$(docker exec wardops-redis-prod redis-cli -a redispass INFO memory 2>/dev/null | grep "used_memory_human" | cut -d':' -f2 | tr -d '\r')
 log_test "Redis memory usage" "PASS" "$REDIS_MEM"
 
 # Test 5.9: Redis queue depth
-QUEUE_DEPTH=$(docker exec wardops-redis-prod redis-cli LLEN celery 2>/dev/null)
+QUEUE_DEPTH=$(docker exec wardops-redis-prod redis-cli -a redispass LLEN celery 2>/dev/null)
 if [ "$QUEUE_DEPTH" -lt 100 ]; then
     log_test "Redis queue depth" "PASS" "$QUEUE_DEPTH tasks queued"
 else
