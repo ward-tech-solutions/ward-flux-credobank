@@ -111,7 +111,7 @@ export default function Devices() {
 
   // Delete device mutation
   const deleteMutation = useMutation({
-    mutationFn: (deviceId: string) => devicesAPI.deleteDevice(deviceId),
+    mutationFn: (deviceId: string) => devicesAPI.standalone.delete(deviceId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
       toast.success('Device deleted successfully')
