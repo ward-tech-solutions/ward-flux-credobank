@@ -618,8 +618,13 @@ export default function Monitor() {
         if (!aRecentlyDown && bRecentlyDown) return 1
 
         // Priority 3: Among recently down or older down devices, sort by recency (most recent first)
-        const aDowntime = a.triggers?.[0] ? parseInt(a.triggers[0].lastchange) : a.last_check
-        const bDowntime = b.triggers?.[0] ? parseInt(b.triggers[0].lastchange) : b.last_check
+        // Use down_since timestamp for standalone devices, fallback to triggers for Zabbix
+        const aDowntime = a.down_since
+          ? new Date(a.down_since).getTime()
+          : (a.triggers?.[0] ? parseInt(a.triggers[0].lastchange) * 1000 : a.last_check * 1000)
+        const bDowntime = b.down_since
+          ? new Date(b.down_since).getTime()
+          : (b.triggers?.[0] ? parseInt(b.triggers[0].lastchange) * 1000 : b.last_check * 1000)
         return bDowntime - aDowntime // Later timestamp = more recent = higher priority
       }
 
