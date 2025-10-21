@@ -12,14 +12,15 @@ COPY frontend/package*.json ./
 # Install frontend dependencies
 RUN npm ci --prefer-offline --no-audit --legacy-peer-deps
 
+# Cache buster - this invalidates the cache when source changes
+ARG CACHE_BUST=unknown
+RUN echo "Cache bust: ${CACHE_BUST}"
+
 # Copy frontend source
 COPY frontend/ ./
 
-# Build React app - force clean build with cache bust
-# Using BUILD_DATE as cache buster to ensure fresh builds
-ARG BUILD_DATE=unknown
-RUN echo "Build date: ${BUILD_DATE}" && \
-    rm -rf dist .vite node_modules/.vite && \
+# Build React app - force clean build
+RUN rm -rf dist .vite node_modules/.vite && \
     npm run build
 
 # Stage 2: Build Python Dependencies
