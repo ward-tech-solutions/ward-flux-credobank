@@ -5,9 +5,8 @@ echo "  DUPLICATE IP ADDRESS DIAGNOSTIC"
 echo "================================================================"
 echo ""
 
-echo "Finding database name..."
-DB_NAME=$(docker exec wardops-postgres-prod psql -U ward_admin -l 2>/dev/null | grep ward | awk '{print $1}' | head -1)
-echo "Database: $DB_NAME"
+echo "Using database: ward_ops"
+DB_NAME="ward_ops"
 echo ""
 
 echo "Duplicate IP addresses:"
