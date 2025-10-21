@@ -186,7 +186,7 @@ fi
 
 # Test 2.7: Get Branches
 BRANCHES=$(curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/api/v1/branches" 2>/dev/null)
-BRANCH_COUNT=$(echo "$BRANCHES" | jq 'length' 2>/dev/null || echo "0")
+BRANCH_COUNT=$(echo "$BRANCHES" | jq '.branches | length' 2>/dev/null || echo "0")
 
 if [ "$BRANCH_COUNT" -gt 0 ]; then
     log_test "GET /api/v1/branches" "PASS" "Retrieved $BRANCH_COUNT branches"
@@ -214,7 +214,7 @@ else
 fi
 
 # Test 2.10: Get specific branch
-FIRST_BRANCH_ID=$(echo "$BRANCHES" | jq -r '.[0].id' 2>/dev/null)
+FIRST_BRANCH_ID=$(echo "$BRANCHES" | jq -r '.branches[0].id' 2>/dev/null)
 if [ -n "$FIRST_BRANCH_ID" ] && [ "$FIRST_BRANCH_ID" != "null" ]; then
     BRANCH_DETAIL=$(curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/api/v1/branches/$FIRST_BRANCH_ID" 2>/dev/null)
     if echo "$BRANCH_DETAIL" | jq -e '.id' > /dev/null 2>&1; then
