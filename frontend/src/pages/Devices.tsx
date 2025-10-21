@@ -1083,7 +1083,7 @@ export default function Devices() {
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && deviceToDelete && (
         <Modal
-          isOpen={deleteModalOpen}
+          open={deleteModalOpen}
           onClose={() => {
             setDeleteModalOpen(false)
             setDeviceToDelete(null)
