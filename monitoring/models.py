@@ -16,9 +16,8 @@ from database import Base
 
 class MonitoringMode(str, Enum):
     """Monitoring mode selection"""
-    zabbix = "zabbix"          # Use Zabbix API only
-    standalone = "standalone"  # Use standalone monitoring only
-    hybrid = "hybrid"          # Use both sources
+    standalone = "standalone"  # Standalone ICMP + SNMP monitoring
+    snmp_only = "snmp_only"    # SNMP polling only (no ICMP)
 
 
 class AlertSeverity(str, Enum):

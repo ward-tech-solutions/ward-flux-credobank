@@ -69,12 +69,6 @@ async def get_devices(
     db: Session = Depends(get_db),
 ):
     """Get devices with optional filters and user permissions"""
-    manager = DeviceManager(db, request)
-    mode = manager.get_active_mode()
-
-    if mode == MonitoringMode.zabbix:
-        return await _get_zabbix_devices(request, region, branch, device_type, current_user)
-
     return _get_standalone_devices(db, region, branch, device_type, current_user)
 
 
@@ -86,15 +80,6 @@ async def get_device_details(
     db: Session = Depends(get_db),
 ):
     """Get detailed information about a specific device"""
-    manager = DeviceManager(db, request)
-    mode = manager.get_active_mode()
-
-    if mode == MonitoringMode.zabbix:
-        details = await run_in_executor(request.app.state.zabbix.get_host_details, device_id)
-        if details:
-            return details
-        return JSONResponse(status_code=404, content={"error": "Device not found"})
-
     try:
         device_uuid = uuid.UUID(device_id)
     except ValueError:
@@ -125,39 +110,6 @@ async def update_device(
     data = await request.json()
     update_data = DeviceUpdate(**data)
 
-    # For now, we'll store this in Zabbix host inventory or tags
-    # This is a simplified implementation - you may want to enhance this
-    # to actually update Zabbix host inventory fields
-
-    manager = DeviceManager(db, request)
-    mode = manager.get_active_mode()
-
-    if mode == MonitoringMode.zabbix:
-        zabbix = request.app.state.zabbix
-
-        try:
-            inventory = {}
-            if update_data.region is not None:
-                inventory["location"] = update_data.region
-            if update_data.branch is not None:
-                inventory["site_city"] = update_data.branch
-
-            if inventory:
-                update_result = await run_in_executor(lambda: zabbix.update_host(hostid, inventory=inventory))
-
-                if not update_result.get("success"):
-                    raise Exception(update_result.get("message", "Unknown error"))
-
-            return {
-                "status": "success",
-                "message": "Device updated successfully",
-                "hostid": hostid,
-                "updated_fields": {"region": update_data.region, "branch": update_data.branch},
-            }
-        except Exception as e:
-            logger.error(f"Failed to update device {hostid}: {e}")
-            return JSONResponse(status_code=500, content={"error": f"Failed to update device: {str(e)}"})
-
     try:
         device_uuid = uuid.UUID(hostid)
     except ValueError:
@@ -185,31 +137,6 @@ async def update_device(
         "hostid": hostid,
         "updated_fields": {"region": update_data.region, "branch": update_data.branch},
     }
-
-
-async def _get_zabbix_devices(
-    request: Request,
-    region: Optional[str],
-    branch: Optional[str],
-    device_type: Optional[str],
-    current_user: User,
-):
-    zabbix = request.app.state.zabbix
-    groupids = get_monitored_groupids()
-
-    if region:
-        devices = await run_in_executor(zabbix.get_devices_by_region, region)
-    elif branch:
-        devices = await run_in_executor(zabbix.get_devices_by_branch, branch)
-    elif device_type:
-        devices = await run_in_executor(zabbix.get_devices_by_type, device_type)
-    else:
-        devices = await run_in_executor(lambda: zabbix.get_all_hosts(group_ids=groupids))
-
-    # Apply region/branch filtering based on user permissions
-    devices = [d for d in devices if user_can_access_device(current_user, d)]
-
-    return devices
 
 
 def _get_standalone_devices(
@@ -367,17 +294,6 @@ async def get_device_history(
     """Get real ping history for a device"""
     import time
 
-    manager = DeviceManager(db, request)
-    mode = manager.get_active_mode()
-
-    if mode == MonitoringMode.zabbix:
-        zabbix = request.app.state.zabbix
-        loop = asyncio.get_event_loop()
-        time_map = {"24h": 86400, "7d": 604800, "30d": 2592000}
-        time_from = int(time.time()) - time_map.get(time_range, 86400)
-        history = await loop.run_in_executor(None, lambda: zabbix.get_device_ping_history(hostid, time_from))
-        return {"hostid": hostid, "history": history, "time_range": time_range}
-
     try:
         device_uuid = uuid.UUID(hostid)
     except ValueError:
@@ -421,28 +337,16 @@ async def ping_device(
     import subprocess
     import time
 
-    manager = DeviceManager(db, request)
-    mode = manager.get_active_mode()
+    try:
+        device_uuid = uuid.UUID(device_id)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid device ID"})
 
-    if mode == MonitoringMode.zabbix:
-        zabbix = request.app.state.zabbix
-        loop = asyncio.get_event_loop()
-        device = await loop.run_in_executor(None, lambda: zabbix.get_host_details(device_id))
-        if not device:
-            return JSONResponse(status_code=404, content={"error": "Device not found"})
-        ip = device.get("ip")
-        device_name = device.get("display_name")
-    else:
-        try:
-            device_uuid = uuid.UUID(device_id)
-        except ValueError:
-            return JSONResponse(status_code=400, content={"error": "Invalid device ID"})
-
-        standalone = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
-        if not standalone:
-            return JSONResponse(status_code=404, content={"error": "Device not found"})
-        ip = standalone.ip
-        device_name = standalone.name
+    standalone = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
+    if not standalone:
+        return JSONResponse(status_code=404, content={"error": "Device not found"})
+    ip = standalone.ip
+    device_name = standalone.name
 
     if not ip:
         return JSONResponse(

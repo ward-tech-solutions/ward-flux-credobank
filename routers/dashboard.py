@@ -42,21 +42,11 @@ async def health_check(request: Request):
     except Exception as e:
         db_status = f"unhealthy: {str(e)}"
 
-    # Check Zabbix connection
-    try:
-        zabbix = getattr(request.app.state, "zabbix", None)
-        if zabbix and getattr(zabbix, "zapi", None):
-            zabbix_status = "connected"
-        else:
-            zabbix_status = "not_configured"
-    except Exception as e:
-        zabbix_status = f"error: {str(e)}"
-
     return {
         "status": "healthy" if db_status == "healthy" else "degraded",
         "version": "2.0.0",
         "timestamp": datetime.now().isoformat(),
-        "components": {"database": db_status, "zabbix": zabbix_status, "api": "healthy"},
+        "components": {"database": db_status, "api": "healthy"},
     }
 
 
@@ -68,140 +58,7 @@ async def get_dashboard_stats(
     db: Session = Depends(get_db),
 ):
     """Get dashboard statistics with optional region filter and user permissions"""
-    manager = DeviceManager(db, request)
-    mode = manager.get_active_mode()
-
-    if mode == MonitoringMode.zabbix:
-        return await _get_zabbix_dashboard_stats(request, region, current_user)
-
-    if mode == MonitoringMode.standalone:
-        return _get_standalone_dashboard_stats(db, region, current_user)
-
-    if mode == MonitoringMode.hybrid:
-        standalone_stats = _get_standalone_dashboard_stats(db, region, current_user)
-        zabbix_stats = await _get_zabbix_dashboard_stats(request, region, current_user)
-        return _merge_dashboard_stats(standalone_stats, zabbix_stats)
-
-    logger.warning("Unknown monitoring mode detected, defaulting to standalone stats")
     return _get_standalone_dashboard_stats(db, region, current_user)
-
-
-async def _get_zabbix_dashboard_stats(request: Request, region: Optional[str], current_user: User) -> dict:
-    """Existing Zabbix-powered dashboard statistics."""
-    zabbix = request.app.state.zabbix
-
-    conn = sqlite3.connect("data/ward_ops.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        SELECT groupid, display_name
-        FROM monitored_hostgroups
-        WHERE is_active = 1
-    """
-    )
-    monitored_groups = [dict(row) for row in cursor.fetchall()]
-
-    logger.info(f"[DEBUG] Monitored groups from DB: {monitored_groups}")
-
-    if not monitored_groups:
-        logger.info("[DEBUG] No monitored groups, getting all hosts")
-        devices = await run_in_executor(zabbix.get_all_hosts)
-    else:
-        monitored_groupids = [g["groupid"] for g in monitored_groups]
-        logger.info(f"[DEBUG] Fetching hosts for group IDs: {monitored_groupids}")
-        loop = asyncio.get_event_loop()
-        devices = await loop.run_in_executor(
-            executor, lambda: zabbix.get_all_hosts(group_ids=monitored_groupids)
-        )
-        logger.info(f"[DEBUG] Retrieved {len(devices)} devices from Zabbix")
-
-    if region:
-        devices = [d for d in devices if d.get("region") == region]
-
-    if current_user.role != UserRole.ADMIN:
-        if current_user.region:
-            devices = [d for d in devices if d.get("region") == current_user.region]
-
-        if current_user.branches:
-            allowed_branches = [b.strip() for b in current_user.branches.split(",")]
-            devices = [d for d in devices if d.get("branch") in allowed_branches]
-
-    alerts = await run_in_executor(zabbix.get_active_alerts)
-
-    total_devices = len(devices)
-    online_devices = len([h for h in devices if h.get("ping_status") == "Up"])
-    offline_devices = len([h for h in devices if h.get("ping_status") == "Down"])
-    warning_devices = len([h for h in devices if h.get("ping_status") == "Unknown"])
-
-    device_types: Dict[str, Dict[str, int]] = {}
-    for host in devices:
-        dt = host.get("device_type") or "Unknown"
-        entry = device_types.setdefault(dt, {"total": 0, "online": 0, "offline": 0})
-        entry["total"] += 1
-        if host.get("ping_status") == "Up":
-            entry["online"] += 1
-        elif host.get("ping_status") == "Down":
-            entry["offline"] += 1
-
-    regions_stats: Dict[str, Dict[str, float]] = {}
-    for host in devices:
-        city_name = extract_city_from_hostname(host.get("host", host.get("display_name", "")))
-
-        cursor.execute(
-            """
-            SELECT r.name_en as region, c.latitude, c.longitude
-            FROM georgian_cities c
-            JOIN georgian_regions r ON c.region_id = r.id
-            WHERE c.name_en LIKE ? AND c.is_active = 1
-            LIMIT 1
-        """,
-            (f"%{city_name}%",),
-        )
-
-        city_data = cursor.fetchone()
-
-        if city_data:
-            city_data = dict(city_data)
-            region_name = city_data["region"]
-            entry = regions_stats.setdefault(
-                region_name,
-                {
-                    "total": 0,
-                    "online": 0,
-                    "offline": 0,
-                    "latitude": city_data["latitude"],
-                    "longitude": city_data["longitude"],
-                },
-            )
-        else:
-            region_name = host.get("region", "Unknown")
-            entry = regions_stats.setdefault(region_name, {"total": 0, "online": 0, "offline": 0})
-
-        entry["total"] += 1
-        if host.get("ping_status") == "Up":
-            entry.setdefault("online", 0)
-            entry["online"] += 1
-        elif host.get("ping_status") == "Down":
-            entry.setdefault("offline", 0)
-            entry["offline"] += 1
-
-    conn.close()
-
-    uptime_percentage = round((online_devices / total_devices * 100) if total_devices > 0 else 0, 2)
-
-    return {
-        "total_devices": total_devices,
-        "online_devices": online_devices,
-        "offline_devices": offline_devices,
-        "warning_devices": warning_devices,
-        "uptime_percentage": uptime_percentage,
-        "active_alerts": len(alerts),
-        "critical_alerts": len([a for a in alerts if a.get("severity") in ["High", "Disaster"]]),
-        "device_types": device_types,
-        "regions_stats": regions_stats,
-    }
 
 
 def _get_standalone_dashboard_stats(
@@ -326,57 +183,3 @@ def _latest_ping_lookup(db: Session, ips: List[str]) -> Dict[str, PingResult]:
     return lookup
 
 
-def _merge_dashboard_stats(primary: dict, secondary: dict) -> dict:
-    total_devices = primary["total_devices"] + secondary["total_devices"]
-    online_devices = primary["online_devices"] + secondary["online_devices"]
-    offline_devices = primary["offline_devices"] + secondary["offline_devices"]
-    warning_devices = primary["warning_devices"] + secondary["warning_devices"]
-
-    uptime_percentage = round((online_devices / total_devices * 100) if total_devices > 0 else 0, 2)
-
-    device_types = _merge_device_type_stats(
-        primary.get("device_types", {}), secondary.get("device_types", {})
-    )
-    regions_stats = _merge_region_stats(
-        primary.get("regions_stats", {}), secondary.get("regions_stats", {})
-    )
-
-    return {
-        "total_devices": total_devices,
-        "online_devices": online_devices,
-        "offline_devices": offline_devices,
-        "warning_devices": warning_devices,
-        "uptime_percentage": uptime_percentage,
-        "active_alerts": primary.get("active_alerts", 0) + secondary.get("active_alerts", 0),
-        "critical_alerts": primary.get("critical_alerts", 0) + secondary.get("critical_alerts", 0),
-        "device_types": device_types,
-        "regions_stats": regions_stats,
-    }
-
-
-def _merge_device_type_stats(*stats_dicts: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, int]]:
-    merged: Dict[str, Dict[str, int]] = {}
-    for stats in stats_dicts:
-        for dtype, values in stats.items():
-            entry = merged.setdefault(dtype, {"total": 0, "online": 0, "offline": 0})
-            entry["total"] += values.get("total", 0)
-            entry["online"] += values.get("online", 0)
-            entry["offline"] += values.get("offline", 0)
-    return merged
-
-
-def _merge_region_stats(*stats_dicts: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
-    merged: Dict[str, Dict[str, float]] = {}
-    for stats in stats_dicts:
-        for region, values in stats.items():
-            entry = merged.setdefault(
-                region,
-                {"total": 0, "online": 0, "offline": 0, "latitude": None, "longitude": None},
-            )
-            entry["total"] += values.get("total", 0)
-            entry["online"] += values.get("online", 0)
-            entry["offline"] += values.get("offline", 0)
-            if entry.get("latitude") is None and values.get("latitude") is not None:
-                entry["latitude"] = values.get("latitude")
-                entry["longitude"] = values.get("longitude")
-    return merged

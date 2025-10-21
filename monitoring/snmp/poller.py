@@ -172,7 +172,10 @@ class SNMPPoller:
         self, ip: str, oids: List[str], credentials: SNMPCredentialData, port: int = 161
     ) -> List[SNMPResult]:
         """
-        Perform bulk SNMP GET for multiple OIDs
+        Perform bulk SNMP GET for multiple OIDs using GETBULK (SNMPv2c+)
+
+        For SNMPv1, falls back to multiple GET operations.
+        GETBULK is significantly faster when polling multiple OIDs from the same device.
 
         Args:
             ip: Target IP address
@@ -190,14 +193,28 @@ class SNMPPoller:
             # Build OID objects
             oid_objects = [ObjectType(ObjectIdentity(oid)) for oid in oids]
 
-            # Perform GETBULK
-            error_indication, error_status, error_index, var_binds = await getCmd(
-                SnmpEngine(),
-                auth_data,
-                target,
-                ContextData(),
-                *oid_objects
-            )
+            # Use GETBULK for SNMPv2c/v3, fall back to getCmd for SNMPv1
+            if credentials.version == "v1":
+                # SNMPv1 doesn't support GETBULK, use multiple GET
+                error_indication, error_status, error_index, var_binds = await getCmd(
+                    SnmpEngine(),
+                    auth_data,
+                    target,
+                    ContextData(),
+                    *oid_objects
+                )
+            else:
+                # SNMPv2c/v3 - use GETBULK for better performance
+                # max-repetitions: how many rows to return per OID (we want just 1 for GET-like behavior)
+                error_indication, error_status, error_index, var_binds = await bulkCmd(
+                    SnmpEngine(),
+                    auth_data,
+                    target,
+                    ContextData(),
+                    0,  # non-repeaters (number of scalar OIDs)
+                    len(oids),  # max-repetitions (how many results per repeating OID)
+                    *oid_objects
+                )
 
             if error_indication:
                 logger.warning(f"SNMP BULK GET error for {ip}: {error_indication}")
