@@ -12,7 +12,7 @@ import DeviceDetailsModal from '@/components/DeviceDetailsModal'
 import SSHTerminalModal from '@/components/SSHTerminalModal'
 import { devicesAPI, branchesAPI } from '@/services/api'
 import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus, MapPin, Info, Activity, Trash2 } from 'lucide-react'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/Modal'
 import { toast } from 'sonner'
 
 export default function Devices() {
@@ -1088,33 +1088,41 @@ export default function Devices() {
             setDeleteModalOpen(false)
             setDeviceToDelete(null)
           }}
-          title="Delete Device"
+          size="sm"
         >
-          <div className="space-y-4">
+          <ModalHeader onClose={() => {
+            setDeleteModalOpen(false)
+            setDeviceToDelete(null)
+          }}>
+            <ModalTitle>Delete Device</ModalTitle>
+          </ModalHeader>
+          <ModalContent>
             <p className="text-gray-600 dark:text-gray-300">
-              Are you sure you want to delete <strong>{deviceToDelete.name || deviceToDelete.display_name}</strong>?
+              Are you sure you want to delete <strong className="text-gray-900 dark:text-gray-100">{deviceToDelete.name || deviceToDelete.display_name}</strong>?
+            </p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">
               This action cannot be undone.
             </p>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setDeleteModalOpen(false)
-                  setDeviceToDelete(null)
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => deleteMutation.mutate(deviceToDelete.hostid || deviceToDelete.id)}
-                disabled={deleteMutation.isPending}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-              </Button>
-            </div>
-          </div>
+          </ModalContent>
+          <ModalFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteModalOpen(false)
+                setDeviceToDelete(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteMutation.mutate(deviceToDelete.hostid || deviceToDelete.id)}
+              disabled={deleteMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </ModalFooter>
         </Modal>
       )}
     </div>
