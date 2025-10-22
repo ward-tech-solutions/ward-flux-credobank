@@ -367,16 +367,8 @@ def import_template(
     if not file.filename.endswith('.json'):
         raise HTTPException(status_code=400, detail="File must be a JSON file")
 
-    # Validate file size (max 1MB for JSON templates)
-    MAX_FILE_SIZE = 1 * 1024 * 1024  # 1MB
-    content = file.file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB"
-        )
-
     try:
+        content = file.file.read()
         template_data = json.loads(content)
 
         # Check if template already exists

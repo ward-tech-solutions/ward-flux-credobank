@@ -15,14 +15,8 @@ from monitoring.models import StandaloneDevice, SNMPCredential, AlertRule, Monit
 from models import Branch, DiscoveryRule, DiscoveryCredential
 from sqlalchemy import text
 
-# Get database URL from environment variable
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    print("ERROR: DATABASE_URL environment variable is required")
-    print("\nUsage:")
-    print("  export DATABASE_URL='postgresql://user:pass@host:5432/dbname'")
-    print("  python scripts/export_credobank_data.py")
-    sys.exit(1)
+# Get database URL from environment variable or use default for local development
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://ward_admin:ward_admin_password@localhost:5432/ward_ops")
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default"""
@@ -57,26 +51,7 @@ def export_model(session, model, filename):
     return len(data)
 
 def export_table(session, table_name, filename):
-    """Export a raw SQL table to JSON
-
-    Note: table_name must be from a trusted source (hard-coded values only).
-    SQLAlchemy text() doesn't support table name parameters.
-    """
-    # Whitelist of allowed table names to prevent SQL injection
-    ALLOWED_TABLES = {
-        "georgian_regions",
-        "georgian_cities",
-        "branches",
-        "standalone_devices",
-        "alert_rules",
-        "snmp_credentials",
-        "discovery_rules",
-        "discovery_credentials",
-    }
-
-    if table_name not in ALLOWED_TABLES:
-        raise ValueError(f"Table '{table_name}' is not in the allowed list")
-
+    """Export a raw SQL table to JSON"""
     result = session.execute(text(f"SELECT * FROM {table_name}"))
     columns = result.keys()
     data = []
