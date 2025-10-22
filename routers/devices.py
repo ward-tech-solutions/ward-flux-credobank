@@ -153,14 +153,57 @@ def _get_standalone_devices(
     device_type: Optional[str],
     current_user: User,
 ):
+    from models import Branch
+    from sqlalchemy import func
+
     query = db.query(StandaloneDevice)
 
     if device_type:
         query = query.filter(StandaloneDevice.device_type == device_type)
 
     devices = query.all()
-    payload = []
 
+    # PERFORMANCE OPTIMIZATION: Bulk fetch all related data
+    # This replaces 2,628 queries (876 devices × 3 queries) with just 4 queries
+
+    device_ips = [d.ip for d in devices if d.ip]
+    device_ids = [d.id for d in devices]
+
+    # Bulk query 1: Get latest ping for all devices using DISTINCT ON
+    latest_pings = (
+        db.query(PingResult)
+        .filter(PingResult.device_ip.in_(device_ips))
+        .distinct(PingResult.device_ip)
+        .order_by(PingResult.device_ip, PingResult.timestamp.desc())
+        .all()
+    )
+    ping_lookup = {ping.device_ip: ping for ping in latest_pings}
+
+    # Bulk query 2: Get active alert counts for all devices
+    alert_counts = (
+        db.query(
+            AlertHistory.device_id,
+            func.count(AlertHistory.id).label('count')
+        )
+        .filter(
+            AlertHistory.device_id.in_(device_ids),
+            AlertHistory.resolved_at.is_(None)
+        )
+        .group_by(AlertHistory.device_id)
+        .all()
+    )
+    alert_lookup = {str(device_id): count for device_id, count in alert_counts}
+
+    # Bulk query 3: Get all branches
+    branch_ids = [d.branch_id for d in devices if d.branch_id]
+    if branch_ids:
+        branches = db.query(Branch).filter(Branch.id.in_(branch_ids)).all()
+        branch_lookup = {b.id: b for b in branches}
+    else:
+        branch_lookup = {}
+
+    # Build payload using pre-fetched data (no more queries in loop!)
+    payload = []
     for device in devices:
         fields = device.custom_fields or {}
         if region and fields.get("region") != region:
@@ -175,7 +218,64 @@ def _get_standalone_devices(
         }):
             continue
 
-        payload.append(_standalone_device_to_payload(db, device))
+        # Use pre-fetched data - no database queries here!
+        ping = ping_lookup.get(device.ip)
+        alert_count = alert_lookup.get(str(device.id), 0)
+        branch_obj = branch_lookup.get(device.branch_id) if device.branch_id else None
+
+        # Build payload directly instead of calling _standalone_device_to_payload
+        branch_name = ""
+        region_name = ""
+        if branch_obj:
+            branch_name = branch_obj.display_name
+            region_name = branch_obj.region or ""
+
+        ping_status = "Unknown"
+        ping_response_time = None
+        last_check = None
+        available = "Unknown"
+        if ping:
+            ping_status = "Up" if ping.is_reachable else "Down"
+            ping_response_time = ping.avg_rtt_ms
+            last_check = int(ping.timestamp.timestamp()) if ping.timestamp else None
+            available = "Available" if ping.is_reachable else "Unavailable"
+        else:
+            ping_status = fields.get("ping_status", "Unknown")
+            ping_response_time = fields.get("ping_response_time")
+            available = fields.get("available", "Unknown")
+            synced_at = fields.get("synced_at")
+            if synced_at:
+                try:
+                    last_check = int(datetime.fromisoformat(synced_at).timestamp())
+                except ValueError:
+                    last_check = None
+
+        payload.append({
+            "hostid": str(device.id),
+            "hostname": device.hostname or device.name,
+            "display_name": device.normalized_name or device.name,
+            "name": device.normalized_name or device.name,
+            "original_name": device.original_name or device.name,
+            "branch": branch_name or fields.get("branch", ""),
+            "region": region_name or fields.get("region", ""),
+            "ip": device.ip,
+            "device_type": device.device_type or fields.get("device_type", ""),
+            "status": "Enabled" if device.enabled else "Disabled",
+            "enabled": device.enabled,
+            "available": available,
+            "ping_status": ping_status,
+            "ping_response_time": ping_response_time,
+            "last_check": last_check or 0,
+            "down_since": device.down_since.replace(tzinfo=timezone.utc).isoformat() if device.down_since else None,
+            "groups": device.tags or [],
+            "problems": alert_count,
+            "triggers": [],
+            "latitude": fields.get("latitude"),
+            "longitude": fields.get("longitude"),
+            "vendor": device.vendor,
+            "model": device.model,
+            "created_at": device.created_at.isoformat() if device.created_at else None,
+        })
 
     return payload
 
