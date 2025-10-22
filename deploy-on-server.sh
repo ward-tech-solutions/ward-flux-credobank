@@ -16,8 +16,18 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-DEPLOY_PATH="/root/ward-ops-credobank"
-BACKUP_PATH="/root/ward-ops-backup-$(date +%Y%m%d-%H%M%S)"
+# Auto-detect the deployment path (works for both /root and /home/wardops)
+if [ -d "/home/wardops/ward-flux-credobank" ]; then
+    DEPLOY_PATH="/home/wardops/ward-flux-credobank"
+    BACKUP_PATH="/home/wardops/ward-flux-backup-$(date +%Y%m%d-%H%M%S)"
+elif [ -d "/root/ward-ops-credobank" ]; then
+    DEPLOY_PATH="/root/ward-ops-credobank"
+    BACKUP_PATH="/root/ward-ops-backup-$(date +%Y%m%d-%H%M%S)"
+else
+    echo -e "${RED}[ERROR]${NC} Could not find deployment directory"
+    echo "Tried: /home/wardops/ward-flux-credobank and /root/ward-ops-credobank"
+    exit 1
+fi
 
 # Functions
 log_info() {
