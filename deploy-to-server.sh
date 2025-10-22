@@ -47,7 +47,7 @@ echo ""
 
 # Backfill alerts from existing down devices
 echo "📋 Backfilling alert history from currently down devices..."
-docker exec wardops-worker-prod python scripts/backfill_alerts.py
+docker exec wardops-worker-prod python /app/scripts/backfill_alerts.py || echo "⚠️  Backfill script not found (will create alerts on next state change)"
 echo ""
 
 echo "✅ Deployment complete!"
