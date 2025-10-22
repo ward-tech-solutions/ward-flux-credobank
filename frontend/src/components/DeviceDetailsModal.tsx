@@ -40,7 +40,7 @@ interface DeviceDetailsModalProps {
   onOpenSSH?: (deviceName: string, deviceIP: string) => void
 }
 
-type TimeRange = '24h' | '7d' | '30d'
+type TimeRange = '30m' | '1h' | '3h' | '6h' | '12h' | '24h' | '7d' | '30d'
 
 const getDeviceIcon = (deviceType: string): any => {
   const type = deviceType?.toLowerCase() || ''
@@ -84,7 +84,7 @@ const formatDuration = (ms: number) => {
 
 export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }: DeviceDetailsModalProps) {
   const [copiedIP, setCopiedIP] = useState(false)
-  const [timeRange, setTimeRange] = useState<TimeRange>('24h')
+  const [timeRange, setTimeRange] = useState<TimeRange>('1h')
   const [isPinging, setIsPinging] = useState(false)
   const queryClient = useQueryClient()
 
@@ -140,11 +140,19 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
 
       // Format time based on time range
       let timeFormat = ''
-      if (timeRange === '24h') {
+      if (timeRange === '30m' || timeRange === '1h' || timeRange === '3h') {
+        // For short ranges, show HH:MM:SS
+        const hours = date.getHours().toString().padStart(2, '0')
+        const minutes = date.getMinutes().toString().padStart(2, '0')
+        const seconds = date.getSeconds().toString().padStart(2, '0')
+        timeFormat = `${hours}:${minutes}:${seconds}`
+      } else if (timeRange === '6h' || timeRange === '12h' || timeRange === '24h') {
+        // For medium ranges, show HH:MM
         const hours = date.getHours().toString().padStart(2, '0')
         const minutes = date.getMinutes().toString().padStart(2, '0')
         timeFormat = `${hours}:${minutes}`
       } else if (timeRange === '7d') {
+        // For 7 days, show day and hour
         const day = date.toLocaleDateString('en-US', { weekday: 'short' })
         const hours = date.getHours().toString().padStart(2, '0')
         timeFormat = `${day} ${hours}:00`
@@ -438,14 +446,54 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                   <Activity className="h-5 w-5 text-ward-green" />
                   Status History
                 </h3>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant={timeRange === '30m' ? 'primary' : 'outline'}
+                    onClick={() => setTimeRange('30m')}
+                    className={timeRange === '30m' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
+                  >
+                    30m
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={timeRange === '1h' ? 'primary' : 'outline'}
+                    onClick={() => setTimeRange('1h')}
+                    className={timeRange === '1h' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
+                  >
+                    1h
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={timeRange === '3h' ? 'primary' : 'outline'}
+                    onClick={() => setTimeRange('3h')}
+                    className={timeRange === '3h' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
+                  >
+                    3h
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={timeRange === '6h' ? 'primary' : 'outline'}
+                    onClick={() => setTimeRange('6h')}
+                    className={timeRange === '6h' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
+                  >
+                    6h
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={timeRange === '12h' ? 'primary' : 'outline'}
+                    onClick={() => setTimeRange('12h')}
+                    className={timeRange === '12h' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
+                  >
+                    12h
+                  </Button>
                   <Button
                     size="sm"
                     variant={timeRange === '24h' ? 'primary' : 'outline'}
                     onClick={() => setTimeRange('24h')}
                     className={timeRange === '24h' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
                   >
-                    Last 24 Hours
+                    24h
                   </Button>
                   <Button
                     size="sm"
@@ -453,7 +501,7 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                     onClick={() => setTimeRange('7d')}
                     className={timeRange === '7d' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
                   >
-                    Last 7 Days
+                    7d
                   </Button>
                   <Button
                     size="sm"
@@ -461,7 +509,7 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                     onClick={() => setTimeRange('30d')}
                     className={timeRange === '30d' ? 'bg-ward-green hover:bg-ward-green-dark' : ''}
                   >
-                    Last 30 Days
+                    30d
                   </Button>
                 </div>
               </div>
