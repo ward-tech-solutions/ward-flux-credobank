@@ -57,7 +57,26 @@ def export_model(session, model, filename):
     return len(data)
 
 def export_table(session, table_name, filename):
-    """Export a raw SQL table to JSON"""
+    """Export a raw SQL table to JSON
+
+    Note: table_name must be from a trusted source (hard-coded values only).
+    SQLAlchemy text() doesn't support table name parameters.
+    """
+    # Whitelist of allowed table names to prevent SQL injection
+    ALLOWED_TABLES = {
+        "georgian_regions",
+        "georgian_cities",
+        "branches",
+        "standalone_devices",
+        "alert_rules",
+        "snmp_credentials",
+        "discovery_rules",
+        "discovery_credentials",
+    }
+
+    if table_name not in ALLOWED_TABLES:
+        raise ValueError(f"Table '{table_name}' is not in the allowed list")
+
     result = session.execute(text(f"SELECT * FROM {table_name}"))
     columns = result.keys()
     data = []

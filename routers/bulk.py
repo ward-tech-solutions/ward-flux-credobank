@@ -51,6 +51,18 @@ async def bulk_import_devices(
 ):
     """Bulk import devices from CSV/Excel"""
 
+    # Validate file size (max 10MB)
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB, received: {len(contents) // (1024*1024)}MB"
+        )
+
+    # Reset file pointer for parsing
+    await file.seek(0)
+
     # Parse file
     if file.filename.endswith(".csv"):
         df = await parse_csv_file(file)

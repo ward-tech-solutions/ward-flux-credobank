@@ -82,7 +82,6 @@ async def websocket_updates(websocket: WebSocket):
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                     }
                 )
-                ws_messages_total.labels(endpoint=UPDATES_ENDPOINT_LABEL, type="heartbeat").inc()
                 await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
             except Exception:
                 break
@@ -99,7 +98,12 @@ async def websocket_updates(websocket: WebSocket):
                     payload = json.loads(data)
                     if payload.get("type") == "pong":
                         continue
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Invalid JSON received from WebSocket client: {e}")
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Invalid JSON format"
+                    })
                     continue
             except asyncio.TimeoutError:
                 await websocket.close()
@@ -136,6 +140,9 @@ async def monitor_device_changes(_app: FastAPI):
 
                 for device in devices:
                     device_id = str(device.id)
+                    # Skip devices without IP addresses
+                    if not device.ip:
+                        continue
                     ping = ping_lookup.get(device.ip)
                     if ping:
                         current_status = "Up" if ping.is_reachable else "Down"
@@ -258,8 +265,17 @@ async def websocket_router_interfaces(websocket: WebSocket, hostid: str):
         # Keep connection alive
         while True:
             data = await websocket.receive_text()
-            # Echo back for ping/pong
-            await websocket.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+            # Try to parse as JSON, log errors
+            try:
+                msg = json.loads(data)
+                # Echo back for ping/pong
+                await websocket.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+            except json.JSONDecodeError as e:
+                logger.warning(f"Invalid JSON received from router WebSocket: {e}")
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Invalid JSON format"
+                })
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected for router {hostid}")
@@ -342,8 +358,17 @@ async def websocket_endpoint(websocket: WebSocket):
         # Keep connection alive
         while True:
             data = await websocket.receive_text()
-            # Echo back for ping/pong
-            await websocket.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+            # Try to parse as JSON, log errors
+            try:
+                msg = json.loads(data)
+                # Echo back for ping/pong
+                await websocket.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+            except json.JSONDecodeError as e:
+                logger.warning(f"Invalid JSON received from notifications WebSocket: {e}")
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Invalid JSON format"
+                })
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)

@@ -282,6 +282,44 @@ app.add_middleware(
 )
 
 # ============================================
+# Request Timeout Middleware
+# ============================================
+import signal
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+class TimeoutMiddleware(BaseHTTPMiddleware):
+    """Middleware to enforce request timeouts"""
+    def __init__(self, app, timeout: int = 30):
+        super().__init__(app)
+        self.timeout = timeout
+
+    async def dispatch(self, request: Request, call_next):
+        try:
+            # Skip timeout for WebSocket connections
+            if request.url.path.startswith("/ws/"):
+                return await call_next(request)
+
+            # Apply timeout to HTTP requests
+            response = await asyncio.wait_for(
+                call_next(request),
+                timeout=self.timeout
+            )
+            return response
+        except asyncio.TimeoutError:
+            logger.warning(f"Request timeout ({self.timeout}s): {request.method} {request.url.path}")
+            return JSONResponse(
+                status_code=504,
+                content={
+                    "error": "Request timeout",
+                    "message": f"Request exceeded {self.timeout} second timeout"
+                }
+            )
+
+# Add timeout middleware (30 seconds for all HTTP requests)
+app.add_middleware(TimeoutMiddleware, timeout=30)
+
+# ============================================
 # Rate Limiting Setup
 # ============================================
 try:
