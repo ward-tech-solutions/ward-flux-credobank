@@ -91,10 +91,10 @@ git log -1 --pretty=format:"   Commit: %h - %s (%an, %ar)"
 echo ""
 echo ""
 
-# Step 6: Stop containers
-log_info "Stopping containers gracefully..."
-docker-compose -f docker-compose.production-local.yml stop
-log_success "Containers stopped"
+# Step 6: Stop and remove old containers
+log_info "Stopping and removing old containers..."
+docker-compose -f docker-compose.production-local.yml down
+log_success "Old containers removed"
 
 # Step 7: Build new images with cache busting
 log_info "Building new Docker images..."
