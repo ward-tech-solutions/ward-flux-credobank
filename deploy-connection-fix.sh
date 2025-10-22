@@ -26,13 +26,13 @@ echo ""
 
 # Rebuild containers with new code
 echo "3. Rebuilding containers..."
-docker-compose -f docker-compose.production-local.yml build --no-cache api worker beat
+docker-compose -f docker-compose.production-local.yml build --no-cache api celery-worker celery-beat
 echo "✅ Containers rebuilt"
 echo ""
 
 # Restart services
 echo "4. Restarting services..."
-docker-compose -f docker-compose.production-local.yml restart api worker beat
+docker-compose -f docker-compose.production-local.yml restart api celery-worker celery-beat
 echo "✅ Services restarted"
 echo ""
 
