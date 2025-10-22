@@ -26,7 +26,7 @@ echo ""
 
 # Rebuild and restart containers
 echo "🏗️  Rebuilding Docker images (with --no-cache for frontend)..."
-docker-compose -f docker-compose.production-local.yml build --no-cache wardops-api-prod
+docker-compose -f docker-compose.production-local.yml build --no-cache api
 echo "✅ Images rebuilt"
 echo ""
 
