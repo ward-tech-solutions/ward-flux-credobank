@@ -154,7 +154,8 @@ def _get_standalone_devices(
     current_user: User,
 ):
     from models import Branch
-    from sqlalchemy import func
+    from sqlalchemy import and_
+    from sqlalchemy.sql import func
 
     query = db.query(StandaloneDevice)
 
@@ -169,12 +170,27 @@ def _get_standalone_devices(
     device_ips = [d.ip for d in devices if d.ip]
     device_ids = [d.id for d in devices]
 
-    # Bulk query 1: Get latest ping for all devices using DISTINCT ON
+    # Bulk query 1: Get latest ping for all devices
+    # Use subquery to get latest timestamp per device, then join
+    subq = (
+        db.query(
+            PingResult.device_ip,
+            func.max(PingResult.timestamp).label('max_timestamp')
+        )
+        .filter(PingResult.device_ip.in_(device_ips))
+        .group_by(PingResult.device_ip)
+        .subquery()
+    )
+
     latest_pings = (
         db.query(PingResult)
-        .filter(PingResult.device_ip.in_(device_ips))
-        .distinct(PingResult.device_ip)
-        .order_by(PingResult.device_ip, PingResult.timestamp.desc())
+        .join(
+            subq,
+            and_(
+                PingResult.device_ip == subq.c.device_ip,
+                PingResult.timestamp == subq.c.max_timestamp
+            )
+        )
         .all()
     )
     ping_lookup = {ping.device_ip: ping for ping in latest_pings}
