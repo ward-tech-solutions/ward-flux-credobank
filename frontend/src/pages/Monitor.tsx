@@ -68,11 +68,24 @@ const calculateDowntime = (device: Device) => {
     return `${minutes}m`
   }
 
-  // Priority 2: If no triggers but device is down, this is a newly detected outage
-  // We can't determine exact downtime without historical data, so show a more accurate message
+  // Priority 2: Use down_since if available (accurate for standalone devices)
+  if (device.ping_status === 'Down' && device.down_since) {
+    const now = Date.now()
+    const downSinceTime = new Date(device.down_since).getTime()
+    const diff = now - downSinceTime
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    if (minutes > 0) return `${minutes}m`
+    return `< 1m`
+  }
+
+  // Priority 3: Fallback to last_check (least accurate - should rarely be used)
   if (device.ping_status === 'Down') {
-    // Use last_check as an approximation, but be aware this may not be accurate
-    // for devices that have been down longer than the last check cycle
     const now = Date.now()
     const lastCheckTime = device.last_check * 1000
     const diff = now - lastCheckTime
@@ -82,7 +95,7 @@ const calculateDowntime = (device: Device) => {
       return `< 2m`
     }
 
-    // Otherwise, estimate based on last check (but this is unreliable)
+    // Otherwise, estimate based on last check (unreliable)
     const hours = Math.floor(diff / (1000 * 60 * 60))
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
 
@@ -99,18 +112,23 @@ const isRecentlyDown = (device: Device): boolean => {
     return false
   }
 
-  // Check if device has triggers
+  const now = Date.now()
+  const tenMinutes = 10 * 60 * 1000
+
+  // Priority 1: Check triggers (for Zabbix devices)
   if (device.triggers && device.triggers.length > 0) {
     const problemStart = parseInt(device.triggers[0].lastchange) * 1000
-    const now = Date.now()
-    const tenMinutes = 10 * 60 * 1000
     return (now - problemStart) < tenMinutes
   }
 
-  // Fallback: check last_check if no triggers (recently went down)
-  const now = Date.now()
+  // Priority 2: Check down_since (for standalone devices)
+  if (device.down_since) {
+    const downSinceTime = new Date(device.down_since).getTime()
+    return (now - downSinceTime) < tenMinutes
+  }
+
+  // Priority 3: Fallback to last_check (least accurate)
   const lastCheck = device.last_check * 1000
-  const tenMinutes = 10 * 60 * 1000
   return (now - lastCheck) < tenMinutes
 }
 
