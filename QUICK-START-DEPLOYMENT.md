@@ -19,17 +19,19 @@ cd /home/wardops/ward-flux-credobank
 # 3. Pull latest optimizations
 git pull origin main
 
-# 4. Apply database indexes (takes 2-5 min)
-python3 scripts/apply_performance_indexes.py
-
-# 5. Deploy
+# 4. Deploy Docker containers (takes 5-10 min)
 bash deploy-on-server.sh
+
+# 5. Apply database indexes (AFTER Docker is up)
+bash apply-indexes.sh
 
 # 6. Verify
 curl http://localhost:5001/api/v1/health
 ```
 
 **Done!** System is now optimized and production-ready.
+
+**⚠️ IMPORTANT**: Apply indexes AFTER Docker deployment, not before!
 
 ---
 
@@ -70,14 +72,23 @@ git log -1 --oneline
 # Should show: bbba213 Apply critical performance and reliability optimizations
 ```
 
-### Step 3: Apply Database Indexes
-```bash
-# Activate virtual environment (if needed)
-python3 -m venv venv
-source venv/bin/activate
+### Step 3: Apply Database Indexes (AFTER Docker is Running)
 
-# Apply indexes
-python scripts/apply_performance_indexes.py
+**⚠️ CRITICAL**: Only run this AFTER Step 2 (Docker deployment) completes!
+
+```bash
+# Easy method - use the helper script
+bash apply-indexes.sh
+```
+
+**Or manual method**:
+```bash
+# Method 1: Run inside Docker (preferred)
+docker-compose -f docker-compose.production-local.yml exec api python scripts/apply_performance_indexes.py
+
+# Method 2: Apply SQL directly (if Method 1 fails)
+docker cp migrations/postgres/012_add_performance_indexes.sql wardops-postgres-prod:/tmp/
+docker-compose -f docker-compose.production-local.yml exec postgres psql -U ward_admin -d ward_ops -f /tmp/012_add_performance_indexes.sql
 ```
 
 **Expected Output**:

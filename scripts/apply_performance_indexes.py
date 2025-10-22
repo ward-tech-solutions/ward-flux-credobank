@@ -5,7 +5,12 @@ Apply performance optimization indexes to database
 This script applies critical indexes that improve query performance by 10-100×.
 Safe to run multiple times (uses IF NOT EXISTS).
 
+⚠️  IMPORTANT: This script must run INSIDE Docker container!
+
 Usage:
+    docker-compose -f docker-compose.production-local.yml exec api python scripts/apply_performance_indexes.py
+
+    OR from within Docker container:
     python scripts/apply_performance_indexes.py
 """
 
@@ -13,12 +18,41 @@ import os
 import sys
 from pathlib import Path
 
+# Check if running inside Docker
+if not os.path.exists('/.dockerenv'):
+    print("=" * 70)
+    print("❌ ERROR: This script must run INSIDE Docker container!")
+    print("=" * 70)
+    print("\nYou tried to run it on the host system, but Python packages")
+    print("are only installed inside Docker.\n")
+    print("✅ Correct usage:")
+    print("   docker-compose -f docker-compose.production-local.yml exec api \\")
+    print("       python scripts/apply_performance_indexes.py")
+    print("\nOR use manual SQL method:")
+    print("   docker cp migrations/postgres/012_add_performance_indexes.sql wardops-postgres-prod:/tmp/")
+    print("   docker-compose -f docker-compose.production-local.yml exec postgres \\")
+    print("       psql -U ward_admin -d ward_ops -f /tmp/012_add_performance_indexes.sql")
+    print("\n" + "=" * 70)
+    sys.exit(1)
+
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database import SessionLocal, engine
-from sqlalchemy import text
-import logging
+try:
+    from database import SessionLocal, engine
+    from sqlalchemy import text
+    import logging
+except ImportError as e:
+    print("=" * 70)
+    print("❌ ERROR: Missing Python packages!")
+    print("=" * 70)
+    print(f"\nImport error: {e}\n")
+    print("This likely means you're not running inside Docker.")
+    print("\n✅ Run this command instead:")
+    print("   docker-compose -f docker-compose.production-local.yml exec api \\")
+    print("       python scripts/apply_performance_indexes.py")
+    print("\n" + "=" * 70)
+    sys.exit(1)
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
