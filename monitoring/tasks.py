@@ -224,7 +224,9 @@ def ping_device(device_id: str, device_ip: str):
                 # If device was DOWN, log the recovery
                 if not previous_state:
                     if device.down_since:
-                        downtime_duration = utcnow() - device.down_since
+                        # Handle timezone-naive down_since timestamps
+                        down_since_aware = device.down_since.replace(tzinfo=timezone.utc) if device.down_since.tzinfo is None else device.down_since
+                        downtime_duration = utcnow() - down_since_aware
                         logger.info(f"✅ Device {device.name} ({device_ip}) RECOVERED - was DOWN for {downtime_duration}")
                     else:
                         logger.info(f"✅ Device {device.name} ({device_ip}) is now UP")
