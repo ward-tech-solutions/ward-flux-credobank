@@ -6,6 +6,7 @@ Secure storage and retrieval of SNMP credentials using Fernet encryption.
 
 import os
 import logging
+import threading
 from typing import Optional
 from cryptography.fernet import Fernet
 
@@ -99,21 +100,25 @@ class CredentialEncryption:
         return key.decode()
 
 
-# Singleton instance
+# Singleton instance with thread-safe initialization
 _encryption: Optional[CredentialEncryption] = None
+_encryption_lock = threading.Lock()
 
 
 def get_encryption() -> CredentialEncryption:
     """
-    Get or create CredentialEncryption singleton
+    Get or create CredentialEncryption singleton (thread-safe)
 
     Returns:
         CredentialEncryption instance
     """
     global _encryption
 
+    # Double-checked locking pattern for thread safety
     if _encryption is None:
-        _encryption = CredentialEncryption()
+        with _encryption_lock:
+            if _encryption is None:  # Double check inside lock
+                _encryption = CredentialEncryption()
 
     return _encryption
 

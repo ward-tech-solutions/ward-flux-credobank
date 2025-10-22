@@ -6,9 +6,27 @@ High-performance asynchronous SNMP polling engine with multi-vendor support.
 
 import logging
 import asyncio
+import threading
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
-from pysnmp.hlapi.asyncio import *
+from pysnmp.hlapi.asyncio import (
+    getCmd,
+    nextCmd,
+    bulkCmd,
+    SnmpEngine,
+    CommunityData,
+    UdpTransportTarget,
+    ContextData,
+    ObjectType,
+    ObjectIdentity,
+    UsmUserData,
+    usmHMACMD5AuthProtocol,
+    usmHMACSHAAuthProtocol,
+    usmDESPrivProtocol,
+    usmAesCfb128Protocol,
+    usmAesCfb192Protocol,
+    usmAesCfb256Protocol,
+)
 from pysnmp.proto.rfc1902 import Integer, OctetString, Counter32, Counter64, Gauge32, TimeTicks
 from pyasn1.type.univ import ObjectIdentifier
 
@@ -391,7 +409,7 @@ class SNMPPoller:
             try:
                 # Try to decode as string
                 return str(value), "string"
-            except:
+            except (UnicodeDecodeError, AttributeError):
                 # Return hex if decode fails
                 return value.hexValue, "hex"
         elif isinstance(value, ObjectIdentifier):
@@ -400,21 +418,25 @@ class SNMPPoller:
             return str(value), "unknown"
 
 
-# Singleton instance
+# Singleton instance with thread-safe initialization
 _snmp_poller: Optional[SNMPPoller] = None
+_snmp_poller_lock = threading.Lock()
 
 
 def get_snmp_poller() -> SNMPPoller:
     """
-    Get or create SNMPPoller singleton
+    Get or create SNMPPoller singleton (thread-safe)
 
     Returns:
         SNMPPoller instance
     """
     global _snmp_poller
 
+    # Double-checked locking pattern for thread safety
     if _snmp_poller is None:
-        _snmp_poller = SNMPPoller()
+        with _snmp_poller_lock:
+            if _snmp_poller is None:  # Double check inside lock
+                _snmp_poller = SNMPPoller()
 
     return _snmp_poller
 

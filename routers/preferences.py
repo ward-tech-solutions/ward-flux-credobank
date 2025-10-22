@@ -73,16 +73,21 @@ async def update_user_preferences(
     if preferences.dashboard_layout is not None:
         current_user.dashboard_layout = preferences.dashboard_layout
 
-    db.commit()
-    db.refresh(current_user)
+    try:
+        db.commit()
+        db.refresh(current_user)
 
-    return UserPreferences(
-        theme_preference=current_user.theme_preference,
-        language=current_user.language,
-        timezone=current_user.timezone,
-        notifications_enabled=current_user.notifications_enabled,
-        dashboard_layout=current_user.dashboard_layout,
-    )
+        return UserPreferences(
+            theme_preference=current_user.theme_preference,
+            language=current_user.language,
+            timezone=current_user.timezone,
+            notifications_enabled=current_user.notifications_enabled,
+            dashboard_layout=current_user.dashboard_layout,
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update preferences: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update preferences: {str(e)}")
 
 
 @router.put("/theme")
@@ -93,21 +98,31 @@ async def update_theme(
     if theme not in ["light", "dark", "auto"]:
         raise HTTPException(status_code=400, detail="Invalid theme. Must be 'light', 'dark', or 'auto'")
 
-    current_user.theme_preference = theme
-    db.commit()
+    try:
+        current_user.theme_preference = theme
+        db.commit()
 
-    return {"message": "Theme updated successfully", "theme": theme}
+        return {"message": "Theme updated successfully", "theme": theme}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update theme: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update theme: {str(e)}")
 
 
 @router.delete("/")
 async def reset_preferences(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Reset all preferences to defaults"""
-    current_user.theme_preference = "auto"
-    current_user.language = "en"
-    current_user.timezone = "UTC"
-    current_user.notifications_enabled = True
-    current_user.dashboard_layout = None
+    try:
+        current_user.theme_preference = "auto"
+        current_user.language = "en"
+        current_user.timezone = "UTC"
+        current_user.notifications_enabled = True
+        current_user.dashboard_layout = None
 
-    db.commit()
+        db.commit()
 
-    return {"message": "Preferences reset to defaults"}
+        return {"message": "Preferences reset to defaults"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to reset preferences: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset preferences: {str(e)}")

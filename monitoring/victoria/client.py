@@ -6,6 +6,7 @@ HTTP client for VictoriaMetrics API with Prometheus-compatible metrics.
 
 import os
 import logging
+import threading
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import requests
@@ -93,7 +94,7 @@ class VictoriaMetricsClient:
 
             # Write using /api/v1/import/prometheus endpoint
             url = urljoin(self.base_url, "/api/v1/import/prometheus")
-            response = self.session.post(url, data=metric_line)
+            response = self.session.post(url, data=metric_line, timeout=10)
 
             if response.status_code == 204:
                 logger.debug(f"Metric written: {metric_name} = {value}")
@@ -145,7 +146,7 @@ class VictoriaMetricsClient:
 
             # Write using /api/v1/import/prometheus endpoint
             url = urljoin(self.base_url, "/api/v1/import/prometheus")
-            response = self.session.post(url, data=data)
+            response = self.session.post(url, data=data, timeout=10)
 
             if response.status_code == 204:
                 logger.info(f"Bulk write successful: {len(metrics)} metrics")
@@ -179,7 +180,7 @@ class VictoriaMetricsClient:
             if time:
                 params["time"] = int(time.timestamp())
 
-            response = self.session.get(url, params=params)
+            response = self.session.get(url, params=params, timeout=10)
 
             if response.status_code == 200:
                 return response.json()
@@ -223,7 +224,7 @@ class VictoriaMetricsClient:
                 "step": step,
             }
 
-            response = self.session.get(url, params=params)
+            response = self.session.get(url, params=params, timeout=10)
 
             if response.status_code == 200:
                 return response.json()
@@ -317,7 +318,7 @@ class VictoriaMetricsClient:
             url = urljoin(self.base_url, "/api/v1/admin/tsdb/delete_series")
             params = {"match[]": match}
 
-            response = self.session.post(url, params=params)
+            response = self.session.post(url, params=params, timeout=10)
 
             if response.status_code == 204:
                 logger.warning(f"Metrics deleted: {match}")
@@ -336,20 +337,24 @@ class VictoriaMetricsClient:
         logger.info("VictoriaMetrics client closed")
 
 
-# Singleton instance
+# Singleton instance with thread-safe initialization
 _vm_client: Optional[VictoriaMetricsClient] = None
+_vm_client_lock = threading.Lock()
 
 
 def get_victoria_client() -> VictoriaMetricsClient:
     """
-    Get or create VictoriaMetrics client singleton
+    Get or create VictoriaMetrics client singleton (thread-safe)
 
     Returns:
         VictoriaMetricsClient instance
     """
     global _vm_client
 
+    # Double-checked locking pattern for thread safety
     if _vm_client is None:
-        _vm_client = VictoriaMetricsClient()
+        with _vm_client_lock:
+            if _vm_client is None:  # Double check inside lock
+                _vm_client = VictoriaMetricsClient()
 
     return _vm_client

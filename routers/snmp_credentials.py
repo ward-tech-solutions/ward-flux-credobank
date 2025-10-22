@@ -131,12 +131,17 @@ def create_snmpv2c_credential(
         community_encrypted=community_encrypted,
     )
 
-    db.add(new_credential)
-    db.commit()
-    db.refresh(new_credential)
+    try:
+        db.add(new_credential)
+        db.commit()
+        db.refresh(new_credential)
 
-    logger.info(f"Created SNMPv2c credential for device: {device.name}")
-    return SNMPCredentialResponse.from_orm(new_credential)
+        logger.info(f"Created SNMPv2c credential for device: {device.name}")
+        return SNMPCredentialResponse.from_orm(new_credential)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to create SNMP credential: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create credential: {str(e)}")
 
 
 @router.post("/v3", response_model=SNMPCredentialResponse, status_code=status.HTTP_201_CREATED)
@@ -177,12 +182,17 @@ def create_snmpv3_credential(
         priv_key_encrypted=priv_key_encrypted,
     )
 
-    db.add(new_credential)
-    db.commit()
-    db.refresh(new_credential)
+    try:
+        db.add(new_credential)
+        db.commit()
+        db.refresh(new_credential)
 
-    logger.info(f"Created SNMPv3 credential for device: {device.name}")
-    return SNMPCredentialResponse.from_orm(new_credential)
+        logger.info(f"Created SNMPv3 credential for device: {device.name}")
+        return SNMPCredentialResponse.from_orm(new_credential)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to create SNMPv3 credential: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create credential: {str(e)}")
 
 
 @router.get("/device/{device_id}", response_model=SNMPCredentialResponse)
@@ -212,11 +222,16 @@ def delete_device_credential(
     if not credential:
         raise HTTPException(status_code=404, detail="SNMP credential not found")
 
-    db.delete(credential)
-    db.commit()
+    try:
+        db.delete(credential)
+        db.commit()
 
-    logger.info(f"Deleted SNMP credential for device: {device_id}")
-    return {"success": True, "message": "SNMP credential deleted"}
+        logger.info(f"Deleted SNMP credential for device: {device_id}")
+        return {"success": True, "message": "SNMP credential deleted"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to delete SNMP credential for {device_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete credential: {str(e)}")
 
 
 @router.get("/list", response_model=List[SNMPCredentialResponse])
@@ -291,9 +306,13 @@ async def test_snmp_credential(
 
             # Update device vendor if detected and not already set
             if vendor_detected and not device.vendor:
-                device.vendor = vendor_detected
-                db.commit()
-                logger.info(f"Auto-detected vendor for {device.name}: {vendor_detected}")
+                try:
+                    device.vendor = vendor_detected
+                    db.commit()
+                    logger.info(f"Auto-detected vendor for {device.name}: {vendor_detected}")
+                except Exception as e:
+                    db.rollback()
+                    logger.error(f"Failed to update vendor for {device.name}: {e}")
 
         return SNMPTestResponse(
             success=result.get("success", False),
@@ -363,12 +382,17 @@ async def detect_device_vendor(
 
         if vendor_detected:
             # Update device
-            old_vendor = device.vendor
-            device.vendor = vendor_detected
-            device.updated_at = datetime.utcnow()
-            db.commit()
+            try:
+                old_vendor = device.vendor
+                device.vendor = vendor_detected
+                device.updated_at = datetime.utcnow()
+                db.commit()
 
-            logger.info(f"Detected vendor for {device.name}: {vendor_detected} (was: {old_vendor})")
+                logger.info(f"Detected vendor for {device.name}: {vendor_detected} (was: {old_vendor})")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Failed to update vendor for {device.name}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to update vendor: {str(e)}")
 
             return {
                 "success": True,
@@ -433,24 +457,29 @@ def auto_assign_template(
 
     # Create monitoring items from template
     created_items = []
-    for item_def in template.items:
-        monitoring_item = MonitoringItem(
-            id=uuid.uuid4(),
-            device_id=device.id,
-            template_id=template.id,
-            oid_name=item_def["oid_name"],
-            oid=item_def["oid"],
-            interval=item_def.get("interval", 60),
-            value_type=item_def.get("value_type", "integer"),
-            units=item_def.get("units", ""),
-            enabled=True,
-        )
-        db.add(monitoring_item)
-        created_items.append(item_def["name"])
+    try:
+        for item_def in template.items:
+            monitoring_item = MonitoringItem(
+                id=uuid.uuid4(),
+                device_id=device.id,
+                template_id=template.id,
+                oid_name=item_def["oid_name"],
+                oid=item_def["oid"],
+                interval=item_def.get("interval", 60),
+                value_type=item_def.get("value_type", "integer"),
+                units=item_def.get("units", ""),
+                enabled=True,
+            )
+            db.add(monitoring_item)
+            created_items.append(item_def["name"])
 
-    db.commit()
+        db.commit()
 
-    logger.info(f"Auto-assigned template '{template.name}' to device {device.name}: {len(created_items)} items created")
+        logger.info(f"Auto-assigned template '{template.name}' to device {device.name}: {len(created_items)} items created")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to assign template to {device.name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to assign template: {str(e)}")
 
     return {
         "success": True,

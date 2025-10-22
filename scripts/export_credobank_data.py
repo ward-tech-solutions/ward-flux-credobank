@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Export CredoBank devices to seed files"""
 import json
+import os
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -14,7 +15,14 @@ from monitoring.models import StandaloneDevice, SNMPCredential, AlertRule, Monit
 from models import Branch, DiscoveryRule, DiscoveryCredential
 from sqlalchemy import text
 
-DATABASE_URL = "postgresql://ward_admin:ward_admin_password@localhost:5432/ward_ops"
+# Get database URL from environment variable
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    print("ERROR: DATABASE_URL environment variable is required")
+    print("\nUsage:")
+    print("  export DATABASE_URL='postgresql://user:pass@host:5432/dbname'")
+    print("  python scripts/export_credobank_data.py")
+    sys.exit(1)
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default"""

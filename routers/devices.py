@@ -113,30 +113,37 @@ async def update_device(
     try:
         device_uuid = uuid.UUID(hostid)
     except ValueError:
-        return {
-            "hostid": hostid,
-            "history": [],
-            "time_range": time_range,
-        }
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "Invalid device ID format",
+                "hostid": hostid,
+            }
+        )
 
     device = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
     if not device:
         return JSONResponse(status_code=404, content={"error": "Device not found"})
 
-    fields = device.custom_fields or {}
-    if update_data.region is not None:
-        fields["region"] = update_data.region
-    if update_data.branch is not None:
-        fields["branch"] = update_data.branch
-    device.custom_fields = fields
-    db.commit()
+    try:
+        fields = device.custom_fields or {}
+        if update_data.region is not None:
+            fields["region"] = update_data.region
+        if update_data.branch is not None:
+            fields["branch"] = update_data.branch
+        device.custom_fields = fields
+        db.commit()
 
-    return {
-        "status": "success",
-        "message": "Device updated successfully",
-        "hostid": hostid,
-        "updated_fields": {"region": update_data.region, "branch": update_data.branch},
-    }
+        return {
+            "status": "success",
+            "message": "Device updated successfully",
+            "hostid": hostid,
+            "updated_fields": {"region": update_data.region, "branch": update_data.branch},
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update device {hostid}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update device: {str(e)}")
 
 
 def _get_standalone_devices(
@@ -279,8 +286,12 @@ def _store_ping_result(
         max_rtt_ms=_to_int(response_time),
         is_reachable=not timeout and pkt_received > 0,
     )
-    db.add(ping_record)
-    db.commit()
+    try:
+        db.add(ping_record)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to save ping record for {device_ip}: {e}")
 
 
 @router.get("/{hostid}/history")

@@ -135,7 +135,8 @@ class NetworkScanner:
                 timeout=1
             )
             return hostname
-        except:
+        except (OSError, asyncio.TimeoutError):
+            # OSError covers socket.herror, socket.gaierror, socket.timeout
             return None
 
     async def scan_network(
