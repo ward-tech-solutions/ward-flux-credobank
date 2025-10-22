@@ -57,7 +57,7 @@ if USE_POSTGRES:
         pool_timeout=30,            # Wait max 30s for connection
         connect_args={
             'connect_timeout': 10,  # Connection timeout 10s
-            'options': '-c statement_timeout=30000'  # Query timeout 30s
+            'options': '-c statement_timeout=30000 -c idle_in_transaction_session_timeout=60000'  # Query timeout 30s, idle transaction timeout 60s
         },
         echo=False,
     )

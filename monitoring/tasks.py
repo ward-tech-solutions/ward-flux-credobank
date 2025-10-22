@@ -62,6 +62,7 @@ def poll_device_snmp(self, device_id: str):
 
         # Get device monitoring items
         items = db.query(MonitoringItem).filter_by(device_id=device_id, enabled=True).all()
+        db.commit()  # Commit read-only transaction to prevent idle state
 
         if not items:
             logger.warning(f"No monitoring items found for device {device_id}")
@@ -150,6 +151,7 @@ def poll_all_devices_snmp():
         # Get all devices with monitoring items
         devices = db.query(MonitoringItem.device_id).distinct().all()
         device_ids = [str(d.device_id) for d in devices]
+        db.commit()  # Commit read-only transaction to prevent idle state
 
         logger.info(f"Polling {len(device_ids)} devices")
 
