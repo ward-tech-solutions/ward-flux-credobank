@@ -45,12 +45,18 @@ echo "🏥 Checking system health..."
 docker-compose -f docker-compose.production-local.yml ps
 echo ""
 
+# Backfill alerts from existing down devices
+echo "📋 Backfilling alert history from currently down devices..."
+docker exec wardops-worker-prod python scripts/backfill_alerts.py
+echo ""
+
 echo "✅ Deployment complete!"
 echo ""
 echo "📝 Latest fixes deployed:"
 echo "   - Downtime calculation now uses accurate 'down_since' timestamp"
-echo "   - No more timezone mismatch with actual device outage times"
-echo "   - Monitor page shows correct downtime duration"
+echo "   - Automatic alert creation for device state changes"
+echo "   - Alert history populated with current down devices"
+echo "   - Time range options: 30m, 1h, 3h, 6h, 12h, 24h, 7d, 30d"
 echo ""
 echo "🧪 Verification steps:"
 echo "   1. Open Monitor page in browser"
