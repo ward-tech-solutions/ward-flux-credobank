@@ -6,6 +6,7 @@ Background tasks for distributed monitoring.
 
 import logging
 import asyncio
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 from sqlalchemy import text
@@ -220,13 +221,23 @@ def ping_device(device_id: str, device_ip: str):
         if device:
             # CASE 1: Device is UP (is_alive = True)
             if current_state:
-                # If device was DOWN, log the recovery
+                # If device was DOWN, log the recovery and resolve any active alerts
                 if not previous_state:
                     if device.down_since:
                         # Handle timezone-naive down_since timestamps
                         down_since_aware = device.down_since.replace(tzinfo=timezone.utc) if device.down_since.tzinfo is None else device.down_since
                         downtime_duration = utcnow() - down_since_aware
                         logger.info(f"✅ Device {device.name} ({device_ip}) RECOVERED - was DOWN for {downtime_duration}")
+
+                        # Resolve any active alerts for this device
+                        active_alerts = db.query(AlertHistory).filter(
+                            AlertHistory.device_id == device_uuid,
+                            AlertHistory.resolved_at.is_(None)
+                        ).all()
+
+                        for alert in active_alerts:
+                            alert.resolved_at = utcnow()
+                            logger.info(f"Resolved alert {alert.id} for device {device.name}")
                     else:
                         logger.info(f"✅ Device {device.name} ({device_ip}) is now UP")
 
@@ -237,10 +248,27 @@ def ping_device(device_id: str, device_ip: str):
 
             # CASE 2: Device is DOWN (is_alive = False)
             else:
-                # If device just went down, set down_since
+                # If device just went down, set down_since and create alert
                 if previous_state:
                     device.down_since = utcnow()
                     logger.warning(f"❌ Device {device.name} ({device_ip}) went DOWN")
+
+                    # Create alert in alert_history table
+                    new_alert = AlertHistory(
+                        id=uuid.uuid4(),
+                        device_id=device_uuid,
+                        rule_name="Device Unreachable",
+                        severity="CRITICAL",
+                        message=f"Device {device.name} is not responding to ICMP ping",
+                        value=0,  # is_alive = 0
+                        threshold=1,  # Expected is_alive = 1
+                        triggered_at=utcnow(),
+                        resolved_at=None,
+                        acknowledged=False,
+                        notifications_sent=0
+                    )
+                    db.add(new_alert)
+                    logger.info(f"Created alert for device {device.name} going DOWN")
 
                 # Ensure down_since is set for DOWN devices
                 elif device.down_since is None:
