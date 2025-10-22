@@ -24,6 +24,11 @@ router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 rules_router = APIRouter(prefix="/api/v1/alert-rules", tags=["alert-rules"])
 
 
+def utcnow():
+    """Get current UTC time with timezone awareness"""
+    return datetime.now(timezone.utc)
+
+
 # Pydantic models for request/response
 class AlertRuleCreate(BaseModel):
     name: str
@@ -308,7 +313,7 @@ async def get_alert_stats(
     info_count = sum(1 for a in active_alerts if a.severity.upper() == "INFO")
 
     # Get recent resolved count (last 24h)
-    yesterday = datetime.utcnow() - timedelta(hours=24)
+    yesterday = utcnow() - timedelta(hours=24)
     resolved_24h = (
         db.query(AlertHistory)
         .filter(
@@ -343,7 +348,7 @@ async def acknowledge_alert(
 
     alert.acknowledged = True
     alert.acknowledged_by = current_user.username
-    alert.acknowledged_at = datetime.utcnow()
+    alert.acknowledged_at = utcnow()
 
     db.commit()
 
@@ -363,7 +368,7 @@ async def resolve_alert(
         return {"error": "Alert not found"}, 404
 
     if not alert.resolved_at:
-        alert.resolved_at = datetime.utcnow()
+        alert.resolved_at = utcnow()
         db.commit()
 
     return {"success": True, "alert_id": alert_id, "resolved_at": alert.resolved_at.isoformat()}
@@ -461,8 +466,8 @@ async def create_alert_rule(
         enabled=rule_data.enabled,
         device_id=uuid.UUID(rule_data.device_id) if rule_data.device_id else None,
         branch_id=rule_data.branch_id if rule_data.branch_id else None,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utcnow(),
+        updated_at=utcnow(),
     )
 
     db.add(new_rule)
@@ -539,7 +544,7 @@ async def update_alert_rule(
     if rule_data.branch_id is not None:
         rule.branch_id = rule_data.branch_id
 
-    rule.updated_at = datetime.utcnow()
+    rule.updated_at = utcnow()
 
     db.commit()
     db.refresh(rule)
@@ -593,7 +598,7 @@ async def toggle_alert_rule(
         return {"error": "Alert rule not found"}, 404
 
     rule.enabled = not rule.enabled
-    rule.updated_at = datetime.utcnow()
+    rule.updated_at = utcnow()
 
     db.commit()
 

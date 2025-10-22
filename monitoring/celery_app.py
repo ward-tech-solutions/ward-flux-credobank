@@ -28,16 +28,31 @@ app.conf.update(
     # Result backend settings
     result_expires=3600,  # Results expire after 1 hour
     result_backend_transport_options={"master_name": "mymaster"},
+    # Redis connection pooling - critical for 50 workers
+    broker_pool_limit=100,                      # Increased from default 10
+    broker_connection_retry_on_startup=True,
+    broker_connection_max_retries=10,
+    broker_connection_timeout=10,               # Connection timeout 10s
+    redis_max_connections=200,                  # Max Redis connections
     # Worker settings
     worker_prefetch_multiplier=4,
-    worker_max_tasks_per_child=1000,  # Restart worker after 1000 tasks (prevent memory leaks)
+    worker_max_tasks_per_child=500,  # Restart worker after 500 tasks (~4 hours, prevent memory leaks)
     # Task execution
     task_acks_late=True,  # Acknowledge task after completion
     task_reject_on_worker_lost=True,
-    # Retry settings
-    task_autoretry_for=(Exception,),
-    task_retry_kwargs={"max_retries": 3},
-    task_default_retry_delay=60,  # 1 minute
+    # Retry settings - Only retry on specific transient errors
+    # Don't retry programming errors (TypeError, KeyError, etc.)
+    task_autoretry_for=(
+        ConnectionError,
+        TimeoutError,
+    ),
+    task_retry_kwargs={
+        "max_retries": 3,
+        "retry_backoff": True,      # Exponential backoff: 10s, 20s, 40s
+        "retry_backoff_max": 300,   # Max wait 5 minutes
+        "retry_jitter": True,       # Add randomness to prevent thundering herd
+    },
+    task_default_retry_delay=10,  # Start with 10 seconds (not 60)
     # Logging
     worker_log_format="[%(asctime)s: %(levelname)s/%(processName)s] %(message)s",
     worker_task_log_format="[%(asctime)s: %(levelname)s/%(processName)s][%(task_name)s(%(task_id)s)] %(message)s",
@@ -64,6 +79,13 @@ app.conf.beat_schedule = {
     "cleanup-old-data": {
         "task": "monitoring.tasks.cleanup_old_data",
         "schedule": crontab(hour=2, minute=0),
+    },
+    # Cleanup old ping results every day at 3 AM
+    # Keeps 30 days of ping data (configurable)
+    "cleanup-ping-results": {
+        "task": "maintenance.cleanup_old_ping_results",
+        "schedule": crontab(hour=3, minute=0),
+        "kwargs": {"days": 30},  # Keep 30 days of data
     },
 }
 

@@ -42,13 +42,23 @@ if not USE_POSTGRES:
         )
 
 # Create engine with appropriate configuration
+# Connection pool sizing:
+# - 50 Celery workers × 4 prefetch × 1.5 safety factor = 300 connections needed
+# - pool_size: Base connections always open (100)
+# - max_overflow: Additional connections on demand (200)
+# - Total capacity: 300 connections
 if USE_POSTGRES:
     engine = create_engine(
         DATABASE_URL,
-        pool_size=20,
-        max_overflow=40,
-        pool_pre_ping=True,
-        pool_recycle=3600,
+        pool_size=100,              # Increased from 20 - base connection pool
+        max_overflow=200,           # Increased from 40 - overflow connections
+        pool_pre_ping=True,         # Test connections before use
+        pool_recycle=1800,          # Recycle connections after 30min (was 1hr)
+        pool_timeout=30,            # Wait max 30s for connection
+        connect_args={
+            'connect_timeout': 10,  # Connection timeout 10s
+            'options': '-c statement_timeout=30000'  # Query timeout 30s
+        },
         echo=False,
     )
 else:

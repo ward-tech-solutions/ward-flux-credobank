@@ -9,6 +9,8 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from urllib.parse import urljoin
 
 logger = logging.getLogger(__name__)
@@ -24,16 +26,33 @@ class VictoriaMetricsClient:
 
     def __init__(self, base_url: Optional[str] = None):
         """
-        Initialize VictoriaMetrics client
+        Initialize VictoriaMetrics client with retry logic
 
         Args:
             base_url: VictoriaMetrics base URL (defaults to env VICTORIA_URL)
         """
         self.base_url = base_url or os.getenv("VICTORIA_URL", "http://localhost:8428")
         self.session = requests.Session()
+
+        # Configure automatic retries for transient failures
+        # Prevents data loss during temporary network issues
+        retry_strategy = Retry(
+            total=3,                                        # Retry up to 3 times
+            backoff_factor=0.5,                             # Wait 0.5s, 1s, 2s between retries
+            status_forcelist=[429, 500, 502, 503, 504],    # Retry on these HTTP codes
+            allowed_methods=["GET", "POST"],                # Retry safe methods
+        )
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,        # Connection pooling
+            pool_maxsize=20             # Max connections in pool
+        )
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+
         self.session.headers.update({"Content-Type": "application/x-www-form-urlencoded"})
 
-        logger.info(f"VictoriaMetrics client initialized: {self.base_url}")
+        logger.info(f"VictoriaMetrics client initialized: {self.base_url} (with retry logic)")
 
     def write_metric(
         self,

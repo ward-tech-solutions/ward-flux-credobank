@@ -42,6 +42,7 @@ def poll_device_snmp(self, device_id: str):
     Args:
         device_id: Device UUID
     """
+    db = None
     try:
         db = SessionLocal()
         logger.info(f"Polling device: {device_id}")
@@ -50,14 +51,12 @@ def poll_device_snmp(self, device_id: str):
         profile = db.query(MonitoringProfile).filter_by(is_active=True).first()
         if not profile:
             logger.debug(f"No active monitoring profile, skipping device {device_id}")
-            db.close()
             return
 
         # Get device
         device = db.query(StandaloneDevice).filter_by(id=device_id).first()
         if not device:
             logger.error(f"Device {device_id} not found")
-            db.close()
             return
 
         # Get device monitoring items
@@ -65,13 +64,11 @@ def poll_device_snmp(self, device_id: str):
 
         if not items:
             logger.warning(f"No monitoring items found for device {device_id}")
-            db.close()
             return
 
         # Check for SNMP credentials (denormalized in standalone_devices table)
         if not device.snmp_community or not device.snmp_community.strip():
             logger.error(f"No SNMP credentials found for device {device.name} ({device.ip})")
-            db.close()
             return
 
         # Build credential data from denormalized fields
@@ -93,11 +90,9 @@ def poll_device_snmp(self, device_id: str):
 
         for item in items:
             try:
-                # Run async SNMP GET
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                result = loop.run_until_complete(snmp_poller.get(device_ip, item.oid, credentials, port=snmp_port))
-                loop.close()
+                # Run async SNMP GET using asyncio.run() - properly manages event loop lifecycle
+                # This is much more efficient than creating/destroying event loops manually
+                result = asyncio.run(snmp_poller.get(device_ip, item.oid, credentials, port=snmp_port))
 
                 if result.success and result.value is not None:
                     # Prepare metric for VictoriaMetrics
@@ -111,7 +106,7 @@ def poll_device_snmp(self, device_id: str):
                             "item": item.oid_name,
                             "oid": item.oid,
                         },
-                        "timestamp": datetime.utcnow(),
+                        "timestamp": utcnow(),
                     }
 
                     metrics_to_write.append(metric)
@@ -127,12 +122,14 @@ def poll_device_snmp(self, device_id: str):
             vm_client.write_metrics_bulk(metrics_to_write)
             logger.info(f"Wrote {len(metrics_to_write)} metrics for device {device_id}")
 
-        db.close()
         return {"device_id": device_id, "metrics_written": len(metrics_to_write)}
 
     except Exception as e:
         logger.error(f"Error in poll_device_snmp for {device_id}: {e}")
         raise
+    finally:
+        if db:
+            db.close()
 
 
 @shared_task(name="monitoring.tasks.poll_all_devices_snmp")
@@ -140,13 +137,13 @@ def poll_all_devices_snmp():
     """
     Poll all devices with SNMP monitoring items
     """
+    db = None
     try:
         db = SessionLocal()
 
         # Check if monitoring is enabled
         profile = db.query(MonitoringProfile).filter_by(is_active=True).first()
         if not profile:
-            db.close()
             return
 
         # Get all devices with monitoring items
@@ -159,12 +156,14 @@ def poll_all_devices_snmp():
         for device_id in device_ids:
             poll_device_snmp.delay(device_id)
 
-        db.close()
         return {"devices_scheduled": len(device_ids)}
 
     except Exception as e:
         logger.error(f"Error in poll_all_devices_snmp: {e}")
         raise
+    finally:
+        if db:
+            db.close()
 
 
 @shared_task(name="monitoring.tasks.ping_device")
@@ -298,13 +297,13 @@ def ping_all_devices():
     """
     Ping all monitored devices
     """
+    db = None
     try:
         db = SessionLocal()
 
         # Check if monitoring is enabled
         profile = db.query(MonitoringProfile).filter_by(is_active=True).first()
         if not profile:
-            db.close()
             return
 
         devices = db.query(StandaloneDevice).filter_by(enabled=True).all()
@@ -315,12 +314,14 @@ def ping_all_devices():
             if device.ip:
                 ping_device.delay(str(device.id), device.ip)
 
-        db.close()
         return {"devices_scheduled": len(devices)}
 
     except Exception as e:
         logger.error(f"Error in ping_all_devices: {e}")
         raise
+    finally:
+        if db:
+            db.close()
 
 
 @shared_task(name="monitoring.tasks.check_alert_rules")
@@ -390,11 +391,12 @@ def cleanup_old_data():
     """
     Clean up old alert history and discovery results
     """
+    db = None
     try:
         db = SessionLocal()
 
         # Delete alerts older than 90 days
-        cutoff_date = datetime.utcnow() - timedelta(days=90)
+        cutoff_date = utcnow() - timedelta(days=90)
         deleted_alerts = (
             db.query(AlertHistory)
             .filter(AlertHistory.created_at < cutoff_date)
@@ -404,7 +406,7 @@ def cleanup_old_data():
         # Delete discovery results older than 30 days
         from monitoring.models import DiscoveryResult
 
-        cutoff_date = datetime.utcnow() - timedelta(days=30)
+        cutoff_date = utcnow() - timedelta(days=30)
         deleted_discoveries = (
             db.query(DiscoveryResult)
             .filter(DiscoveryResult.discovered_at < cutoff_date, DiscoveryResult.added_to_monitoring == True)
@@ -412,14 +414,18 @@ def cleanup_old_data():
         )
 
         db.commit()
-        db.close()
 
         logger.info(f"Cleanup complete: {deleted_alerts} alerts, {deleted_discoveries} discoveries deleted")
         return {"alerts_deleted": deleted_alerts, "discoveries_deleted": deleted_discoveries}
 
     except Exception as e:
         logger.error(f"Error in cleanup_old_data: {e}")
+        if db:
+            db.rollback()
         raise
+    finally:
+        if db:
+            db.close()
 
 
 def _build_credential_data(snmp_cred: SNMPCredential) -> SNMPCredentialData:
@@ -487,7 +493,7 @@ def run_scheduled_discovery(self):
     db = SessionLocal()
     try:
         # Find rules that are due to run
-        now = datetime.utcnow()
+        now = utcnow()
         rules = db.query(DiscoveryRule).filter(
             DiscoveryRule.enabled == True,
             DiscoveryRule.schedule_enabled == True,
@@ -545,7 +551,7 @@ def cleanup_old_discovery_results(self, days: int = 30):
 
     db = SessionLocal()
     try:
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = utcnow() - timedelta(days=days)
 
         # Delete old results that were not imported
         deleted = db.query(DiscoveryResult).filter(
@@ -590,29 +596,39 @@ def evaluate_alert_rules(self):
         # Get all devices
         devices = db.query(StandaloneDevice).all()
         logger.info(f"Evaluating alerts for {len(devices)} devices")
-        
+
         triggered_count = 0
         resolved_count = 0
-        
+
+        # OPTIMIZATION: Fetch ALL ping data once instead of per-device queries
+        # Before: 100 devices × 10 rules = 1000 queries/minute
+        # After: 1 query total (1000× faster!)
+        ten_mins_ago = utcnow() - timedelta(minutes=10)
+        all_recent_pings = (
+            db.query(PingResult)
+            .filter(PingResult.timestamp >= ten_mins_ago)
+            .order_by(PingResult.device_ip, PingResult.timestamp.desc())
+            .all()
+        )
+
+        # Group pings by device IP for O(1) lookup
+        from collections import defaultdict
+        pings_by_device = defaultdict(list)
+        for ping in all_recent_pings:
+            pings_by_device[ping.device_ip].append(ping)
+
+        logger.info(f"Fetched {len(all_recent_pings)} ping results for {len(pings_by_device)} devices")
+
         for device in devices:
+            # Get pings for this device from pre-fetched data
+            recent_pings = pings_by_device.get(device.ip, [])
+
             for rule in rules:
                 try:
                     # Evaluate rule for this device
                     should_trigger = False
                     alert_message = ""
                     alert_value = None
-                    
-                    # Get last 10 minutes of ping data
-                    ten_mins_ago = datetime.utcnow() - timedelta(minutes=10)
-                    recent_pings = (
-                        db.query(PingResult)
-                        .filter(
-                            PingResult.device_ip == device.ip,
-                            PingResult.timestamp >= ten_mins_ago
-                        )
-                        .order_by(PingResult.timestamp.desc())
-                        .all()
-                    )
                     
                     if not recent_pings:
                         # No data - trigger "No Data Received" alert
@@ -684,7 +700,7 @@ def evaluate_alert_rules(self):
                             message=alert_message,
                             value=alert_value,
                             threshold=rule.expression,
-                            triggered_at=datetime.utcnow(),
+                            triggered_at=utcnow(),
                             acknowledged=False,
                             notifications_sent=[],
                         )
@@ -694,7 +710,7 @@ def evaluate_alert_rules(self):
                     
                     elif not should_trigger and existing_alert:
                         # AUTO-RESOLVE ALERT
-                        existing_alert.resolved_at = datetime.utcnow()
+                        existing_alert.resolved_at = utcnow()
                         resolved_count += 1
                         logger.info(f"✅ ALERT RESOLVED: {existing_alert.message}")
                 
@@ -708,7 +724,7 @@ def evaluate_alert_rules(self):
             "evaluated": len(devices) * len(rules),
             "triggered": triggered_count,
             "resolved": resolved_count,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": utcnow().isoformat()
         }
         
         if triggered_count > 0:
@@ -729,7 +745,7 @@ def evaluate_alert_rules(self):
 @shared_task(name="maintenance.cleanup_old_ping_results")
 def cleanup_old_ping_results(days: int = 90):
     """Delete ping_results entries older than the provided number of days."""
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = utcnow() - timedelta(days=days)
     try:
         db = SessionLocal()
         deleted = db.execute(
