@@ -217,30 +217,37 @@ def ping_device(device_id: str, device_ip: str):
         db.add(ping_result)
 
         # Update down_since timestamp based on ACTUAL state transitions
+        # CRITICAL: This must match Zabbix behavior - immediate state updates
         if device:
-            # State transition: UP -> DOWN (device just went down)
-            if previous_state and not current_state:
-                device.down_since = utcnow()
-                logger.info(f"Device {device.name} ({device_ip}) went DOWN (UP->DOWN transition)")
+            # CASE 1: Device is UP (is_alive = True)
+            if current_state:
+                # If device was DOWN, log the recovery
+                if not previous_state:
+                    if device.down_since:
+                        downtime_duration = utcnow() - device.down_since
+                        logger.info(f"✅ Device {device.name} ({device_ip}) RECOVERED - was DOWN for {downtime_duration}")
+                    else:
+                        logger.info(f"✅ Device {device.name} ({device_ip}) is now UP")
 
-            # State transition: DOWN -> UP (device came back up)
-            elif not previous_state and current_state:
-                if device.down_since:
-                    downtime_duration = utcnow() - device.down_since
-                    logger.info(f"Device {device.name} ({device_ip}) came back UP after {downtime_duration} (DOWN->UP transition)")
-                device.down_since = None
+                # ALWAYS clear down_since when device is UP (Zabbix-like behavior)
+                if device.down_since is not None:
+                    logger.info(f"Clearing down_since for {device.name} ({device_ip}) - device is UP")
+                    device.down_since = None
 
-            # Device is currently UP - ensure down_since is cleared (handle stale data)
-            elif current_state and device.down_since is not None:
-                logger.warning(f"Device {device.name} ({device_ip}) is UP but has stale down_since timestamp - clearing it")
-                device.down_since = None
+            # CASE 2: Device is DOWN (is_alive = False)
+            else:
+                # If device just went down, set down_since
+                if previous_state:
+                    device.down_since = utcnow()
+                    logger.warning(f"❌ Device {device.name} ({device_ip}) went DOWN")
 
-            # Device is currently DOWN - ensure down_since is set (handle missing timestamp)
-            elif not current_state and device.down_since is None:
-                logger.warning(f"Device {device.name} ({device_ip}) is DOWN but missing down_since timestamp - setting it now")
-                device.down_since = utcnow()
+                # Ensure down_since is set for DOWN devices
+                elif device.down_since is None:
+                    logger.warning(f"❌ Device {device.name} ({device_ip}) is DOWN - setting down_since timestamp")
+                    device.down_since = utcnow()
 
         db.commit()
+        logger.debug(f"Ping complete for {device_ip}: is_alive={host.is_alive}, down_since={device.down_since if device else 'N/A'}")
 
         # Write metrics to VictoriaMetrics (optional)
         try:
