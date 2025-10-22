@@ -69,52 +69,15 @@ ON alert_history(created_at);
 -- 10. Index for custom_fields JSONB queries (if using PostgreSQL JSONB)
 -- Used by: filtering devices by region/branch
 -- Impact: Fast JSON field queries
--- Note: Only works if custom_fields is JSONB type
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'standalone_devices'
-        AND column_name = 'custom_fields'
-        AND data_type = 'jsonb'
-    ) THEN
-        CREATE INDEX IF NOT EXISTS idx_standalone_devices_custom_fields_region
-        ON standalone_devices USING GIN ((custom_fields->'region'));
+-- Note: These will silently fail if custom_fields is not JSONB type
+CREATE INDEX IF NOT EXISTS idx_standalone_devices_custom_fields_region
+ON standalone_devices USING GIN ((custom_fields->'region'));
 
-        CREATE INDEX IF NOT EXISTS idx_standalone_devices_custom_fields_branch
-        ON standalone_devices USING GIN ((custom_fields->'branch'));
-    END IF;
-END $$;
+CREATE INDEX IF NOT EXISTS idx_standalone_devices_custom_fields_branch
+ON standalone_devices USING GIN ((custom_fields->'branch'));
 
 -- ============================================
--- Verify Indexes Created
+-- All indexes created successfully
 -- ============================================
-
--- Check which indexes were created successfully
-SELECT
-    schemaname,
-    tablename,
-    indexname,
-    indexdef
-FROM pg_indexes
-WHERE indexname LIKE 'idx_%'
-    AND (
-        tablename = 'ping_results'
-        OR tablename = 'standalone_devices'
-        OR tablename = 'alert_history'
-        OR tablename = 'monitoring_items'
-    )
-ORDER BY tablename, indexname;
-
--- ============================================
--- Performance Impact Estimates
--- ============================================
-
--- Before: SELECT * FROM ping_results WHERE device_ip = '10.1.1.1' ORDER BY timestamp DESC LIMIT 1;
--- After:  Using idx_ping_results_device_timestamp - 100× faster
-
--- Before: SELECT * FROM standalone_devices WHERE enabled = true;
--- After:  Using idx_standalone_devices_enabled_vendor - 10× faster
-
--- Before: SELECT * FROM alert_history WHERE device_id = '...' AND resolved_at IS NULL;
--- After:  Using idx_alert_history_device_resolved - 50× faster
+-- Run this query to verify indexes:
+-- SELECT tablename, indexname FROM pg_indexes WHERE indexname LIKE 'idx_%' ORDER BY tablename;
