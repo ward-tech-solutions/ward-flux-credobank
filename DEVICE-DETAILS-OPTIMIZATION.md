@@ -305,11 +305,18 @@ docker logs wardops-api-prod --tail 100 | grep -E "(Cache HIT|Cache MISS)"
    - 4 composite indexes on alert_history table
    - Optimizes device_id + triggered_at queries
 
-4. **deploy-device-details-optimization.sh** (NEW FILE)
+4. **frontend/src/pages/Devices.tsx** (lines 60-1022)
+   - **BONUS FIX:** Fixed Add Device form issues
+   - Added missing fields: Device Name, Device Type, Vendor, Model, Location
+   - Implemented auto-extraction from hostname (was broken)
+   - Now matches Edit Device form layout and fields
+
+5. **deploy-device-details-optimization.sh** (NEW FILE)
    - Automated deployment script
    - Includes verification tests
+   - Rebuilds API container (includes frontend)
 
-5. **DEVICE-DETAILS-OPTIMIZATION.md** (THIS FILE)
+6. **DEVICE-DETAILS-OPTIMIZATION.md** (THIS FILE)
    - Comprehensive documentation
 
 ### Why 30-Second Cache TTL?
