@@ -28,10 +28,10 @@ from sqlalchemy import func, desc
 
 def diagnose_device(device_name_pattern: str):
     """
-    Diagnose device status for a device matching the given name pattern
+    Diagnose device status for a device matching the given name or IP pattern
 
     Args:
-        device_name_pattern: Part of device name to search for (e.g., "khargauli")
+        device_name_pattern: Part of device name or IP to search for (e.g., "khargauli" or "10.195.78.5")
     """
     db = SessionLocal()
 
@@ -42,13 +42,14 @@ def diagnose_device(device_name_pattern: str):
         print(f"Searching for devices matching: '{device_name_pattern}'")
         print(f"Timestamp: {datetime.now(timezone.utc).isoformat()}\n")
 
-        # Find devices matching the pattern
+        # Find devices matching the pattern (search by name OR IP)
         devices = db.query(StandaloneDevice).filter(
-            func.lower(StandaloneDevice.name).like(f"%{device_name_pattern.lower()}%")
+            func.lower(StandaloneDevice.name).like(f"%{device_name_pattern.lower()}%") |
+            StandaloneDevice.ip.like(f"%{device_name_pattern}%")
         ).all()
 
         if not devices:
-            print(f"❌ No devices found matching '{device_name_pattern}'")
+            print(f"❌ No devices found matching '{device_name_pattern}' (searched by name and IP)")
             return
 
         print(f"Found {len(devices)} device(s):\n")
@@ -147,6 +148,11 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         device_pattern = sys.argv[1]
     else:
-        device_pattern = "khargauli"  # Default to user's reported device
+        # Default to searching multiple IPs if no pattern provided
+        print("Usage: diagnose_device_status.py <name_or_ip_pattern>")
+        print("\nSearching default IPs: 10.195.78.5, 10.195.78.247, 10.195.78.248")
+        for ip in ["10.195.78.5", "10.195.78.247", "10.195.78.248"]:
+            diagnose_device(ip)
+        sys.exit(0)
 
     diagnose_device(device_pattern)
