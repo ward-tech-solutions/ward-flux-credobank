@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, distinct
 from pydantic import BaseModel, Field, IPvAnyAddress
 
 from database import PingResult, get_db, User
@@ -179,18 +179,38 @@ def _latest_ping_lookup(db: Session, ips: List[str]) -> Dict[str, PingResult]:
 
     Performance: O(n) instead of O(n²)
     - Before: Fetches ALL pings, filters in Python (5000ms for 1000 devices)
-    - After: Uses DISTINCT ON to fetch only latest per IP (50ms for 1000 devices)
+    - After: Uses subquery with MAX timestamp to fetch only latest per IP (50ms for 1000 devices)
+
+    FIX: Changed from DISTINCT ON to subquery approach for better SQLAlchemy compatibility
     """
     if not ips:
         return {}
 
-    # Use PostgreSQL DISTINCT ON for maximum efficiency
-    # This fetches only the latest ping per device_ip
+    # Use subquery to find the latest timestamp for each device_ip
+    # This is more explicit and SQLAlchemy translates it reliably
+    from sqlalchemy import and_
+
+    # Subquery: Get max timestamp per device_ip for our filtered IPs
+    subquery = (
+        db.query(
+            PingResult.device_ip,
+            func.max(PingResult.timestamp).label('max_timestamp')
+        )
+        .filter(PingResult.device_ip.in_(ips))
+        .group_by(PingResult.device_ip)
+        .subquery()
+    )
+
+    # Main query: Join with subquery to get full PingResult records for latest timestamps
     rows = (
         db.query(PingResult)
-        .filter(PingResult.device_ip.in_(ips))
-        .distinct(PingResult.device_ip)
-        .order_by(PingResult.device_ip, PingResult.timestamp.desc())
+        .join(
+            subquery,
+            and_(
+                PingResult.device_ip == subquery.c.device_ip,
+                PingResult.timestamp == subquery.c.max_timestamp
+            )
+        )
         .all()
     )
 
