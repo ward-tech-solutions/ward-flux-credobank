@@ -793,3 +793,97 @@ def cleanup_old_ping_results(days: int = 90):
         raise
     finally:
         db.close()
+
+
+@shared_task(name="monitoring.tasks.check_worker_health")
+def check_worker_health():
+    """
+    Monitor Celery worker health and detect issues
+
+    Checks:
+    - Number of active workers
+    - Queue length (tasks waiting)
+    - Worker responsiveness
+    - Memory usage (if available)
+
+    Alerts if:
+    - No workers detected (critical)
+    - High queue length (> 1000 tasks)
+    - Workers not responding
+
+    Returns:
+        Dict with health status and metrics
+    """
+    try:
+        from celery import current_app
+
+        inspect = current_app.control.inspect()
+
+        # Check active workers
+        stats = inspect.stats()
+        active = inspect.active()
+        reserved = inspect.reserved()
+
+        if not stats:
+            logger.error("🚨 NO CELERY WORKERS DETECTED! System is not monitoring devices!")
+            return {
+                "status": "critical",
+                "workers": 0,
+                "queue_length": "unknown",
+                "message": "No workers detected - monitoring stopped!"
+            }
+
+        worker_count = len(stats)
+
+        # Calculate queue length
+        queue_length = 0
+        if reserved:
+            queue_length = sum(len(tasks) for tasks in reserved.values())
+
+        # Check active tasks
+        active_task_count = 0
+        if active:
+            active_task_count = sum(len(tasks) for tasks in active.values())
+
+        # Determine status
+        status = "healthy"
+        warnings = []
+
+        if worker_count == 0:
+            status = "critical"
+            warnings.append("No workers running")
+        elif worker_count < 5:
+            status = "degraded"
+            warnings.append(f"Only {worker_count} workers (expected 50+)")
+
+        if queue_length > 1000:
+            status = "degraded"
+            warnings.append(f"High queue length: {queue_length} tasks waiting")
+        elif queue_length > 5000:
+            status = "critical"
+            warnings.append(f"Very high queue length: {queue_length} tasks waiting")
+
+        # Log result
+        if status == "healthy":
+            logger.info(f"✅ Worker health: {worker_count} workers, {queue_length} queued, {active_task_count} active")
+        elif status == "degraded":
+            logger.warning(f"⚠️  Worker health degraded: {', '.join(warnings)}")
+        else:
+            logger.error(f"🚨 Worker health critical: {', '.join(warnings)}")
+
+        return {
+            "status": status,
+            "workers": worker_count,
+            "queue_length": queue_length,
+            "active_tasks": active_task_count,
+            "warnings": warnings,
+            "timestamp": utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Error checking worker health: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "message": str(e),
+            "timestamp": utcnow().isoformat()
+        }

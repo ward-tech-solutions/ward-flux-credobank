@@ -87,6 +87,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(hour=3, minute=0),
         "kwargs": {"days": 30},  # Keep 30 days of data
     },
+    # Monitor worker health every 5 minutes
+    "check-worker-health": {
+        "task": "monitoring.tasks.check_worker_health",
+        "schedule": 300.0,  # Every 5 minutes
+    },
 }
 
 # Auto-discover tasks

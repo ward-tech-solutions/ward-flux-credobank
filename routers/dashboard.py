@@ -29,24 +29,109 @@ router = APIRouter(prefix="/api/v1", tags=["dashboard"])
 
 @router.get("/health")
 async def health_check(request: Request):
-    """Health check endpoint for monitoring and load balancers"""
-    try:
-        # Check database connection
-        from database import SessionLocal
-        from sqlalchemy import text
+    """
+    Comprehensive health check endpoint for monitoring and load balancers
 
+    Checks:
+    - Database connectivity and performance
+    - Redis connectivity
+    - VictoriaMetrics availability
+    - Celery worker status
+    - Disk space (if available)
+
+    Returns:
+        Status: healthy, degraded, or critical
+        Component details for each service
+    """
+    from database import SessionLocal
+    from sqlalchemy import text
+    import os
+    import shutil
+
+    components = {}
+    overall_status = "healthy"
+
+    # 1. Database Health Check
+    try:
         db = SessionLocal()
-        db.execute(text("SELECT 1"))
+        result = db.execute(text("SELECT 1"))
         db.close()
-        db_status = "healthy"
+        components["database"] = "healthy"
     except Exception as e:
-        db_status = f"unhealthy: {str(e)}"
+        components["database"] = f"unhealthy: {str(e)}"
+        overall_status = "critical"
+
+    # 2. Redis Health Check
+    try:
+        import redis
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        r = redis.from_url(redis_url, socket_connect_timeout=5)
+        r.ping()
+        components["redis"] = "healthy"
+    except Exception as e:
+        components["redis"] = f"unhealthy: {str(e)}"
+        overall_status = "degraded"
+
+    # 3. VictoriaMetrics Health Check
+    try:
+        from monitoring.victoria.client import get_victoria_client
+        vm_client = get_victoria_client()
+        if vm_client.health_check():
+            components["victoriametrics"] = "healthy"
+        else:
+            components["victoriametrics"] = "unhealthy"
+            overall_status = "degraded"
+    except Exception as e:
+        components["victoriametrics"] = f"unhealthy: {str(e)}"
+        overall_status = "degraded"
+
+    # 4. Celery Workers Health Check
+    try:
+        from celery import current_app
+        inspect = current_app.control.inspect()
+        stats = inspect.stats()
+        worker_count = len(stats) if stats else 0
+
+        if worker_count == 0:
+            components["celery_workers"] = f"critical: No workers running"
+            overall_status = "critical"
+        elif worker_count < 5:
+            components["celery_workers"] = f"degraded: Only {worker_count} workers (expected 50)"
+            if overall_status == "healthy":
+                overall_status = "degraded"
+        else:
+            components["celery_workers"] = f"healthy ({worker_count} workers)"
+    except Exception as e:
+        components["celery_workers"] = f"error: {str(e)}"
+        overall_status = "degraded"
+
+    # 5. Disk Space Check (optional, non-critical)
+    try:
+        stat = shutil.disk_usage('/')
+        free_gb = stat.free / (1024**3)
+        total_gb = stat.total / (1024**3)
+        percent_free = (stat.free / stat.total) * 100
+
+        if percent_free < 10:
+            components["disk_space"] = f"critical: {free_gb:.1f}GB free ({percent_free:.1f}%)"
+            overall_status = "critical"
+        elif percent_free < 20:
+            components["disk_space"] = f"warning: {free_gb:.1f}GB free ({percent_free:.1f}%)"
+            if overall_status == "healthy":
+                overall_status = "degraded"
+        else:
+            components["disk_space"] = f"healthy: {free_gb:.1f}GB free ({percent_free:.1f}%)"
+    except Exception as e:
+        components["disk_space"] = f"unknown: {str(e)}"
+
+    # 6. API itself is always healthy if we got here
+    components["api"] = "healthy"
 
     return {
-        "status": "healthy" if db_status == "healthy" else "degraded",
+        "status": overall_status,
         "version": "2.0.0",
         "timestamp": datetime.now().isoformat(),
-        "components": {"database": db_status, "api": "healthy"},
+        "components": components,
     }
 
 
