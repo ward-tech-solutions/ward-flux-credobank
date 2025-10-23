@@ -30,14 +30,14 @@ echo "⏰ Started at: $(date)"
 echo ""
 
 ##############################################################################
-# Stop All Workers
+# Stop All Services
 ##############################################################################
-echo -e "${BLUE}[1/5] Stopping all workers...${NC}"
+echo -e "${BLUE}[1/5] Stopping all services...${NC}"
 echo ""
 
-docker-compose -f "$COMPOSE_FILE" stop celery-worker-monitoring celery-worker-snmp celery-worker-alerts celery-worker-maintenance celery-beat 2>&1 || true
+docker-compose -f "$COMPOSE_FILE" stop api celery-worker-monitoring celery-worker-snmp celery-worker-alerts celery-worker-maintenance celery-beat 2>&1 || true
 
-echo "✅ Workers stopped"
+echo "✅ Services stopped"
 echo ""
 
 ##############################################################################
@@ -55,7 +55,7 @@ docker rm -f b91cb4751dd9_wardops-worker-snmp-prod 2>&1 || true
 
 # Remove current containers (they may be corrupted)
 echo "Removing current containers..."
-docker-compose -f "$COMPOSE_FILE" rm -f celery-worker-monitoring celery-worker-snmp celery-worker-alerts celery-worker-maintenance celery-beat 2>&1 || true
+docker-compose -f "$COMPOSE_FILE" rm -f api celery-worker-monitoring celery-worker-snmp celery-worker-alerts celery-worker-maintenance celery-beat 2>&1 || true
 
 echo "✅ Old containers removed"
 echo ""
@@ -74,30 +74,30 @@ echo ""
 ##############################################################################
 # Rebuild Images
 ##############################################################################
-echo -e "${BLUE}[4/5] Rebuilding worker images...${NC}"
+echo -e "${BLUE}[4/5] Rebuilding service images...${NC}"
 echo ""
 
-docker-compose -f "$COMPOSE_FILE" build --no-cache celery-worker-monitoring celery-worker-snmp celery-worker-alerts celery-worker-maintenance celery-beat
+docker-compose -f "$COMPOSE_FILE" build --no-cache api celery-worker-monitoring celery-worker-snmp celery-worker-alerts celery-worker-maintenance celery-beat
 
 echo "✅ Images rebuilt"
 echo ""
 
 ##############################################################################
-# Start Fresh Workers
+# Start Fresh Services
 ##############################################################################
-echo -e "${BLUE}[5/5] Starting fresh auto-scaling workers...${NC}"
+echo -e "${BLUE}[5/5] Starting fresh services with auto-scaling...${NC}"
 echo ""
 
-docker-compose -f "$COMPOSE_FILE" up -d celery-worker-monitoring celery-worker-snmp celery-worker-alerts celery-worker-maintenance celery-beat
+docker-compose -f "$COMPOSE_FILE" up -d api celery-worker-monitoring celery-worker-snmp celery-worker-alerts celery-worker-maintenance celery-beat
 
-echo "Waiting 30 seconds for workers to initialize..."
+echo "Waiting 30 seconds for services to initialize..."
 sleep 30
 
-echo "✅ Workers started"
+echo "✅ Services started"
 echo ""
 
 ##############################################################################
-# Verify Workers
+# Verify Services
 ##############################################################################
 echo "=========================================================================="
 echo -e "${GREEN}✅ DOCKER CONTAINERS FIXED${NC}"
@@ -106,6 +106,10 @@ echo ""
 
 echo "Container status:"
 docker-compose -f "$COMPOSE_FILE" ps
+
+echo ""
+echo "Checking API health:"
+curl -f http://localhost:5001/api/v1/health 2>&1 || echo "API not yet ready (will be ready in ~10 seconds)"
 
 echo ""
 echo "Waiting 35 seconds for first ping cycle..."
