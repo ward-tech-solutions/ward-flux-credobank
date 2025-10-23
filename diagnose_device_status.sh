@@ -8,4 +8,6 @@ echo "Running device status diagnostic for: $DEVICE_PATTERN"
 echo "=========================================="
 echo ""
 
-docker exec wardops-api-prod python3 /app/diagnose_device_status.py "$DEVICE_PATTERN"
+# Copy script into container and run it
+docker cp diagnose_device_status.py wardops-api-prod:/tmp/diagnose_device_status.py
+docker exec wardops-api-prod python3 /tmp/diagnose_device_status.py "$DEVICE_PATTERN"
