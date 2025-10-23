@@ -6,7 +6,7 @@ import logging
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Enum as SQLEnum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
 import os
 from dotenv import load_dotenv
@@ -90,7 +90,7 @@ class User(Base):
     regions = Column(String(1000), nullable=True)  # JSON array of regions for multi-region support
     branches = Column(String(500), nullable=True)  # Comma-separated branch names
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_login = Column(DateTime, nullable=True)
 
     # User Preferences
@@ -115,7 +115,7 @@ class PingResult(Base):
     avg_rtt_ms = Column(Integer, nullable=True)
     max_rtt_ms = Column(Integer, nullable=True)
     is_reachable = Column(Boolean, default=False)
-    timestamp = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc), index=True)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class TracerouteResult(Base):
@@ -131,7 +131,7 @@ class TracerouteResult(Base):
     hop_hostname = Column(String(255))
     latency_ms = Column(Integer, nullable=True)
     packet_loss = Column(Integer, default=0)
-    timestamp = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc), index=True)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class MTRResult(Base):
@@ -157,7 +157,7 @@ class MTRResult(Base):
     latency_max = Column(Integer, nullable=True)  # Worst latency
     latency_stddev = Column(Integer, nullable=True)  # Standard deviation (jitter)
 
-    timestamp = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc), index=True)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class PerformanceBaseline(Base):
@@ -181,9 +181,9 @@ class PerformanceBaseline(Base):
 
     # Metadata
     samples_count = Column(Integer, default=0)  # Number of samples used for baseline
-    last_calculated = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc))
-    created_at = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.now(datetime.timezone.utc))
+    last_calculated = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 def init_db():
