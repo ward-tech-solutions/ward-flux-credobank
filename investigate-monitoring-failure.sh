@@ -32,7 +32,7 @@ echo ""
 echo -e "${BLUE}[1/7] Checking recent ping activity (last 2 hours)...${NC}"
 echo ""
 
-docker-compose -f "$COMPOSE_FILE" exec -T postgres psql -U wardops -d wardops <<'SQL'
+docker-compose -f "$COMPOSE_FILE" exec -T postgres psql -U ward_admin -d ward_ops <<'SQL'
 SELECT
   COUNT(*) as total_pings_last_2h,
   COUNT(DISTINCT device_ip) as unique_devices_pinged,
@@ -50,7 +50,7 @@ echo ""
 echo -e "${BLUE}[2/7] Finding when monitoring stopped...${NC}"
 echo ""
 
-docker-compose -f "$COMPOSE_FILE" exec -T postgres psql -U wardops -d wardops <<'SQL'
+docker-compose -f "$COMPOSE_FILE" exec -T postgres psql -U ward_admin -d ward_ops <<'SQL'
 -- Show ping activity by hour for last 24 hours
 SELECT
   date_trunc('hour', timestamp) as hour,
@@ -106,7 +106,7 @@ echo ""
 echo -e "${BLUE}[6/7] Checking monitoring profile status...${NC}"
 echo ""
 
-docker-compose -f "$COMPOSE_FILE" exec -T postgres psql -U wardops -d wardops <<'SQL'
+docker-compose -f "$COMPOSE_FILE" exec -T postgres psql -U ward_admin -d ward_ops <<'SQL'
 SELECT id, name, is_active, created_at
 FROM monitoring_profiles
 ORDER BY created_at DESC
@@ -121,7 +121,7 @@ echo ""
 echo -e "${BLUE}[7/7] Checking total enabled devices...${NC}"
 echo ""
 
-docker-compose -f "$COMPOSE_FILE" exec -T postgres psql -U wardops -d wardops <<'SQL'
+docker-compose -f "$COMPOSE_FILE" exec -T postgres psql -U ward_admin -d ward_ops <<'SQL'
 SELECT
   COUNT(*) as total_devices,
   COUNT(*) FILTER (WHERE enabled = true) as enabled_devices,
