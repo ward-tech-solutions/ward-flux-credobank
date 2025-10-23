@@ -75,8 +75,8 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
     """
     import asyncio
     from icmplib import async_ping
-    from database import PingResult, AlertHistory
-    from monitoring.models import AlertSeverity
+    from database import PingResult
+    from monitoring.models import AlertHistory, AlertSeverity
     import uuid
 
     db = None
