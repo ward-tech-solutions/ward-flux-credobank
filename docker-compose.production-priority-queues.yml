@@ -140,12 +140,13 @@ services:
     restart: unless-stopped
 
   # MEDIUM PRIORITY: Ping Monitoring Worker (real-time device status)
+  # Optimized for 6 vCPU / 16GB RAM server
   celery-worker-monitoring:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: wardops-worker-monitoring-prod
-    command: celery -A celery_app worker --loglevel=info --concurrency=150 -Q monitoring --max-tasks-per-child=1000
+    command: celery -A celery_app worker --loglevel=info --concurrency=35 -Q monitoring --max-tasks-per-child=1000
     environment:
       DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
       REDIS_URL: redis://:redispass@redis:6379/0
@@ -167,12 +168,13 @@ services:
     restart: unless-stopped
 
   # LOW PRIORITY: SNMP Polling Worker (metrics collection, can be delayed)
+  # Optimized for 6 vCPU / 16GB RAM server
   celery-worker-snmp:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: wardops-worker-snmp-prod
-    command: celery -A celery_app worker --loglevel=info --concurrency=200 -Q snmp --max-tasks-per-child=500
+    command: celery -A celery_app worker --loglevel=info --concurrency=25 -Q snmp --max-tasks-per-child=500
     environment:
       DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
       REDIS_URL: redis://:redispass@redis:6379/0
