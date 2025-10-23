@@ -1,0 +1,276 @@
+"""
+Batch processing tasks - Zabbix-style architecture
+Process multiple devices in parallel within a single task
+"""
+
+import asyncio
+from celery import shared_task
+from database import SessionLocal
+from monitoring.models import StandaloneDevice
+from datetime import datetime, timezone
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def utcnow():
+    """Get current UTC time with timezone info"""
+    return datetime.now(timezone.utc)
+
+
+@shared_task(name="monitoring.tasks.ping_devices_batch")
+def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
+    """
+    Ping multiple devices in PARALLEL within a single task
+    This is how Zabbix does it - batch processing!
+
+    Args:
+        device_ids: List of device UUIDs
+        device_ips: List of device IPs
+
+    Instead of 875 individual tasks, we have ~18 batch tasks (50 devices each)
+    This reduces task queue from 1,750/min to 36/min (48x reduction!)
+    """
+    import asyncio
+    from icmplib import async_ping
+    from database import PingResult, AlertHistory
+    from monitoring.models import AlertSeverity
+    import uuid
+
+    db = None
+    try:
+        db = SessionLocal()
+
+        # Ping all devices in parallel using asyncio
+        async def ping_all():
+            tasks = [async_ping(ip, count=2, interval=0.2, timeout=1, privileged=False)
+                     for ip in device_ips]
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Execute parallel pings
+        results = asyncio.run(ping_all())
+
+        # Process results
+        ping_count = 0
+        for device_id, device_ip, result in zip(device_ids, device_ips, results):
+            if isinstance(result, Exception):
+                logger.error(f"Error pinging {device_ip}: {result}")
+                continue
+
+            # Get device from database
+            device_uuid = uuid.UUID(device_id)
+            device = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
+
+            if not device:
+                continue
+
+            # Get previous state
+            previous_ping = (
+                db.query(PingResult)
+                .filter(PingResult.device_ip == device_ip)
+                .order_by(PingResult.timestamp.desc())
+                .first()
+            )
+
+            current_state = result.is_alive
+            previous_state = previous_ping.is_reachable if previous_ping else True
+
+            # Save ping result
+            ping_result = PingResult(
+                device_ip=device_ip,
+                device_name=device.name if device else None,
+                packets_sent=result.packets_sent,
+                packets_received=result.packets_received,
+                packet_loss_percent=int(result.packet_loss),
+                min_rtt_ms=int(result.min_rtt) if result.min_rtt else 0,
+                avg_rtt_ms=int(result.avg_rtt) if result.avg_rtt else 0,
+                max_rtt_ms=int(result.max_rtt) if result.max_rtt else 0,
+                is_reachable=result.is_alive,
+                timestamp=utcnow()
+            )
+            db.add(ping_result)
+            ping_count += 1
+
+            # Handle state transitions
+            if current_state and not previous_state:
+                # Device came UP
+                if device.down_since:
+                    logger.info(f"✅ Device {device.name} ({device_ip}) RECOVERED")
+                    # Resolve alerts
+                    active_alerts = db.query(AlertHistory).filter(
+                        AlertHistory.device_id == device_uuid,
+                        AlertHistory.resolved_at.is_(None)
+                    ).all()
+                    for alert in active_alerts:
+                        alert.resolved_at = utcnow()
+                device.down_since = None
+
+            elif not current_state and previous_state:
+                # Device went DOWN
+                device.down_since = utcnow()
+                logger.warning(f"❌ Device {device.name} ({device_ip}) went DOWN")
+
+                # Create alert
+                new_alert = AlertHistory(
+                    id=uuid.uuid4(),
+                    device_id=device_uuid,
+                    rule_name="Device Unreachable",
+                    severity=AlertSeverity.CRITICAL,
+                    message=f"Device {device.name} is not responding to ICMP ping",
+                    value="0",
+                    threshold="1",
+                    triggered_at=utcnow(),
+                    acknowledged=False,
+                    notifications_sent=[]
+                )
+                db.add(new_alert)
+
+            elif not current_state and device.down_since is None:
+                # Device is DOWN but down_since not set
+                device.down_since = utcnow()
+
+        db.commit()
+        logger.info(f"Batch processed {ping_count} devices")
+
+        return {"devices_pinged": ping_count, "batch_size": len(device_ids)}
+
+    except Exception as e:
+        logger.error(f"Error in ping_devices_batch: {e}")
+        if db:
+            db.rollback()
+        raise
+    finally:
+        if db:
+            db.close()
+
+
+@shared_task(name="monitoring.tasks.ping_all_devices_batched")
+def ping_all_devices_batched():
+    """
+    Schedule ping tasks in BATCHES (Zabbix-style)
+
+    Instead of:
+      - 875 individual ping_device tasks = 1,750 tasks/min
+
+    We do:
+      - 18 batch tasks (50 devices each) = 36 tasks/min
+
+    This is 48x fewer tasks in the queue!
+    """
+    db = None
+    try:
+        db = SessionLocal()
+
+        # Check if monitoring is enabled
+        from monitoring.models import MonitoringProfile
+        profile = db.query(MonitoringProfile).filter_by(is_active=True).first()
+        if not profile:
+            return
+
+        # Get all enabled devices
+        devices = db.query(StandaloneDevice).filter_by(enabled=True).all()
+
+        if not devices:
+            return
+
+        # Batch devices into groups of 50
+        BATCH_SIZE = 50
+        batches = []
+
+        for i in range(0, len(devices), BATCH_SIZE):
+            batch = devices[i:i+BATCH_SIZE]
+            device_ids = [str(d.id) for d in batch if d.ip]
+            device_ips = [d.ip for d in batch if d.ip]
+
+            if device_ids:
+                batches.append((device_ids, device_ips))
+
+        logger.info(f"Scheduling {len(batches)} batch ping tasks for {len(devices)} devices")
+
+        # Schedule batch tasks
+        for device_ids, device_ips in batches:
+            ping_devices_batch.delay(device_ids, device_ips)
+
+        return {
+            "total_devices": len(devices),
+            "batches_scheduled": len(batches),
+            "batch_size": BATCH_SIZE
+        }
+
+    except Exception as e:
+        logger.error(f"Error in ping_all_devices_batched: {e}")
+        raise
+    finally:
+        if db:
+            db.close()
+
+
+@shared_task(name="monitoring.tasks.poll_devices_snmp_batch")
+def poll_devices_snmp_batch(device_ids: list[str]):
+    """
+    Poll multiple devices via SNMP in batch
+    Reduces SNMP queue from 875 tasks/min to ~18 tasks/min
+    """
+    from monitoring.tasks import poll_device_snmp
+
+    results = []
+    for device_id in device_ids:
+        try:
+            result = poll_device_snmp(device_id)
+            results.append(result)
+        except Exception as e:
+            logger.error(f"Error polling device {device_id}: {e}")
+
+    return {
+        "devices_polled": len(results),
+        "batch_size": len(device_ids)
+    }
+
+
+@shared_task(name="monitoring.tasks.poll_all_devices_snmp_batched")
+def poll_all_devices_snmp_batched():
+    """
+    Schedule SNMP polling in BATCHES
+    Reduces queue size by 48x
+    """
+    db = None
+    try:
+        db = SessionLocal()
+
+        # Get devices with SNMP enabled
+        devices = db.query(StandaloneDevice).filter(
+            StandaloneDevice.enabled == True,
+            StandaloneDevice.snmp_community.isnot(None)
+        ).all()
+
+        if not devices:
+            return
+
+        # Batch into groups of 50
+        BATCH_SIZE = 50
+        batches = []
+
+        for i in range(0, len(devices), BATCH_SIZE):
+            batch = devices[i:i+BATCH_SIZE]
+            device_ids = [str(d.id) for d in batch]
+            if device_ids:
+                batches.append(device_ids)
+
+        logger.info(f"Scheduling {len(batches)} SNMP batch tasks for {len(devices)} devices")
+
+        # Schedule batch tasks
+        for device_ids in batches:
+            poll_devices_snmp_batch.delay(device_ids)
+
+        return {
+            "total_devices": len(devices),
+            "batches_scheduled": len(batches),
+            "batch_size": BATCH_SIZE
+        }
+
+    except Exception as e:
+        logger.error(f"Error in poll_all_devices_snmp_batched: {e}")
+        raise
+    finally:
+        if db:
+            db.close()
