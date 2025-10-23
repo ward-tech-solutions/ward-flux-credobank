@@ -83,6 +83,15 @@ def poll_device_snmp(self, device_id: str):
         device_name = device.name
         snmp_port = device.snmp_port or 161
 
+        # CRITICAL FIX: Extract all data from MonitoringItem objects BEFORE closing session
+        # Otherwise we get DetachedInstanceError when accessing item.oid after session close
+        items_data = []
+        for item in items:
+            items_data.append({
+                "oid": item.oid,
+                "oid_name": item.oid_name,
+            })
+
         # CRITICAL FIX: Close database session BEFORE doing network operations
         # Keeping the session open during SNMP polling causes "idle in transaction"
         db.commit()  # Commit read-only transaction
@@ -96,34 +105,34 @@ def poll_device_snmp(self, device_id: str):
         # Poll each monitoring item
         metrics_to_write = []
 
-        for item in items:
+        for item_data in items_data:
             try:
                 # Run async SNMP GET using asyncio.run() - properly manages event loop lifecycle
                 # This is much more efficient than creating/destroying event loops manually
-                result = asyncio.run(snmp_poller.get(device_ip, item.oid, credentials, port=snmp_port))
+                result = asyncio.run(snmp_poller.get(device_ip, item_data["oid"], credentials, port=snmp_port))
 
                 if result.success and result.value is not None:
                     # Prepare metric for VictoriaMetrics
                     metric = {
-                        "metric_name": _sanitize_metric_name(item.oid_name),
+                        "metric_name": _sanitize_metric_name(item_data["oid_name"]),
                         "value": float(result.value) if result.value_type in ["integer", "gauge", "counter32", "counter64"] else 0,
                         "labels": {
                             "device": device_name or device_ip,
                             "device_id": str(device_id),
                             "ip": device_ip,
-                            "item": item.oid_name,
-                            "oid": item.oid,
+                            "item": item_data["oid_name"],
+                            "oid": item_data["oid"],
                         },
                         "timestamp": utcnow(),
                     }
 
                     metrics_to_write.append(metric)
-                    logger.debug(f"Polled {device_ip} - {item.oid_name}: {result.value}")
+                    logger.debug(f"Polled {device_ip} - {item_data['oid_name']}: {result.value}")
                 else:
-                    logger.warning(f"Failed to poll {device_ip} - {item.oid_name}: {result.error}")
+                    logger.warning(f"Failed to poll {device_ip} - {item_data['oid_name']}: {result.error}")
 
             except Exception as e:
-                logger.error(f"Error polling item {item.oid_name} for device {device_id}: {e}")
+                logger.error(f"Error polling item {item_data['oid_name']} for device {device_id}: {e}")
 
         # Write metrics to VictoriaMetrics in bulk
         if metrics_to_write:
