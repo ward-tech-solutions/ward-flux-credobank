@@ -1,9 +1,11 @@
 """
-Batch processing tasks - Zabbix-style architecture
+Batch processing tasks - Zabbix-style architecture with AUTO-SCALING
 Process multiple devices in parallel within a single task
+Automatically adjusts batch size based on device count
 """
 
 import asyncio
+import math
 from celery import shared_task
 from database import SessionLocal
 from monitoring.models import StandaloneDevice
@@ -16,6 +18,46 @@ logger = logging.getLogger(__name__)
 def utcnow():
     """Get current UTC time with timezone info"""
     return datetime.now(timezone.utc)
+
+
+def calculate_optimal_batch_size(device_count: int, target_batches: int = 10) -> int:
+    """
+    AUTO-SCALING: Calculate optimal batch size to keep task count manageable
+
+    Strategy: Always aim for ~10 batches regardless of device count
+
+    Examples:
+    - 875 devices  → 875/10 = 88 → rounded to 100 (9 batches)
+    - 1,500 devices → 1,500/10 = 150 (10 batches)
+    - 3,000 devices → 3,000/10 = 300 (10 batches)
+    - 10,000 devices → 10,000/10 = 1,000 (10 batches)
+
+    This keeps queue size constant as you scale!
+
+    Args:
+        device_count: Number of devices to process
+        target_batches: Target number of batches (default 10)
+
+    Returns:
+        Optimal batch size (between 50 and 500)
+    """
+    if device_count == 0:
+        return 50
+
+    # Calculate base batch size
+    batch_size = math.ceil(device_count / target_batches)
+
+    # Round to nearest 50 for cleaner batches
+    batch_size = math.ceil(batch_size / 50) * 50
+
+    # Enforce limits: 50-500 devices per batch
+    # Min 50: Ensures we use batch processing even for small deployments
+    # Max 500: Prevents individual batches from taking too long
+    batch_size = max(50, min(batch_size, 500))
+
+    logger.info(f"AUTO-SCALING: {device_count} devices → batch size {batch_size} → ~{math.ceil(device_count/batch_size)} batches")
+
+    return batch_size
 
 
 @shared_task(name="monitoring.tasks.ping_devices_batch")
@@ -173,9 +215,9 @@ def ping_all_devices_batched():
         if not devices:
             return
 
-        # Batch devices into groups of 100 for REAL-TIME performance
-        # 875 devices / 100 = 9 batches (faster processing!)
-        BATCH_SIZE = 100
+        # AUTO-SCALING: Calculate optimal batch size based on device count
+        # This automatically adjusts as you add/remove devices!
+        BATCH_SIZE = calculate_optimal_batch_size(len(devices))
         batches = []
 
         for i in range(0, len(devices), BATCH_SIZE):
@@ -247,8 +289,8 @@ def poll_all_devices_snmp_batched():
         if not devices:
             return
 
-        # Batch into groups of 100 for REAL-TIME performance
-        BATCH_SIZE = 100
+        # AUTO-SCALING: Calculate optimal batch size based on device count
+        BATCH_SIZE = calculate_optimal_batch_size(len(devices))
         batches = []
 
         for i in range(0, len(devices), BATCH_SIZE):
