@@ -83,17 +83,17 @@ echo -e "${GREEN}✅ Containers rebuilt${NC}"
 echo ""
 
 ##############################################################################
-# Step 3: Restart Services
+# Step 3: Recreate Services with New Images
 ##############################################################################
-echo -e "${BLUE}[3/4] Restarting services...${NC}"
+echo -e "${BLUE}[3/4] Recreating services with new images...${NC}"
 
-# Restart only affected services (faster than full restart)
-docker-compose -f "$COMPOSE_FILE" restart api celery-worker
+# Stop old containers and start new ones with rebuilt images
+docker-compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate api celery-worker
 
 echo "Waiting for services to stabilize..."
 sleep 20
 
-echo -e "${GREEN}✅ Services restarted${NC}"
+echo -e "${GREEN}✅ Services recreated with new images${NC}"
 echo ""
 
 ##############################################################################
