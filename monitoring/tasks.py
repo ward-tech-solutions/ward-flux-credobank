@@ -199,6 +199,10 @@ def ping_device(device_id: str, device_ip: str):
         from database import PingResult
         # NOTE: datetime, timezone already imported at module level (line 10)
 
+        # Log execution for debugging (especially for target device)
+        if device_ip == "10.195.83.252":
+            logger.info(f"ping_device: EXECUTING ping for TARGET device {device_ip} (ID: {device_id})")
+
         # Perform ping (optimized: reduced from 5 to 2 pings, timeout from 2s to 1s)
         host = ping(device_ip, count=2, interval=0.2, timeout=1, privileged=False)
 
@@ -349,17 +353,43 @@ def ping_all_devices():
         # Check if monitoring is enabled
         profile = db.query(MonitoringProfile).filter_by(is_active=True).first()
         if not profile:
+            logger.warning("ping_all_devices: No active monitoring profile found")
             return
 
         devices = db.query(StandaloneDevice).filter_by(enabled=True).all()
 
-        logger.info(f"Pinging {len(devices)} standalone devices")
+        logger.info(f"ping_all_devices: Retrieved {len(devices)} enabled devices from database")
 
+        # Log all device IPs for debugging
+        device_ips = [d.ip for d in devices if d.ip]
+        logger.info(f"ping_all_devices: Device IPs to ping: {device_ips}")
+
+        # Check specifically for the problematic device
+        target_ip = "10.195.83.252"
+        target_device = next((d for d in devices if d.ip == target_ip), None)
+        if target_device:
+            logger.info(f"ping_all_devices: Found target device {target_ip} - ID: {target_device.id}, Name: {target_device.name}, Enabled: {target_device.enabled}")
+        else:
+            logger.warning(f"ping_all_devices: Target device {target_ip} NOT FOUND in enabled devices query!")
+            # Check if it exists in database at all
+            all_devices_count = db.query(StandaloneDevice).count()
+            logger.info(f"ping_all_devices: Total devices in database: {all_devices_count}")
+            specific_device = db.query(StandaloneDevice).filter_by(ip=target_ip).first()
+            if specific_device:
+                logger.warning(f"ping_all_devices: Device {target_ip} exists but enabled={specific_device.enabled}")
+            else:
+                logger.error(f"ping_all_devices: Device {target_ip} does NOT exist in database!")
+
+        scheduled_count = 0
         for device in devices:
             if device.ip:
                 ping_device.delay(str(device.id), device.ip)
+                scheduled_count += 1
+                if device.ip == target_ip:
+                    logger.info(f"ping_all_devices: Successfully scheduled ping for target device {target_ip}")
 
-        return {"devices_scheduled": len(devices)}
+        logger.info(f"ping_all_devices: Scheduled {scheduled_count} ping tasks")
+        return {"devices_scheduled": scheduled_count}
 
     except Exception as e:
         logger.error(f"Error in ping_all_devices: {e}")
