@@ -75,9 +75,9 @@ export default function Devices() {
 
   // Auto-extract branch/city from hostname when hostname changes
   useEffect(() => {
-    if (addDeviceModalOpen && addDeviceForm.hostname && !addDeviceForm.branch) {
+    if (addDeviceModalOpen && addDeviceForm.hostname) {
       const extractedCity = extractCityFromHostname(addDeviceForm.hostname)
-      if (extractedCity) {
+      if (extractedCity && extractedCity !== addDeviceForm.branch) {
         setAddDeviceForm(prev => ({ ...prev, branch: extractedCity }))
       }
     }
@@ -103,8 +103,9 @@ export default function Devices() {
       city = parts[0]  // Use first part as city
     }
 
-    // Remove numbers: "Batumi1" -> "Batumi"
-    city = city.split('').filter(c => isNaN(parseInt(c))).join('')
+    // Remove numbers: "Batumi1" -> "Batumi", "Kabali99" -> "Kabali"
+    // Use regex to remove all digits
+    city = city.replace(/\d+/g, '')
 
     return city.trim()
   }
