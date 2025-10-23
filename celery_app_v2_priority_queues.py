@@ -142,17 +142,17 @@ app.conf.beat_schedule = {
         'schedule': 60.0,  # Every 60 seconds
     },
 
-    # Ping all devices every 30 seconds (CRITICAL - user requirement)
-    # OPTIMIZED: Uses batch processing (18 tasks instead of 1,750)
+    # Ping all devices every 10 seconds (NEAR REAL-TIME!)
+    # OPTIMIZED: Uses batch processing (9 batches × 100 devices = 54 tasks/min)
     'ping-all-devices': {
         'task': 'monitoring.tasks.ping_all_devices_batched',
-        'schedule': 30.0,  # Every 30 seconds (CRITICAL for downtime tracking)
+        'schedule': 10.0,  # Every 10 seconds (NEAR REAL-TIME downtime detection!)
     },
 
-    # 🚨 PRODUCTION ALERT ENGINE - Evaluate alert rules every 30 seconds (MATCHES ZABBIX)
+    # 🚨 PRODUCTION ALERT ENGINE - Evaluate alert rules every 10 seconds (REAL-TIME!)
     'evaluate-alert-rules': {
         'task': 'monitoring.tasks.evaluate_alert_rules',
-        'schedule': 30.0,  # Every 30 seconds (CHANGED FROM 60s - user requirement)
+        'schedule': 10.0,  # Every 10 seconds (REAL-TIME alerting!)
         'options': {'priority': 10}  # Highest priority
     },
 

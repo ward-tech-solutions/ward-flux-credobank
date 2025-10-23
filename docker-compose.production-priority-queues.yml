@@ -113,12 +113,13 @@ services:
   # ===========================================================================
 
   # HIGH PRIORITY: Alert Evaluation Worker (always runs immediately)
+  # REAL-TIME: Evaluates every 10 seconds
   celery-worker-alerts:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: wardops-worker-alerts-prod
-    command: celery -A celery_app worker --loglevel=info --concurrency=4 -Q alerts --prefetch-multiplier=1
+    command: celery -A celery_app worker --loglevel=info --concurrency=6 -Q alerts --prefetch-multiplier=1
     environment:
       DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
       REDIS_URL: redis://:redispass@redis:6379/0
@@ -140,13 +141,13 @@ services:
     restart: unless-stopped
 
   # MEDIUM PRIORITY: Ping Monitoring Worker (real-time device status)
-  # BATCH PROCESSING: 18 batch tasks instead of 1,750 individual tasks!
+  # NEAR REAL-TIME: 9 batches every 10 seconds (54 tasks/min)
   celery-worker-monitoring:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: wardops-worker-monitoring-prod
-    command: celery -A celery_app worker --loglevel=info --concurrency=10 -Q monitoring --max-tasks-per-child=1000
+    command: celery -A celery_app worker --loglevel=info --concurrency=15 -Q monitoring --max-tasks-per-child=1000
     environment:
       DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
       REDIS_URL: redis://:redispass@redis:6379/0

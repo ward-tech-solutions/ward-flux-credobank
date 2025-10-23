@@ -173,8 +173,9 @@ def ping_all_devices_batched():
         if not devices:
             return
 
-        # Batch devices into groups of 50
-        BATCH_SIZE = 50
+        # Batch devices into groups of 100 for REAL-TIME performance
+        # 875 devices / 100 = 9 batches (faster processing!)
+        BATCH_SIZE = 100
         batches = []
 
         for i in range(0, len(devices), BATCH_SIZE):
@@ -246,8 +247,8 @@ def poll_all_devices_snmp_batched():
         if not devices:
             return
 
-        # Batch into groups of 50
-        BATCH_SIZE = 50
+        # Batch into groups of 100 for REAL-TIME performance
+        BATCH_SIZE = 100
         batches = []
 
         for i in range(0, len(devices), BATCH_SIZE):
