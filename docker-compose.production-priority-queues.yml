@@ -1,0 +1,236 @@
+version: '3.8'
+
+# Production Setup with Priority Queue Architecture
+# ROBUST SOLUTION - Separate workers for different priority tasks
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: wardops-postgres-prod
+    environment:
+      POSTGRES_USER: ward_admin
+      POSTGRES_PASSWORD: ward_admin_password
+      POSTGRES_DB: ward_ops
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ward_admin"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: wardops-redis-prod
+    command: redis-server --requirepass redispass --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: wardops-victoriametrics-prod
+    ports:
+      - "8428:8428"
+    volumes:
+      - victoriametrics_prod_data:/victoria-metrics-data
+    command:
+      - '--storageDataPath=/victoria-metrics-data'
+      - '--httpListenAddr=:8428'
+      - '--retentionPeriod=12'
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wardops-api-prod
+    environment:
+      DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
+      REDIS_URL: redis://:redispass@redis:6379/0
+      VICTORIA_URL: http://victoriametrics:8428
+      DEFAULT_ADMIN_PASSWORD: admin123
+      SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ENVIRONMENT: production
+      MONITORING_MODE: snmp_only
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      victoriametrics:
+        condition: service_started
+    volumes:
+      - ./logs:/app/logs
+      - api_prod_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # ===========================================================================
+  # CELERY BEAT - Task Scheduler (Only 1 instance needed)
+  # ===========================================================================
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wardops-beat-prod
+    command: celery -A celery_app beat --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
+      REDIS_URL: redis://:redispass@redis:6379/0
+      VICTORIA_URL: http://victoriametrics:8428
+      SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ENVIRONMENT: production
+      MONITORING_MODE: snmp_only
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # ===========================================================================
+  # PRIORITY QUEUE WORKERS - Separate workers for different task types
+  # ===========================================================================
+
+  # HIGH PRIORITY: Alert Evaluation Worker (always runs immediately)
+  celery-worker-alerts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wardops-worker-alerts-prod
+    command: celery -A celery_app worker --loglevel=info --concurrency=4 -Q alerts --prefetch-multiplier=1
+    environment:
+      DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
+      REDIS_URL: redis://:redispass@redis:6379/0
+      VICTORIA_URL: http://victoriametrics:8428
+      SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ENVIRONMENT: production
+      MONITORING_MODE: snmp_only
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A celery_app inspect ping -d celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # MEDIUM PRIORITY: Ping Monitoring Worker (real-time device status)
+  celery-worker-monitoring:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wardops-worker-monitoring-prod
+    command: celery -A celery_app worker --loglevel=info --concurrency=50 -Q monitoring --max-tasks-per-child=1000
+    environment:
+      DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
+      REDIS_URL: redis://:redispass@redis:6379/0
+      VICTORIA_URL: http://victoriametrics:8428
+      SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ENVIRONMENT: production
+      MONITORING_MODE: snmp_only
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A celery_app inspect ping -d celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # LOW PRIORITY: SNMP Polling Worker (metrics collection, can be delayed)
+  celery-worker-snmp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wardops-worker-snmp-prod
+    command: celery -A celery_app worker --loglevel=info --concurrency=30 -Q snmp --max-tasks-per-child=500
+    environment:
+      DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
+      REDIS_URL: redis://:redispass@redis:6379/0
+      VICTORIA_URL: http://victoriametrics:8428
+      SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ENVIRONMENT: production
+      MONITORING_MODE: snmp_only
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A celery_app inspect ping -d celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # BACKGROUND: Maintenance Worker (cleanup, reports, etc.)
+  celery-worker-maintenance:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wardops-worker-maintenance-prod
+    command: celery -A celery_app worker --loglevel=info --concurrency=2 -Q maintenance
+    environment:
+      DATABASE_URL: postgresql://ward_admin:ward_admin_password@postgres:5432/ward_ops
+      REDIS_URL: redis://:redispass@redis:6379/0
+      VICTORIA_URL: http://victoriametrics:8428
+      SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ENVIRONMENT: production
+      MONITORING_MODE: snmp_only
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wardops-frontend-prod
+    environment:
+      VITE_API_URL: http://localhost:5001
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+  victoriametrics_prod_data:
+  api_prod_data:
