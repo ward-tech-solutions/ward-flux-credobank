@@ -53,7 +53,14 @@ echo ""
 echo -e "${BLUE}[1/5] Flushing Redis cache (will free ~6GB)...${NC}"
 echo ""
 
-docker exec wardops-redis-prod redis-cli -a redispass FLUSHDB
+# Try without password first, then with password
+if docker exec wardops-redis-prod redis-cli PING 2>/dev/null | grep -q PONG; then
+    echo "Redis has no auth - flushing without password..."
+    docker exec wardops-redis-prod redis-cli FLUSHDB
+else
+    echo "Redis requires auth - flushing with password..."
+    docker exec wardops-redis-prod redis-cli -a redispass FLUSHDB 2>&1 | grep -v "Warning: Using a password"
+fi
 
 echo ""
 echo -e "${GREEN}✅ Redis cache flushed${NC}"
@@ -65,7 +72,12 @@ echo ""
 echo -e "${BLUE}[2/5] Checking Redis memory after flush...${NC}"
 echo ""
 
-docker exec wardops-redis-prod redis-cli -a redispass INFO memory | grep -E "used_memory_human|used_memory_peak_human"
+# Check memory (with or without auth)
+if docker exec wardops-redis-prod redis-cli PING 2>/dev/null | grep -q PONG; then
+    docker exec wardops-redis-prod redis-cli INFO memory | grep -E "used_memory_human|used_memory_peak_human"
+else
+    docker exec wardops-redis-prod redis-cli -a redispass INFO memory 2>&1 | grep -E "used_memory_human|used_memory_peak_human"
+fi
 
 echo ""
 REDIS_MEM_AFTER=$(docker stats --no-stream --format "{{.MemUsage}}" wardops-redis-prod | awk '{print $1}')
@@ -142,7 +154,7 @@ echo "Watch memory usage:"
 echo "  watch -n 5 'docker stats --no-stream --format \"table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}\"'"
 echo ""
 echo "Check Redis memory growth:"
-echo "  docker exec wardops-redis-prod redis-cli -a redispass INFO memory | grep used_memory_human"
+echo "  docker exec wardops-redis-prod redis-cli INFO memory | grep used_memory_human"
 echo ""
 echo "Check worker logs:"
 echo "  docker logs wardops-worker-prod -f | grep -E '(ping|error)'"
