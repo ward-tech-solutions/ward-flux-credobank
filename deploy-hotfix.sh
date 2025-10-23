@@ -87,8 +87,12 @@ echo ""
 ##############################################################################
 echo -e "${BLUE}[3/4] Recreating services with new images...${NC}"
 
-# Stop old containers and start new ones with rebuilt images
-docker-compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate api celery-worker
+# Stop and remove old containers
+docker-compose -f "$COMPOSE_FILE" stop api celery-worker
+docker-compose -f "$COMPOSE_FILE" rm -f api celery-worker
+
+# Start new containers with rebuilt images
+docker-compose -f "$COMPOSE_FILE" up -d api celery-worker
 
 echo "Waiting for services to stabilize..."
 sleep 20
