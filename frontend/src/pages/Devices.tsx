@@ -58,14 +58,30 @@ export default function Devices() {
   // Add Device modal states
   const [addDeviceModalOpen, setAddDeviceModalOpen] = useState(false)
   const [addDeviceForm, setAddDeviceForm] = useState({
-    hostname: '',
+    name: '',
     ip: '',
+    hostname: '',
+    vendor: '',
+    device_type: '',
+    model: '',
+    location: '',
+    description: '',
     region: '',
     branch: '',
     snmp_community: '',
     snmp_version: '2c',
   })
   const [addingDevice, setAddingDevice] = useState(false)
+
+  // Auto-extract branch/city from hostname when hostname changes
+  useEffect(() => {
+    if (addDeviceModalOpen && addDeviceForm.hostname && !addDeviceForm.branch) {
+      const extractedCity = extractCityFromHostname(addDeviceForm.hostname)
+      if (extractedCity) {
+        setAddDeviceForm(prev => ({ ...prev, branch: extractedCity }))
+      }
+    }
+  }, [addDeviceForm.hostname, addDeviceModalOpen])
 
   // Helper function to extract city from hostname
   const extractCityFromHostname = (hostname: string): string => {
@@ -246,8 +262,8 @@ export default function Devices() {
   }
 
   const handleAddDevice = async () => {
-    if (!addDeviceForm.hostname || !addDeviceForm.ip) {
-      toast.error('Please fill in all required fields')
+    if (!addDeviceForm.name || !addDeviceForm.ip) {
+      toast.error('Please fill in Device Name and IP Address')
       return
     }
 
@@ -255,11 +271,16 @@ export default function Devices() {
     try {
       // Call standalone API
       await devicesAPI.createStandalone({
-        name: addDeviceForm.hostname,
+        name: addDeviceForm.name,
         ip: addDeviceForm.ip,
         hostname: addDeviceForm.hostname,
-        location: addDeviceForm.region,
+        vendor: addDeviceForm.vendor || undefined,
+        device_type: addDeviceForm.device_type || undefined,
+        model: addDeviceForm.model || undefined,
+        location: addDeviceForm.location || addDeviceForm.region,
+        description: addDeviceForm.description || undefined,
         custom_fields: {
+          region: addDeviceForm.region,
           branch: addDeviceForm.branch,
           snmp_community: addDeviceForm.snmp_community,
           snmp_version: addDeviceForm.snmp_version,
@@ -269,8 +290,14 @@ export default function Devices() {
 
       setAddDeviceModalOpen(false)
       setAddDeviceForm({
-        hostname: '',
+        name: '',
         ip: '',
+        hostname: '',
+        vendor: '',
+        device_type: '',
+        model: '',
+        location: '',
+        description: '',
         region: '',
         branch: '',
         snmp_community: '',
@@ -290,8 +317,14 @@ export default function Devices() {
   const handleAddDeviceModalClose = () => {
     setAddDeviceModalOpen(false)
     setAddDeviceForm({
-      hostname: '',
+      name: '',
       ip: '',
+      hostname: '',
+      vendor: '',
+      device_type: '',
+      model: '',
+      location: '',
+      description: '',
       region: '',
       branch: '',
       snmp_community: '',
@@ -932,12 +965,12 @@ export default function Devices() {
                   <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Basic Information</h3>
                 </div>
 
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
-                    label="Hostname"
-                    value={addDeviceForm.hostname}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, hostname: e.target.value })}
-                    placeholder="Enter device hostname"
+                    label="Device Name"
+                    value={addDeviceForm.name}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, name: e.target.value })}
+                    placeholder="e.g., Kabali - NVR - 10.10.10.10"
                     required
                   />
 
@@ -945,9 +978,46 @@ export default function Devices() {
                     label="IP Address"
                     value={addDeviceForm.ip}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, ip: e.target.value })}
-                    placeholder="192.168.1.1"
+                    placeholder="10.10.10.10"
                     required
                   />
+
+                  <Input
+                    label="Hostname"
+                    value={addDeviceForm.hostname}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, hostname: e.target.value })}
+                    placeholder="e.g., Kabali-NVR-10.10.10.10"
+                  />
+
+                  <Input
+                    label="Device Type"
+                    value={addDeviceForm.device_type}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, device_type: e.target.value })}
+                    placeholder="e.g., Biostar, NVR, ATM"
+                  />
+
+                  <Input
+                    label="Vendor"
+                    value={addDeviceForm.vendor}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, vendor: e.target.value })}
+                    placeholder="e.g., Cisco, Fortinet"
+                  />
+
+                  <Input
+                    label="Model"
+                    value={addDeviceForm.model}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, model: e.target.value })}
+                    placeholder="Device model"
+                  />
+
+                  <div className="md:col-span-2">
+                    <Input
+                      label="Physical Location"
+                      value={addDeviceForm.location}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddDeviceForm({ ...addDeviceForm, location: e.target.value })}
+                      placeholder="Physical location"
+                    />
+                  </div>
                 </div>
               </div>
 
