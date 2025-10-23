@@ -2,6 +2,16 @@
 """
 Diagnostic script to investigate device status mismatch issue
 Specifically for Kharagauli device showing UP when it was DOWN
+
+USAGE:
+  # From inside Docker container:
+  docker exec wardops-api-prod python3 /app/diagnose_device_status.py khargauli
+
+  # Or use the wrapper script:
+  ./diagnose_device_status.sh khargauli
+
+  # For other devices:
+  ./diagnose_device_status.sh "device-name-pattern"
 """
 
 import sys

@@ -109,8 +109,13 @@ User observed that device "Kharagauli" was actually DOWN (not responding), but t
 ### Step 1: Run Diagnostic Script
 
 ```bash
-cd /home/wardops/ward-ops-credobank
-python3 diagnose_device_status.py khargauli
+cd /home/wardops/ward-flux-credobank
+
+# Option 1: Use wrapper script (recommended)
+./diagnose_device_status.sh khargauli
+
+# Option 2: Run directly in Docker container
+docker exec wardops-api-prod python3 /app/diagnose_device_status.py khargauli
 ```
 
 **What it checks:**
