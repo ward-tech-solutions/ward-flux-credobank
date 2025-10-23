@@ -21,8 +21,8 @@ from datetime import datetime, timezone
 # Add project root to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from database import SessionLocal
-from models import StandaloneDevice, PingResult
+from database import SessionLocal, PingResult
+from monitoring.models import StandaloneDevice
 from sqlalchemy import func, desc
 
 
