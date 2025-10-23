@@ -66,13 +66,33 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
 @router.post("/auth/register", response_model=UserResponse)
 async def register(user_data: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     """Register new user (admin only)"""
+    import json
+
     if get_user_by_username(db, user_data.username):
         raise HTTPException(status_code=400, detail="Username already registered")
     if get_user_by_email(db, user_data.email):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user = create_user(db, user_data)
-    return user
+
+    # Ensure regions is properly serialized as JSON string if it's a list
+    regions_value = user.regions
+    if isinstance(regions_value, list):
+        regions_value = json.dumps(regions_value)
+
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        region=user.region,
+        regions=regions_value,
+        branches=user.branches,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        last_login=user.last_login,
+    )
 
 
 @router.get("/auth/me", response_model=UserResponse)
