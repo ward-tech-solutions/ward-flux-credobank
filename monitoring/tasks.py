@@ -188,7 +188,7 @@ def ping_device(device_id: str, device_ip: str):
     try:
         from icmplib import ping
         from database import PingResult
-        from datetime import datetime
+        # NOTE: datetime, timezone already imported at module level (line 10)
 
         # Perform ping (optimized: reduced from 5 to 2 pings, timeout from 2s to 1s)
         host = ping(device_ip, count=2, interval=0.2, timeout=1, privileged=False)
