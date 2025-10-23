@@ -407,7 +407,7 @@ def _store_ping_result(
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.error(f"Failed to save ping record for {device_ip}: {e}")
+        logger.error(f"Failed to save ping record for {ip}: {e}")
 
 
 @router.get("/{hostid}/history")

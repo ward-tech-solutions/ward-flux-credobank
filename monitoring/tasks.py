@@ -62,7 +62,6 @@ def poll_device_snmp(self, device_id: str):
 
         # Get device monitoring items
         items = db.query(MonitoringItem).filter_by(device_id=device_id, enabled=True).all()
-        db.commit()  # Commit read-only transaction to prevent idle state
 
         if not items:
             logger.warning(f"No monitoring items found for device {device_id}")
@@ -81,9 +80,16 @@ def poll_device_snmp(self, device_id: str):
 
         # Get device info
         device_ip = device.ip
+        device_name = device.name
         snmp_port = device.snmp_port or 161
 
-        # Initialize clients
+        # CRITICAL FIX: Close database session BEFORE doing network operations
+        # Keeping the session open during SNMP polling causes "idle in transaction"
+        db.commit()  # Commit read-only transaction
+        db.close()   # Close session immediately - we have all the data we need
+        db = None    # Prevent double-close in finally block
+
+        # Initialize clients (AFTER closing database)
         snmp_poller = get_snmp_poller()
         vm_client = get_victoria_client()
 
@@ -102,7 +108,7 @@ def poll_device_snmp(self, device_id: str):
                         "metric_name": _sanitize_metric_name(item.oid_name),
                         "value": float(result.value) if result.value_type in ["integer", "gauge", "counter32", "counter64"] else 0,
                         "labels": {
-                            "device": device.name or device_ip,
+                            "device": device_name or device_ip,
                             "device_id": str(device_id),
                             "ip": device_ip,
                             "item": item.oid_name,
