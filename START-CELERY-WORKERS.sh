@@ -65,11 +65,11 @@ docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "(celery|NAME)"
 
 echo ""
 echo "Celery worker logs (last 20 lines):"
-docker logs wardops-celery-worker --tail 20 2>&1 | tail -20
+docker logs wardops-worker-prod --tail 20 2>&1 | tail -20
 
 echo ""
 echo "Celery beat logs (last 20 lines):"
-docker logs wardops-celery-beat --tail 20 2>&1 | tail -20
+docker logs wardops-beat-prod --tail 20 2>&1 | tail -20
 
 echo ""
 
@@ -84,7 +84,7 @@ sleep 35
 
 echo ""
 echo "Checking for recent ping activity in worker logs:"
-docker logs wardops-celery-worker --tail 50 2>&1 | grep -i "ping" | tail -10 || echo "No ping activity yet (may need more time)"
+docker logs wardops-worker-prod --tail 50 2>&1 | grep -i "ping" | tail -10 || echo "No ping activity yet (may need more time)"
 
 echo ""
 echo "Checking latest ping results in database:"
@@ -120,7 +120,7 @@ echo ""
 echo -e "${BLUE}🔍 Monitor Next 5 Minutes:${NC}"
 echo ""
 echo "1. Watch celery logs:"
-echo "   docker logs wardops-celery-worker -f | grep ping"
+echo "   docker logs wardops-worker-prod -f | grep ping"
 echo ""
 echo "2. Check ping results are updating:"
 echo "   watch -n 5 'docker exec wardops-postgres-prod psql -U ward_admin -d ward_ops -c \"SELECT device_name, timestamp, NOW() - timestamp AS age FROM ping_results ORDER BY timestamp DESC LIMIT 5;\"'"

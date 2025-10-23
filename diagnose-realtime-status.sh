@@ -36,19 +36,19 @@ echo ""
 
 # Check if celery-worker container is running
 echo "Celery Worker Status:"
-docker ps --format "table {{.Names}}\t{{.Status}}" | grep celery-worker || echo -e "${RED}❌ Celery worker not running!${NC}"
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "worker.*prod" || echo -e "${RED}❌ Celery worker not running!${NC}"
 
 echo ""
 echo "Celery Beat Status:"
-docker ps --format "table {{.Names}}\t{{.Status}}" | grep celery-beat || echo -e "${RED}❌ Celery beat not running!${NC}"
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "beat.*prod" || echo -e "${RED}❌ Celery beat not running!${NC}"
 
 echo ""
 echo "Active Celery Workers:"
-docker exec wardops-celery-worker celery -A celery_app inspect active 2>/dev/null || echo -e "${YELLOW}⚠️  Could not inspect celery workers${NC}"
+docker exec wardops-worker-prod celery -A celery_app inspect active 2>/dev/null || echo -e "${YELLOW}⚠️  Could not inspect celery workers${NC}"
 
 echo ""
 echo "Celery Queue Status:"
-docker exec wardops-celery-worker celery -A celery_app inspect stats 2>/dev/null | grep -E "total|pool" || echo -e "${YELLOW}⚠️  Could not get celery stats${NC}"
+docker exec wardops-worker-prod celery -A celery_app inspect stats 2>/dev/null | grep -E "total|pool" || echo -e "${YELLOW}⚠️  Could not get celery stats${NC}"
 
 echo ""
 echo -e "${GREEN}✅ Section 1 complete${NC}"
@@ -61,11 +61,11 @@ echo -e "${BLUE}[2/7] Checking Ping Task Schedule...${NC}"
 echo ""
 
 echo "Scheduled tasks (beat_schedule):"
-docker exec wardops-celery-beat celery -A celery_app inspect scheduled 2>/dev/null | grep -A 5 "ping_all_devices" || echo -e "${YELLOW}⚠️  Could not get scheduled tasks${NC}"
+docker exec wardops-beat-prod celery -A celery_app inspect scheduled 2>/dev/null | grep -A 5 "ping_all_devices" || echo -e "${YELLOW}⚠️  Could not get scheduled tasks${NC}"
 
 echo ""
 echo "Recent celery logs (ping tasks):"
-docker logs wardops-celery-worker --tail 50 2>&1 | grep -i "ping" | tail -20 || echo "No recent ping tasks found"
+docker logs wardops-worker-prod --tail 50 2>&1 | grep -i "ping" | tail -20 || echo "No recent ping tasks found"
 
 echo ""
 echo -e "${GREEN}✅ Section 2 complete${NC}"
