@@ -67,9 +67,10 @@ class RegionalManagerSimulator:
             self.log("Logging in...")
             start = time.time()
 
+            # API uses OAuth2PasswordRequestForm, expects form data not JSON
             response = self.session.post(
                 f"{self.base_url}/api/v1/auth/login",
-                json={"username": self.username, "password": self.password},
+                data={"username": self.username, "password": self.password},
                 timeout=10
             )
 
