@@ -204,7 +204,7 @@ class AlertHistory(Base):
     __tablename__ = "alert_history"
 
     id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    rule_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("alert_rules.id"), nullable=False)
+    rule_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("alert_rules.id"), nullable=True)  # Nullable for ping-based alerts
     device_id = Column(SQLAlchemyUUID(as_uuid=True), index=True)
     rule_name = Column(String(200))
 
