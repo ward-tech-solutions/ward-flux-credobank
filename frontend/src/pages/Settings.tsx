@@ -9,9 +9,10 @@ import { LoadingSpinner } from '@/components/ui/Loading'
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/Modal'
 import Switch from '@/components/ui/Switch'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { Server, Bell, Mail, Shield, Users as UsersIcon, Plus, Edit2, Trash2, Search, Eye, EyeOff, Wrench, Save, MapPin, ToggleLeft, Scan, Map as MapIcon, Network, Stethoscope, BarChart3 } from 'lucide-react'
+import { Server, Bell, Mail, Shield, Users as UsersIcon, Plus, Edit2, Trash2, Search, Eye, EyeOff, Wrench, Save, MapPin, ToggleLeft, Scan, Map as MapIcon, Network, Stethoscope, BarChart3, AlertCircle, X } from 'lucide-react'
 import api, { authAPI } from '@/services/api'
 import { useFeatures } from '@/contexts/FeatureContext'
+import axios from 'axios'
 
 interface User {
   id: string | number
@@ -88,6 +89,7 @@ export default function Settings() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [errorMessage, setErrorMessage] = useState('')
   const [userForm, setUserForm] = useState({
     username: '',
     email: '',
@@ -126,6 +128,7 @@ export default function Settings() {
 
   const handleAddUser = async () => {
     try {
+      setErrorMessage('')
       const userData = {
         ...userForm,
         regions: userForm.regions.length > 0 ? JSON.stringify(userForm.regions) : null
@@ -136,12 +139,18 @@ export default function Settings() {
       loadUsers()
     } catch (error) {
       console.error('Failed to add user:', error)
+      if (axios.isAxiosError(error) && error.response?.data?.detail) {
+        setErrorMessage(error.response.data.detail)
+      } else {
+        setErrorMessage('Failed to create user. Please try again.')
+      }
     }
   }
 
   const handleEditUser = async () => {
     if (!selectedUser) return
     try {
+      setErrorMessage('')
       const updateData = userForm.password
         ? {
             ...userForm,
@@ -161,6 +170,11 @@ export default function Settings() {
       loadUsers()
     } catch (error) {
       console.error('Failed to update user:', error)
+      if (axios.isAxiosError(error) && error.response?.data?.detail) {
+        setErrorMessage(error.response.data.detail)
+      } else {
+        setErrorMessage('Failed to update user. Please try again.')
+      }
     }
   }
 
@@ -183,6 +197,7 @@ export default function Settings() {
       role: 'technician',
       regions: [],
     })
+    setErrorMessage('')
   }
 
   const openEditModal = (user: User) => {
@@ -721,6 +736,23 @@ export default function Settings() {
             </ModalHeader>
             <ModalContent className="bg-gray-50/50 dark:bg-gray-900/20">
               <div className="space-y-6">
+                {/* Error Alert */}
+                {errorMessage && (
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                        {errorMessage}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setErrorMessage('')}
+                      className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
                 {/* Basic Information Section */}
                 <div className="bg-white dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-700 space-y-4">
                   <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
@@ -845,6 +877,23 @@ export default function Settings() {
             </ModalHeader>
             <ModalContent className="bg-gray-50/50 dark:bg-gray-900/20">
               <div className="space-y-6">
+                {/* Error Alert */}
+                {errorMessage && (
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                        {errorMessage}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setErrorMessage('')}
+                      className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
                 {/* Basic Information Section */}
                 <div className="bg-white dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-700 space-y-4">
                   <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
