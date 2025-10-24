@@ -113,6 +113,10 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
             current_state = result.is_alive
             previous_state = device.down_since is None  # If down_since is None, device was UP
 
+            # DEBUG: Log state for devices that are DOWN
+            if not current_state and device.name == "Tbilisi SW Test":
+                logger.info(f"DEBUG {device.name}: current={current_state}, previous={previous_state}, down_since={device.down_since}")
+
             # Save ping result
             ping_result = PingResult(
                 device_ip=device_ip,
@@ -189,7 +193,7 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
                 device.down_since = None
 
             elif not current_state and previous_state:
-                # Device went DOWN
+                # Device went DOWN (was UP, now DOWN)
                 device.down_since = utcnow()
                 logger.warning(f"❌ Device {device.name} ({device_ip}) went DOWN")
 
@@ -209,8 +213,11 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
                 db.add(new_alert)
 
             elif not current_state and device.down_since is None:
-                # Device is DOWN but down_since not set
+                # Device is DOWN but down_since not set (edge case - should be rare)
                 device.down_since = utcnow()
+                logger.warning(f"⚠️  Device {device.name} ({device_ip}) is DOWN but down_since was NULL - setting timestamp")
+
+            # If device is DOWN and down_since already set, preserve the timestamp (don't reset it)
 
         db.commit()
         logger.info(f"Batch processed {ping_count} devices")
