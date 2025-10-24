@@ -127,14 +127,14 @@ async def monitor_device_changes(_app: FastAPI):
             try:
                 devices = session.query(StandaloneDevice).all()
 
-                ping_lookup: Dict[str, PingResult] = {}
-                for ping in (
-                    session.query(PingResult)
-                    .order_by(PingResult.device_ip, PingResult.timestamp.desc())
-                    .all()
-                ):
-                    if ping.device_ip not in ping_lookup:
-                        ping_lookup[ping.device_ip] = ping
+                # PHASE 3: Get latest ping from VictoriaMetrics instead of PostgreSQL
+                device_ips = [d.ip for d in devices if d.ip]
+                try:
+                    from utils.victoriametrics_client import vm_client
+                    ping_lookup = vm_client.get_latest_ping_for_devices(device_ips)
+                except Exception as e:
+                    logger.error(f"WebSocket: Failed to query VictoriaMetrics: {e}")
+                    ping_lookup = {}
 
                 changes = []
 
@@ -145,9 +145,11 @@ async def monitor_device_changes(_app: FastAPI):
                         continue
                     ping = ping_lookup.get(device.ip)
                     if ping:
-                        current_status = "Up" if ping.is_reachable else "Down"
+                        # PHASE 3: ping is now a dict from VictoriaMetrics
+                        current_status = "Up" if ping.get("is_reachable") else "Down"
                     else:
-                        current_status = (device.custom_fields or {}).get("ping_status", "Unknown")
+                        # PHASE 3: Fallback to device.down_since if VM query failed
+                        current_status = "Down" if device.down_since else "Up"
 
                     if device_id in last_state:
                         if last_state[device_id] != current_status:
