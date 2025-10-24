@@ -184,7 +184,7 @@ class StandaloneDeviceResponse(BaseModel):
             'ping_status': ping_status,
             'ping_response_time': ping_response_time,
             'last_ping_timestamp': last_ping_timestamp,
-            'down_since': obj.down_since.isoformat() if obj.down_since else None,
+            'down_since': obj.down_since.isoformat() + 'Z' if obj.down_since else None,
             'problems': problems,
             'ssh_port': obj.ssh_port or 22,
             'ssh_username': obj.ssh_username,
