@@ -6,11 +6,13 @@ Automatically adjusts batch size based on device count
 
 import asyncio
 import math
+import time
 from celery import shared_task
 from database import SessionLocal
 from monitoring.models import StandaloneDevice
 from datetime import datetime, timezone
 import logging
+from utils.victoriametrics_client import vm_client  # PHASE 2: VictoriaMetrics integration
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +134,51 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
             )
             db.add(ping_result)
             ping_count += 1
+
+            # PHASE 2: Write ping data to VictoriaMetrics
+            try:
+                base_labels = {
+                    "device_id": str(device_id),
+                    "device_ip": device_ip,
+                    "device_name": device.name if device else "Unknown",
+                }
+
+                # Add optional labels
+                if device:
+                    if hasattr(device, 'branch') and device.branch:
+                        base_labels["branch"] = device.branch
+                    if hasattr(device, 'region') and device.region:
+                        base_labels["region"] = device.region
+                    if hasattr(device, 'device_type') and device.device_type:
+                        base_labels["device_type"] = device.device_type
+
+                # Write metrics to VictoriaMetrics
+                metrics = [
+                    {
+                        "metric": "device_ping_status",
+                        "value": 1 if result.is_alive else 0,
+                        "labels": base_labels.copy(),
+                        "timestamp": int(time.time())
+                    },
+                    {
+                        "metric": "device_ping_rtt_ms",
+                        "value": result.avg_rtt if result.avg_rtt else 0,
+                        "labels": base_labels.copy(),
+                        "timestamp": int(time.time())
+                    },
+                    {
+                        "metric": "device_ping_packet_loss",
+                        "value": result.packet_loss,
+                        "labels": base_labels.copy(),
+                        "timestamp": int(time.time())
+                    },
+                ]
+
+                success = vm_client.write_metrics(metrics)
+                if not success:
+                    logger.warning(f"Failed to write ping metrics to VictoriaMetrics for {device_ip}")
+            except Exception as vm_err:
+                logger.error(f"VictoriaMetrics write failed for {device_ip}: {vm_err}")
 
             # Handle state transitions
             if current_state and not previous_state:
