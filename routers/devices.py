@@ -459,20 +459,27 @@ async def get_device_history(
 
     try:
         from utils.victoriametrics_client import vm_client
+        import asyncio
+        import concurrent.futures
 
-        # Get status history (1=up, 0=down)
-        status_history = vm_client.get_device_status_history(
-            device_id=str(device.id),
-            hours=hours,
-            step="5m"  # 5-minute resolution for smoother graphs
-        )
+        # OPTIMIZATION: Run both VM queries in parallel using thread pool
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            status_future = executor.submit(
+                vm_client.get_device_status_history,
+                str(device.id),
+                hours,
+                "5m"
+            )
+            rtt_future = executor.submit(
+                vm_client.get_device_rtt_history,
+                str(device.id),
+                hours,
+                "5m"
+            )
 
-        # Get RTT history
-        rtt_history = vm_client.get_device_rtt_history(
-            device_id=str(device.id),
-            hours=hours,
-            step="5m"
-        )
+            # Wait for both queries to complete (runs in parallel)
+            status_history = status_future.result(timeout=5)
+            rtt_history = rtt_future.result(timeout=5)
 
         # Merge status and RTT data by timestamp
         rtt_by_timestamp = {item["timestamp"]: item["rtt_ms"] for item in rtt_history}
