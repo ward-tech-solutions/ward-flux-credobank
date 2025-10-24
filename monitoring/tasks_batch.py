@@ -108,16 +108,10 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
             if not device:
                 continue
 
-            # Get previous state
-            previous_ping = (
-                db.query(PingResult)
-                .filter(PingResult.device_ip == device_ip)
-                .order_by(PingResult.timestamp.desc())
-                .first()
-            )
-
+            # PHASE 4 FIX: Use device.down_since to determine previous state
+            # (can't use ping_results anymore since we stopped writing to PostgreSQL)
             current_state = result.is_alive
-            previous_state = previous_ping.is_reachable if previous_ping else True
+            previous_state = device.down_since is None  # If down_since is None, device was UP
 
             # Save ping result
             ping_result = PingResult(
