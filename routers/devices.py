@@ -448,30 +448,51 @@ async def get_device_history(
     except Exception as e:
         logger.debug(f"Cache read error (non-critical): {e}")
 
-    # Cache miss - query database
+    # Cache miss - query VictoriaMetrics (PHASE 3)
     device = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
     if not device:
         return {"hostid": hostid, "history": [], "time_range": time_range}
 
-    time_map = {"24h": 86400, "7d": 604800, "30d": 2592000}
-    cutoff = datetime.utcfromtimestamp(time.time() - time_map.get(time_range, 86400))
+    # PHASE 3: Query VictoriaMetrics instead of PostgreSQL
+    time_map = {"24h": 24, "7d": 168, "30d": 720}  # Convert to hours
+    hours = time_map.get(time_range, 24)
 
-    ping_rows = (
-        db.query(PingResult)
-        .filter(PingResult.device_ip == device.ip, PingResult.timestamp >= cutoff)
-        .order_by(PingResult.timestamp.desc())
-        .limit(200)
-        .all()
-    )
+    try:
+        from utils.victoriametrics_client import vm_client
 
-    history = [
-        {
-            "clock": int(row.timestamp.timestamp()) if row.timestamp else None,
-            "value": row.avg_rtt_ms or 0,
-            "reachable": row.is_reachable,
-        }
-        for row in ping_rows
-    ]
+        # Get status history (1=up, 0=down)
+        status_history = vm_client.get_device_status_history(
+            device_id=str(device.id),
+            hours=hours,
+            step="5m"  # 5-minute resolution for smoother graphs
+        )
+
+        # Get RTT history
+        rtt_history = vm_client.get_device_rtt_history(
+            device_id=str(device.id),
+            hours=hours,
+            step="5m"
+        )
+
+        # Merge status and RTT data by timestamp
+        rtt_by_timestamp = {item["timestamp"]: item["rtt_ms"] for item in rtt_history}
+
+        history = [
+            {
+                "clock": item["timestamp"],
+                "value": rtt_by_timestamp.get(item["timestamp"], 0),
+                "reachable": item["value"] == 1.0,
+            }
+            for item in status_history
+        ]
+
+        # Sort by timestamp descending and limit to 200 points
+        history = sorted(history, key=lambda x: x["clock"], reverse=True)[:200]
+
+    except Exception as e:
+        logger.error(f"Failed to query VictoriaMetrics for device history: {e}")
+        # Fallback to empty history instead of PostgreSQL
+        history = []
 
     result = {"hostid": hostid, "history": history, "time_range": time_range}
 
