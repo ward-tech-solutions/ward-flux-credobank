@@ -63,12 +63,12 @@ if [ "$ALL_PRESENT" = false ]; then
 fi
 
 # ============================================================================
-# STEP 3: STOP API CONTAINER
+# STEP 3: STOP API CONTAINER (ONLY)
 # ============================================================================
 echo ""
 echo "🛑 Step 3: Stopping API container..."
 
-docker-compose -f docker-compose.production-priority-queues.yml stop api
+docker stop wardops-api-prod
 
 if [ $? -eq 0 ]; then
     echo "✅ API container stopped"
@@ -103,12 +103,16 @@ else
 fi
 
 # ============================================================================
-# STEP 5: START API CONTAINER
+# STEP 5: REMOVE OLD API CONTAINER AND START NEW ONE
 # ============================================================================
 echo ""
-echo "🚀 Step 5: Starting API container..."
+echo "🚀 Step 5: Removing old container and starting new one..."
 
-docker-compose -f docker-compose.production-priority-queues.yml up -d api
+# Remove old container
+docker rm wardops-api-prod 2>/dev/null || true
+
+# Start new container with docker-compose (but only API service)
+docker-compose -f docker-compose.production-priority-queues.yml up -d --no-deps api
 
 if [ $? -eq 0 ]; then
     echo "✅ API container started"
