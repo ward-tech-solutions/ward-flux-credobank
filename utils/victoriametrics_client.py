@@ -534,8 +534,8 @@ class VictoriaMetricsClient:
 
         # PHASE 3 FIX: Batch the queries to avoid URL length limits
         # With 875 devices, a single regex query is too large (HTTP 422)
-        # Process 20 IPs per batch = 44 batches for 875 devices (smaller batches = more reliable)
-        BATCH_SIZE = 20
+        # Process 50 IPs per batch = 18 batches for 875 devices
+        BATCH_SIZE = 50
         all_results = {}
 
         # Split device IPs into batches
