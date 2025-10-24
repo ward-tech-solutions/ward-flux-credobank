@@ -8,7 +8,7 @@ echo ""
 
 # Get admin credentials from docker-compose or use defaults
 ADMIN_USER="admin"
-ADMIN_PASS="admin"  # Change if different
+ADMIN_PASS="admin123"
 
 # Login and get token
 echo "Logging in to API..."
