@@ -508,10 +508,11 @@ class VictoriaMetricsClient:
 
     def get_latest_ping_for_devices(self, device_ips: List[str]) -> Dict[str, Dict[str, Any]]:
         """
-        Get the latest ping results for multiple devices in a single query.
+        Get the latest ping results for multiple devices in batched queries.
         This replaces PostgreSQL _latest_ping_lookup with VictoriaMetrics.
 
         PHASE 3: Optimized bulk query for device list/dashboard APIs
+        PHASE 3 FIX: Batch queries to avoid HTTP 422 (query URL too long)
 
         Args:
             device_ips: List of device IP addresses
@@ -531,57 +532,65 @@ class VictoriaMetricsClient:
         if not device_ips:
             return {}
 
-        # Build regex for device_ip filter (matches any of the provided IPs)
-        # Use regex to avoid query length limits with hundreds of devices
-        ip_regex = "|".join([ip.replace(".", "\\.") for ip in device_ips])
+        # PHASE 3 FIX: Batch the queries to avoid URL length limits
+        # With 875 devices, a single regex query is too large (HTTP 422)
+        # Process 50 IPs per batch = 18 batches for 875 devices
+        BATCH_SIZE = 50
+        all_results = {}
 
-        # Query all 3 ping metrics for the devices
-        queries = {
-            "status": f'device_ping_status{{device_ip=~"{ip_regex}"}}',
-            "rtt": f'device_ping_rtt_ms{{device_ip=~"{ip_regex}"}}',
-            "loss": f'device_ping_packet_loss{{device_ip=~"{ip_regex}"}}'
-        }
+        # Split device IPs into batches
+        for batch_start in range(0, len(device_ips), BATCH_SIZE):
+            batch_ips = device_ips[batch_start:batch_start + BATCH_SIZE]
 
-        results = {}
+            # Build regex for this batch
+            ip_regex = "|".join([ip.replace(".", "\\.") for ip in batch_ips])
 
-        # Execute queries for each metric type
-        for metric_type, query in queries.items():
-            try:
-                result = self.query(query)
-                if result.get("status") == "success":
-                    data = result.get("data", {}).get("result", [])
-                    for item in data:
-                        device_ip = item["metric"].get("device_ip")
-                        if device_ip:
-                            if device_ip not in results:
-                                results[device_ip] = {
-                                    "device_ip": device_ip,
-                                    "device_name": item["metric"].get("device_name", "Unknown"),
-                                    "device_id": item["metric"].get("device_id"),
-                                    "is_reachable": None,
-                                    "avg_rtt_ms": None,
-                                    "packet_loss": None,
-                                    "timestamp": None
-                                }
+            # Query all 3 ping metrics for the batch
+            queries = {
+                "status": f'device_ping_status{{device_ip=~"{ip_regex}"}}',
+                "rtt": f'device_ping_rtt_ms{{device_ip=~"{ip_regex}"}}',
+                "loss": f'device_ping_packet_loss{{device_ip=~"{ip_regex}"}}'
+            }
 
-                            # Parse value and timestamp
-                            value = float(item["value"][1])
-                            timestamp = int(item["value"][0])
+            # Execute queries for each metric type in this batch
+            for metric_type, query in queries.items():
+                try:
+                    result = self.query(query)
+                    if result.get("status") == "success":
+                        data = result.get("data", {}).get("result", [])
+                        for item in data:
+                            device_ip = item["metric"].get("device_ip")
+                            if device_ip:
+                                if device_ip not in all_results:
+                                    all_results[device_ip] = {
+                                        "device_ip": device_ip,
+                                        "device_name": item["metric"].get("device_name", "Unknown"),
+                                        "device_id": item["metric"].get("device_id"),
+                                        "is_reachable": None,
+                                        "avg_rtt_ms": None,
+                                        "packet_loss": None,
+                                        "timestamp": None
+                                    }
 
-                            # Update the appropriate field
-                            if metric_type == "status":
-                                results[device_ip]["is_reachable"] = value == 1.0
-                                results[device_ip]["timestamp"] = timestamp
-                            elif metric_type == "rtt":
-                                results[device_ip]["avg_rtt_ms"] = value
-                            elif metric_type == "loss":
-                                results[device_ip]["packet_loss"] = value
+                                # Parse value and timestamp
+                                value = float(item["value"][1])
+                                timestamp = int(item["value"][0])
 
-            except Exception as e:
-                logger.warning(f"Failed to query {metric_type} for devices: {e}")
-                continue
+                                # Update the appropriate field
+                                if metric_type == "status":
+                                    all_results[device_ip]["is_reachable"] = value == 1.0
+                                    all_results[device_ip]["timestamp"] = timestamp
+                                elif metric_type == "rtt":
+                                    all_results[device_ip]["avg_rtt_ms"] = value
+                                elif metric_type == "loss":
+                                    all_results[device_ip]["packet_loss"] = value
 
-        return results
+                except Exception as e:
+                    logger.warning(f"Failed to query {metric_type} for batch {batch_start}-{batch_start+len(batch_ips)}: {e}")
+                    continue
+
+        logger.info(f"Queried {len(device_ips)} devices in {(len(device_ips) + BATCH_SIZE - 1) // BATCH_SIZE} batches, got {len(all_results)} results")
+        return all_results
 
     def get_stats(self) -> Dict[str, int]:
         """
