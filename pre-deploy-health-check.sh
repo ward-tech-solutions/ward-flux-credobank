@@ -81,7 +81,8 @@ echo ""
 echo -e "${BLUE}[3/5] Checking Redis connectivity...${NC}"
 echo ""
 
-if docker-compose -f "$COMPOSE_FILE" exec -T redis redis-cli PING | grep -q "PONG"; then
+# Redis has authentication with password "redispass"
+if docker-compose -f "$COMPOSE_FILE" exec -T redis redis-cli -a redispass PING 2>/dev/null | grep -q "PONG"; then
     echo -e "  ${GREEN}✅ Redis is accessible${NC}"
 else
     echo -e "  ${RED}❌ Cannot connect to Redis${NC}"
