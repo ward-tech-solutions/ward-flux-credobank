@@ -26,6 +26,8 @@ from monitoring.models import (
     MonitoringMode,
     StandaloneDevice,
 )
+from monitoring.flapping_detector import FlappingDetector
+from monitoring.alert_deduplicator import AlertDeduplicator
 
 logger = logging.getLogger(__name__)
 
@@ -695,6 +697,12 @@ def evaluate_alert_rules(self):
         logger.info(f"Fetched {len(all_recent_pings)} ping results for {len(pings_by_device)} devices")
 
         for device in devices:
+            # FLAPPING DETECTION: Skip alerting if device is flapping
+            if FlappingDetector.should_suppress_alert(device.id, db):
+                logger.warning(f"⚠️  Suppressing alerts for {device.name} - device is FLAPPING")
+                # TODO: Create a single "Device Flapping" alert instead of multiple alerts
+                continue
+
             # Get pings for this device from pre-fetched data
             recent_pings = pings_by_device.get(device.ip, [])
 
@@ -765,6 +773,13 @@ def evaluate_alert_rules(self):
                     )
                     
                     if should_trigger and not existing_alert:
+                        # ALERT DEDUPLICATION: Check if we should suppress this alert
+                        if not AlertDeduplicator.should_create_alert(
+                            device.id, rule.name, rule.severity, db
+                        ):
+                            logger.info(f"Suppressing duplicate alert: {rule.name} for {device.name}")
+                            continue
+
                         # CREATE NEW ALERT
                         new_alert = AlertHistory(
                             id=uuid.uuid4(),
@@ -780,6 +795,12 @@ def evaluate_alert_rules(self):
                             notifications_sent=[],
                         )
                         db.add(new_alert)
+
+                        # Auto-resolve lower-severity duplicate alerts
+                        AlertDeduplicator.resolve_lower_severity_alerts(
+                            device.id, rule.name, rule.severity, db
+                        )
+
                         triggered_count += 1
                         logger.warning(f"🚨 ALERT TRIGGERED: {alert_message}")
                     
