@@ -138,27 +138,47 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
     return history.map((point) => {
       const date = new Date(point.clock * 1000)
 
-      // Format time based on time range
+      // Format time based on time range (using Tbilisi timezone - Asia/Tbilisi / GMT+4)
       let timeFormat = ''
       if (timeRange === '30m' || timeRange === '1h' || timeRange === '3h') {
-        // For short ranges, show HH:MM:SS
-        const hours = date.getHours().toString().padStart(2, '0')
-        const minutes = date.getMinutes().toString().padStart(2, '0')
-        const seconds = date.getSeconds().toString().padStart(2, '0')
-        timeFormat = `${hours}:${minutes}:${seconds}`
+        // For short ranges, show HH:MM:SS in Tbilisi timezone
+        timeFormat = date.toLocaleTimeString('en-GB', {
+          timeZone: 'Asia/Tbilisi',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        })
       } else if (timeRange === '6h' || timeRange === '12h' || timeRange === '24h') {
-        // For medium ranges, show HH:MM
-        const hours = date.getHours().toString().padStart(2, '0')
-        const minutes = date.getMinutes().toString().padStart(2, '0')
-        timeFormat = `${hours}:${minutes}`
+        // For medium ranges, show HH:MM in Tbilisi timezone
+        timeFormat = date.toLocaleTimeString('en-GB', {
+          timeZone: 'Asia/Tbilisi',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        })
       } else if (timeRange === '7d') {
-        // For 7 days, show day and hour
-        const day = date.toLocaleDateString('en-US', { weekday: 'short' })
-        const hours = date.getHours().toString().padStart(2, '0')
+        // For 7 days, show day and hour in Tbilisi timezone
+        const day = date.toLocaleDateString('en-US', {
+          timeZone: 'Asia/Tbilisi',
+          weekday: 'short'
+        })
+        const hours = date.toLocaleTimeString('en-GB', {
+          timeZone: 'Asia/Tbilisi',
+          hour: '2-digit',
+          hour12: false
+        })
         timeFormat = `${day} ${hours}:00`
       } else {
-        const month = date.getMonth() + 1
-        const day = date.getDate()
+        // For 30 days, show MM/DD in Tbilisi timezone
+        const month = date.toLocaleDateString('en-GB', {
+          timeZone: 'Asia/Tbilisi',
+          month: 'numeric'
+        })
+        const day = date.toLocaleDateString('en-GB', {
+          timeZone: 'Asia/Tbilisi',
+          day: 'numeric'
+        })
         timeFormat = `${month}/${day}`
       }
 
