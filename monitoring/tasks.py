@@ -762,12 +762,16 @@ def evaluate_alert_rules(self):
                                 alert_value = f"{packet_loss_pct:.1f}%"
                     
                     # Check if alert already exists
+                    # BUGFIX: Also check rule_name as fallback for old alerts with NULL rule_id
                     existing_alert = (
                         db.query(AlertHistory)
                         .filter(
                             AlertHistory.device_id == device.id,
-                            AlertHistory.rule_id == rule.id,
                             AlertHistory.resolved_at.is_(None)
+                        )
+                        .filter(
+                            (AlertHistory.rule_id == rule.id) |
+                            (AlertHistory.rule_name == rule.name)
                         )
                         .first()
                     )
