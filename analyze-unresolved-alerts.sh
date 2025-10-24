@@ -119,13 +119,21 @@ echo -e "${BLUE}[5/6] Detecting flapping devices (3+ state changes in last hour)
 echo ""
 
 docker-compose -f "$COMPOSE_FILE" exec -T postgres psql -U ward_admin -d ward_ops -c \
-  "WITH state_changes AS (
+  "WITH ping_with_changes AS (
      SELECT
        device_ip,
-       COUNT(*) FILTER (WHERE is_reachable != LAG(is_reachable) OVER (PARTITION BY device_ip ORDER BY timestamp)) as changes,
-       COUNT(*) as total_pings
+       is_reachable,
+       LAG(is_reachable) OVER (PARTITION BY device_ip ORDER BY timestamp) as prev_reachable,
+       timestamp
      FROM ping_results
      WHERE timestamp > NOW() - INTERVAL '1 hour'
+   ),
+   state_changes AS (
+     SELECT
+       device_ip,
+       COUNT(*) FILTER (WHERE is_reachable != prev_reachable) as changes,
+       COUNT(*) as total_pings
+     FROM ping_with_changes
      GROUP BY device_ip
    )
    SELECT
