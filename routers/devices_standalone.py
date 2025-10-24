@@ -128,27 +128,33 @@ class StandaloneDeviceResponse(BaseModel):
         longitude = fields.get("longitude")
         problems = fields.get("problems") or 0
 
+        # CRITICAL FIX: Use device.down_since as the SOURCE OF TRUTH for status
+        # The down_since field is updated by the monitoring worker and is always current
+        # VictoriaMetrics ping data may be stale due to caching/propagation delays
+        if obj.down_since is not None:
+            # Device is DOWN - down_since timestamp exists
+            ping_status = "Down"
+            available = "Unavailable"
+        else:
+            # Device is UP - down_since is NULL
+            ping_status = "Up"
+            available = "Available"
+
+        # Get ping response time and timestamp from ping_result (if available)
         if ping_result:
             # PHASE 3: Handle both dict (VictoriaMetrics) and PingResult object (PostgreSQL fallback)
             if isinstance(ping_result, dict):
                 # VictoriaMetrics format
-                is_reachable = ping_result.get("is_reachable", False)
-                ping_status = "Up" if is_reachable else "Down"
                 ping_response_time = ping_result.get("avg_rtt_ms")
                 timestamp = ping_result.get("timestamp")
                 last_ping_timestamp = datetime.fromtimestamp(timestamp).isoformat() if timestamp else None
-                available = "Available" if is_reachable else "Unavailable"
             else:
                 # PostgreSQL PingResult object (fallback)
-                ping_status = "Up" if ping_result.is_reachable else "Down"
                 ping_response_time = ping_result.avg_rtt_ms
                 last_ping_timestamp = ping_result.timestamp.isoformat() if ping_result.timestamp else None
-                available = "Available" if ping_result.is_reachable else "Unavailable"
         else:
-            ping_status = fields.get("ping_status")
             ping_response_time = fields.get("ping_response_time")
             last_ping_timestamp = fields.get("synced_at")
-            available = fields.get("available")
 
         data = {
             'id': str(obj.id),
