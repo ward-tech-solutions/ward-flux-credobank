@@ -542,8 +542,8 @@ class VictoriaMetricsClient:
         for batch_start in range(0, len(device_ips), BATCH_SIZE):
             batch_ips = device_ips[batch_start:batch_start + BATCH_SIZE]
 
-            # Build regex for this batch
-            ip_regex = "|".join([ip.replace(".", "\\.") for ip in batch_ips])
+            # Build regex for this batch (no need to escape dots in VictoriaMetrics regex)
+            ip_regex = "|".join(batch_ips)
 
             # Query all 3 ping metrics for the batch
             queries = {
