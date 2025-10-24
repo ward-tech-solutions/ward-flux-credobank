@@ -141,8 +141,8 @@ class RegionalManagerSimulator:
 
             # Get device status history (last 7 days)
             response = self.session.get(
-                f"{self.base_url}/api/v1/devices/standalone/{device_id}/history",
-                params={'hours': 168},  # 7 days
+                f"{self.base_url}/api/v1/devices/{device_id}/history",
+                params={'time_range': '7d'},  # 7 days
                 timeout=20
             )
 
@@ -204,8 +204,7 @@ class RegionalManagerSimulator:
             start = time.time()
 
             response = self.session.get(
-                f"{self.base_url}/api/v1/alerts/history",
-                params={'limit': 50},
+                f"{self.base_url}/api/v1/alerts/realtime",
                 timeout=15
             )
 
