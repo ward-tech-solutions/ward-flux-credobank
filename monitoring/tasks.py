@@ -856,9 +856,63 @@ def cleanup_old_ping_results(days: int = 90):
         count = deleted.rowcount if deleted.rowcount is not None else 0
         logger.info(f"🧹 Removed {count} ping_results rows older than {days} days")
         return {"deleted": count, "cutoff": cutoff.isoformat()}
-        
+
     except Exception as exc:
         logger.error(f"Error cleaning old ping results: {exc}", exc_info=True)
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+@shared_task(name="maintenance.cleanup_old_alerts")
+def cleanup_old_alerts(days: int = 7):
+    """
+    Delete resolved alerts older than the provided number of days.
+
+    RETENTION POLICY:
+    - Keep ALL unresolved alerts (regardless of age)
+    - Delete RESOLVED alerts older than {days} days
+    - Default: 7 days retention for resolved alerts
+
+    This keeps the database lean while preserving active alerts.
+    """
+    cutoff = utcnow() - timedelta(days=days)
+    try:
+        db = SessionLocal()
+
+        # Count before deletion
+        before_count = db.execute(text("SELECT COUNT(*) FROM alert_history")).scalar()
+
+        # Delete only RESOLVED alerts older than cutoff
+        deleted = db.execute(
+            text("DELETE FROM alert_history WHERE resolved_at IS NOT NULL AND resolved_at < :cutoff"),
+            {"cutoff": cutoff},
+        )
+        db.commit()
+
+        count = deleted.rowcount if deleted.rowcount is not None else 0
+        after_count = db.execute(text("SELECT COUNT(*) FROM alert_history")).scalar()
+
+        logger.info(
+            f"🧹 Alert cleanup complete: "
+            f"Deleted {count} resolved alerts older than {days} days "
+            f"(Before: {before_count}, After: {after_count})"
+        )
+
+        # Vacuum to reclaim disk space
+        db.execute(text("VACUUM ANALYZE alert_history"))
+        db.commit()
+
+        return {
+            "deleted": count,
+            "before_count": before_count,
+            "after_count": after_count,
+            "cutoff": cutoff.isoformat()
+        }
+
+    except Exception as exc:
+        logger.error(f"Error cleaning old alerts: {exc}", exc_info=True)
         db.rollback()
         raise
     finally:

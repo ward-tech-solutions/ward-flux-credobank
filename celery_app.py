@@ -97,12 +97,17 @@ app.conf.task_routes = {
     },
 
     # BACKGROUND: Maintenance tasks
-    'monitoring.tasks.cleanup_old_ping_results': {
+    'maintenance.cleanup_old_ping_results': {
         'queue': 'maintenance',
         'routing_key': 'maintenance',
         'priority': 0
     },
-    'monitoring.tasks.cleanup_old_discovery_results': {
+    'maintenance.cleanup_old_alerts': {
+        'queue': 'maintenance',
+        'routing_key': 'maintenance',
+        'priority': 0
+    },
+    'maintenance.cleanup_old_discovery_results': {
         'queue': 'maintenance',
         'routing_key': 'maintenance',
         'priority': 0
@@ -174,14 +179,21 @@ app.conf.beat_schedule = {
 
     # Cleanup old ping results daily at 3:00 AM
     'cleanup-old-pings': {
-        'task': 'monitoring.tasks.cleanup_old_ping_results',
+        'task': 'maintenance.cleanup_old_ping_results',
         'schedule': crontab(hour=3, minute=0),  # Daily at 3:00 AM
         'kwargs': {'days': 30}
     },
 
+    # Cleanup old resolved alerts weekly on Sunday at 3:30 AM
+    'cleanup-old-alerts': {
+        'task': 'maintenance.cleanup_old_alerts',
+        'schedule': crontab(hour=3, minute=30, day_of_week=0),  # Sunday 3:30 AM
+        'kwargs': {'days': 7}
+    },
+
     # Cleanup old discovery results daily at 2:00 AM
     'cleanup-old-discovery': {
-        'task': 'monitoring.tasks.cleanup_old_discovery_results',
+        'task': 'maintenance.cleanup_old_discovery_results',
         'schedule': crontab(hour=2, minute=0),  # Daily at 2:00 AM
         'kwargs': {'days': 30}
     },
