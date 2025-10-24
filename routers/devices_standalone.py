@@ -205,7 +205,7 @@ def _latest_ping_lookup(db: Session, ips: List[str]) -> Dict[str, Dict[str, Any]
     if not ips:
         return {}
 
-    # PHASE 3: Query VictoriaMetrics instead of PostgreSQL
+    # PHASE 3: Query VictoriaMetrics
     try:
         from utils.victoriametrics_client import vm_client
         import logging
@@ -215,45 +215,12 @@ def _latest_ping_lookup(db: Session, ips: List[str]) -> Dict[str, Dict[str, Any]
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to query VictoriaMetrics, falling back to PostgreSQL: {e}")
-
-        # FALLBACK: Keep PostgreSQL query as backup during Phase 3 transition
-        from sqlalchemy import and_
-
-        subquery = (
-            db.query(
-                PingResult.device_ip,
-                func.max(PingResult.timestamp).label('max_timestamp')
-            )
-            .filter(PingResult.device_ip.in_(ips))
-            .group_by(PingResult.device_ip)
-            .subquery()
-        )
-
-        rows = (
-            db.query(PingResult)
-            .join(
-                subquery,
-                and_(
-                    PingResult.device_ip == subquery.c.device_ip,
-                    PingResult.timestamp == subquery.c.max_timestamp
-                )
-            )
-            .all()
-        )
-
-        # Convert PingResult objects to dict format for compatibility
-        return {
-            row.device_ip: {
-                "is_reachable": row.is_reachable,
-                "avg_rtt_ms": row.avg_rtt_ms,
-                "packet_loss": row.packet_loss_percent,
-                "timestamp": int(row.timestamp.timestamp()) if row.timestamp else None,
-                "device_ip": row.device_ip,
-                "device_name": row.device_name
-            }
-            for row in rows
-        }
+        logger.error(f"Failed to query VictoriaMetrics for ping data: {e}")
+        logger.warning("Returning empty ping data - status will use device.down_since field")
+        # PHASE 3 FIX: DO NOT fallback to PostgreSQL after Phase 2!
+        # When deploying all phases same day, PostgreSQL table will be immediately stale.
+        # Device status will use device.down_since field which is always current.
+        return {}
 
 
 # ============================================

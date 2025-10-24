@@ -194,7 +194,9 @@ def _get_standalone_dashboard_stats(
             # PHASE 3: ping is now a dict (from VictoriaMetrics), not PingResult object
             status = "Up" if ping.get("is_reachable") else "Down"
         else:
-            status = fields.get("ping_status") or "Unknown"
+            # PHASE 3 ROBUSTNESS: If VM fails, use device.down_since (always current!)
+            # device.down_since is updated in real-time by monitoring worker
+            status = "Down" if device.down_since else "Up"
 
         if status == "Up":
             online_devices += 1
@@ -252,43 +254,29 @@ def _get_standalone_dashboard_stats(
 
 def _latest_ping_lookup(db: Session, ips: List[str]) -> Dict[str, Dict[str, Any]]:
     """
-    PHASE 3: Get latest ping results from VictoriaMetrics instead of PostgreSQL
+    PHASE 3: Get latest ping results from VictoriaMetrics
 
-    Returns: Dict mapping IP -> ping data (compatible with PingResult structure)
+    ROBUSTNESS: If VictoriaMetrics fails, returns empty dict.
+    Callers will use device.down_since for status (always current).
 
-    NOTE: Return format changed to Dict[str, Dict] for VM compatibility.
-          Callers should access fields directly: ping['is_reachable'], ping['avg_rtt_ms']
+    Returns: Dict mapping IP -> ping data
+
+    CRITICAL: After Phase 2, PostgreSQL ping_results table stops growing!
+              DO NOT fallback to PostgreSQL - data will be stale!
     """
     if not ips:
         return {}
 
-    # PHASE 3: Query VictoriaMetrics instead of PostgreSQL
+    # PHASE 3: Query VictoriaMetrics
     try:
         from utils.victoriametrics_client import vm_client
         return vm_client.get_latest_ping_for_devices(ips)
     except Exception as e:
-        logger.warning(f"Failed to query VictoriaMetrics for ping data, falling back to PostgreSQL: {e}")
-        # FALLBACK: Keep PostgreSQL query as backup during Phase 3 transition
-        rows = (
-            db.query(PingResult)
-            .filter(PingResult.device_ip.in_(ips))
-            .order_by(PingResult.device_ip, PingResult.timestamp.desc())
-            .all()
-        )
-
-        lookup: Dict[str, Dict[str, Any]] = {}
-        for row in rows:
-            ip = row.device_ip
-            if ip and ip not in lookup:
-                # Convert PingResult to dict format for compatibility
-                lookup[ip] = {
-                    "is_reachable": row.is_reachable,
-                    "avg_rtt_ms": row.avg_rtt_ms,
-                    "packet_loss": row.packet_loss_percent,
-                    "timestamp": int(row.timestamp.timestamp()) if row.timestamp else None,
-                    "device_ip": row.device_ip,
-                    "device_name": row.device_name
-                }
-        return lookup
+        logger.error(f"Failed to query VictoriaMetrics for ping data: {e}")
+        logger.warning("Returning empty ping data - dashboard will use device.down_since for status")
+        # PHASE 3 FIX: DO NOT fallback to PostgreSQL after Phase 2!
+        # PostgreSQL ping_results table is stale after Phase 2 deployment.
+        # Callers will use device.down_since field which is always current.
+        return {}
 
 
