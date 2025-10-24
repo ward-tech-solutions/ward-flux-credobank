@@ -17,6 +17,7 @@ from monitoring.snmp.poller import get_snmp_poller, SNMPCredentialData
 from monitoring.snmp.credentials import decrypt_credential
 from monitoring.snmp.oids import get_vendor_oids
 from monitoring.victoria.client import get_victoria_client
+from utils.victoriametrics_client import vm_client  # NEW: Robust VM client for ping data
 from monitoring.models import (
     MonitoringItem,
     SNMPCredential,
@@ -198,8 +199,8 @@ def ping_device(device_id: str, device_ip: str):
     db = None
     try:
         from icmplib import ping
-        from database import PingResult
         # NOTE: datetime, timezone already imported at module level (line 10)
+        # NOTE: PingResult removed - ping data now stored in VictoriaMetrics (Phase 2)
 
         # Log execution for debugging (especially for target device)
         if device_ip == "10.195.83.252":
@@ -214,30 +215,13 @@ def ping_device(device_id: str, device_ip: str):
         device_uuid = UUID(device_id) if isinstance(device_id, str) else device_id
         device = db.query(StandaloneDevice).filter_by(id=device_uuid).first()
 
-        # Get previous ping result to detect state transitions
-        previous_ping = (
-            db.query(PingResult)
-            .filter(PingResult.device_ip == device_ip)
-            .order_by(PingResult.timestamp.desc())
-            .first()
-        )
+        # PHASE 2 CHANGE: Removed PostgreSQL ping_results writes
+        # Previous state is now tracked via device.down_since (more efficient)
+        # Historical ping data is stored in VictoriaMetrics instead
 
         current_state = host.is_alive  # True = UP, False = DOWN
-        previous_state = previous_ping.is_reachable if previous_ping else True  # Assume UP if no history
-
-        ping_result = PingResult(
-            device_ip=device_ip,
-            device_name=device.name if device else None,
-            packets_sent=host.packets_sent,
-            packets_received=host.packets_received,
-            packet_loss_percent=int(host.packet_loss),
-            min_rtt_ms=int(host.min_rtt) if host.min_rtt else 0,
-            avg_rtt_ms=int(host.avg_rtt) if host.avg_rtt else 0,
-            max_rtt_ms=int(host.max_rtt) if host.max_rtt else 0,
-            is_reachable=host.is_alive,
-            timestamp=utcnow()
-        )
-        db.add(ping_result)
+        # Check previous state from device.down_since (None = was UP, has value = was DOWN)
+        previous_state = device.down_since is None if device else True
 
         # Update down_since timestamp based on ACTUAL state transitions
         # CRITICAL: This must match Zabbix behavior - immediate state updates
@@ -301,29 +285,70 @@ def ping_device(device_id: str, device_ip: str):
         db.commit()
         logger.debug(f"Ping complete for {device_ip}: is_alive={host.is_alive}, down_since={device.down_since if device else 'N/A'}")
 
-        # Write metrics to VictoriaMetrics (optional)
+        # PHASE 2: Write ping data to VictoriaMetrics (CRITICAL - replaces PostgreSQL)
+        # Using new robust VM client with comprehensive labels for better querying
         try:
-            vm_client = get_victoria_client()
+            import time
+
+            # Prepare comprehensive labels for better filtering and dashboards
+            base_labels = {
+                "device_id": device_id,
+                "device_ip": device_ip,
+                "device_name": device.name if device else "Unknown",
+            }
+
+            # Add optional labels if device exists
+            if device:
+                if hasattr(device, 'branch') and device.branch:
+                    base_labels["branch"] = device.branch
+                if hasattr(device, 'region') and device.region:
+                    base_labels["region"] = device.region
+                if hasattr(device, 'device_type') and device.device_type:
+                    base_labels["device_type"] = device.device_type
+
+            # Write all ping metrics to VictoriaMetrics
             metrics = [
                 {
-                    "metric_name": "ping_rtt_ms",
-                    "value": host.avg_rtt,
-                    "labels": {"device_id": device_id, "ip": device_ip},
-                },
-                {
-                    "metric_name": "ping_packet_loss",
-                    "value": host.packet_loss,
-                    "labels": {"device_id": device_id, "ip": device_ip},
-                },
-                {
-                    "metric_name": "ping_is_alive",
+                    "metric": "device_ping_status",
                     "value": 1 if host.is_alive else 0,
-                    "labels": {"device_id": device_id, "ip": device_ip},
+                    "labels": base_labels.copy(),
+                    "timestamp": int(time.time())
+                },
+                {
+                    "metric": "device_ping_rtt_ms",
+                    "value": host.avg_rtt if host.avg_rtt else 0,
+                    "labels": base_labels.copy(),
+                    "timestamp": int(time.time())
+                },
+                {
+                    "metric": "device_ping_rtt_min_ms",
+                    "value": host.min_rtt if host.min_rtt else 0,
+                    "labels": base_labels.copy(),
+                    "timestamp": int(time.time())
+                },
+                {
+                    "metric": "device_ping_rtt_max_ms",
+                    "value": host.max_rtt if host.max_rtt else 0,
+                    "labels": base_labels.copy(),
+                    "timestamp": int(time.time())
+                },
+                {
+                    "metric": "device_ping_packet_loss",
+                    "value": host.packet_loss,
+                    "labels": base_labels.copy(),
+                    "timestamp": int(time.time())
                 },
             ]
-            vm_client.write_metrics_bulk(metrics)
+
+            # Use new robust VM client with retry logic
+            success = vm_client.write_metrics(metrics)
+            if success:
+                logger.debug(f"✅ Wrote {len(metrics)} ping metrics to VictoriaMetrics for {device_ip}")
+            else:
+                logger.warning(f"⚠️ Failed to write ping metrics to VictoriaMetrics for {device_ip}")
+
         except Exception as vm_err:
-            logger.debug(f"VictoriaMetrics unavailable (non-critical): {vm_err}")
+            logger.error(f"❌ VictoriaMetrics write failed for {device_ip}: {vm_err}")
 
         logger.debug(f"Pinged {device_ip}: RTT={host.avg_rtt}ms, Loss={host.packet_loss}%")
 

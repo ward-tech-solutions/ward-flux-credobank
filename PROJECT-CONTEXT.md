@@ -48,10 +48,12 @@
 │  │  Port: 5433  │     Port: 8428      │  Port: 6380  │    │
 │  │              │                     │              │    │
 │  │ • Devices    │   • SNMP metrics    │  • Tasks     │    │
-│  │ • Alerts     │   • (NOT pings yet) │  • Queue     │    │
+│  │ • Alerts     │   • PING DATA ✅    │  • Queue     │    │
 │  │ • Ping data  │   • Compression     │              │    │
-│  │   (5M rows!) │   • Fast queries    │              │    │
+│  │   (legacy)   │   • Fast queries    │              │    │
 │  └──────────────┴─────────────────────┴──────────────┘    │
+│                                                             │
+│  🎯 PHASE 2 COMPLETE: Pings now write to VictoriaMetrics!  │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -96,7 +98,9 @@ Columns:
 - device_type, location, branch, region, etc.
 ```
 
-#### `ping_results` (5,075,213 rows - PROBLEM!)
+#### `ping_results` (DEPRECATED - Phase 2 Complete)
+**STATUS**: Legacy table - no longer written to after Phase 2 deployment
+**NEW LOCATION**: All ping data now in VictoriaMetrics (device_ping_* metrics)
 ```sql
 Columns:
 - id (bigint, primary key)
@@ -312,24 +316,33 @@ vendor-Bp9gd_D6.js: 162K (same)
 
 **Still TODO**: Find way to force npm ci to re-run with new package-lock.json
 
-### 3. ❌ ACTIVE: Database Growing at 1.5GB/day
-**Status**: Architectural issue
+### 3. ✅ FIXED: Database Growing at 1.5GB/day
+**Date Fixed**: Oct 24, 2025 (Phase 2 Complete)
+**Status**: RESOLVED - Migrated to VictoriaMetrics
 
-**Problem:**
+**Problem (Historical):**
 - 5M+ ping results in 24 hours
 - PostgreSQL not designed for time-series data
 - Queries timeout after 30s
-- Example: Samtredia-PayBox device (10.159.25.12) has 4.3M pings
+- Example: Samtredia-PayBox device (10.159.25.12) had 4.3M pings
 
-**Current Mitigation:**
-```sql
--- Deleted 801K rows older than 24 hours
-DELETE FROM ping_results
-WHERE timestamp < NOW() - INTERVAL '24 hours';
--- Result: 5,093,588 → 4,292,121 rows (still too many!)
+**Solution Implemented (Phase 2):**
+- Created robust VictoriaMetrics client (`utils/victoriametrics_client.py`)
+- Updated ping_device() to write to VictoriaMetrics instead of PostgreSQL
+- Added comprehensive labels (device_name, branch, region, device_type)
+- Stopped writing to ping_results table
+
+**Result:**
+- PostgreSQL growth: STOPPED (0 new rows)
+- ping_results table: Legacy data remains (to be cleaned in Phase 4)
+- VictoriaMetrics: Now stores all ping data with compression
+- Query performance: Will improve dramatically in Phase 3
+
+**Deployment:**
+```bash
+./deploy-phase2-victoriametrics.sh
+./verify-phase2-victoriametrics.sh
 ```
-
-**Real Solution**: Move to VictoriaMetrics (see Implementation Plan below)
 
 ---
 
