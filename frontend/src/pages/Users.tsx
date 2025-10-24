@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/Badge'
 import { LoadingSpinner } from '@/components/ui/Loading'
 import { Modal } from '@/components/ui/Modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { Users as UsersIcon, Plus, Edit2, Trash2, Shield, Search } from 'lucide-react'
+import { Users as UsersIcon, Plus, Edit2, Trash2, Shield, Search, AlertCircle, X } from 'lucide-react'
 import { authAPI } from '@/services/api'
+import axios from 'axios'
 
 interface User {
   id: string | number
@@ -27,6 +28,7 @@ export default function Users() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [errorMessage, setErrorMessage] = useState('')
   const [userForm, setUserForm] = useState({
     username: '',
     email: '',
@@ -54,18 +56,25 @@ export default function Users() {
 
   const handleAddUser = async () => {
     try {
+      setErrorMessage('')
       await authAPI.register(userForm)
       setShowAddModal(false)
       resetForm()
       loadUsers()
     } catch (error) {
       console.error('Failed to add user:', error)
+      if (axios.isAxiosError(error) && error.response?.data?.detail) {
+        setErrorMessage(error.response.data.detail)
+      } else {
+        setErrorMessage('Failed to create user. Please try again.')
+      }
     }
   }
 
   const handleEditUser = async () => {
     if (!selectedUser) return
     try {
+      setErrorMessage('')
       // Only include password in update if it's been changed (non-empty)
       const updateData = userForm.password
         ? userForm
@@ -83,6 +92,11 @@ export default function Users() {
       loadUsers()
     } catch (error) {
       console.error('Failed to update user:', error)
+      if (axios.isAxiosError(error) && error.response?.data?.detail) {
+        setErrorMessage(error.response.data.detail)
+      } else {
+        setErrorMessage('Failed to update user. Please try again.')
+      }
     }
   }
 
@@ -105,6 +119,7 @@ export default function Users() {
       role: 'technician',
       region: '',
     })
+    setErrorMessage('')
   }
 
   const openEditModal = (user: User) => {
@@ -287,6 +302,22 @@ export default function Users() {
         title="Add New User"
       >
         <div className="space-y-4">
+          {errorMessage && (
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                  {errorMessage}
+                </p>
+              </div>
+              <button
+                onClick={() => setErrorMessage('')}
+                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          )}
           <Input
             label="Username"
             value={userForm.username}
@@ -370,6 +401,22 @@ export default function Users() {
         title="Edit User"
       >
         <div className="space-y-4">
+          {errorMessage && (
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                  {errorMessage}
+                </p>
+              </div>
+              <button
+                onClick={() => setErrorMessage('')}
+                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          )}
           <Input
             label="Username"
             value={userForm.username}
