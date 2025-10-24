@@ -132,7 +132,7 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
                 is_reachable=result.is_alive,
                 timestamp=utcnow()
             )
-            db.add(ping_result)
+            # db.add(ping_result)  # PHASE 4: Disabled - using VictoriaMetrics only
             ping_count += 1
 
             # PHASE 2: Write ping data to VictoriaMetrics

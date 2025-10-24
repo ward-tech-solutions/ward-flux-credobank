@@ -334,10 +334,12 @@ export default function Monitor() {
     localStorage.setItem('monitor_searchQuery', searchQuery)
   }, [searchQuery])
 
-  const { data: devices, isLoading, refetch } = useQuery({
+  // OPTIMIZATION: Pause auto-refresh when modal is open to prevent request contention
+  const { data: devices, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['devices'],
     queryFn: () => devicesAPI.getAll(),
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    refetchInterval: selectedDevice ? false : 30000, // Pause refresh when modal open
+    refetchIntervalInBackground: false, // Don't refetch when tab not active
   })
 
   // Ping mutation
@@ -813,14 +815,24 @@ export default function Monitor() {
             <span className="text-sm font-medium text-ward-green">LIVE</span>
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            Refreshing in {refreshCountdown}s
+            {selectedDevice ? (
+              <span className="text-yellow-600 dark:text-yellow-400">Auto-refresh paused (modal open)</span>
+            ) : isFetching ? (
+              <span className="flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Refreshing...
+              </span>
+            ) : (
+              <span>Refreshing in {refreshCountdown}s</span>
+            )}
           </div>
           <button
             onClick={handleRefresh}
-            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            title="Refresh now"
+            disabled={isFetching}
+            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={isFetching ? "Refresh in progress..." : "Refresh now"}
           >
-            <RefreshCw className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <RefreshCw className={`h-5 w-5 text-gray-600 dark:text-gray-400 ${isFetching ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>

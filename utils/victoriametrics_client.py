@@ -50,11 +50,12 @@ class VictoriaMetricsClient:
         self.session = requests.Session()
         retry_strategy = Retry(
             total=3,
-            backoff_factor=0.3,
+            backoff_factor=0.1,  # Faster retries for better responsiveness
             status_forcelist=[429, 500, 502, 503, 504],
             allowed_methods=["GET", "POST"]
         )
-        adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=10, pool_maxsize=20)
+        # OPTIMIZATION: Increased pool size for better parallel query performance
+        adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=20, pool_maxsize=50)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
 

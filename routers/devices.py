@@ -18,6 +18,7 @@ from database import PingResult, User, UserRole, get_db
 from monitoring.device_manager import DeviceManager
 from monitoring.models import AlertHistory, MonitoringMode, StandaloneDevice
 from routers.utils import get_monitored_groupids, run_in_executor
+from utils.optimization_helpers import get_optimal_vm_step
 
 logger = logging.getLogger(__name__)
 
@@ -457,6 +458,9 @@ async def get_device_history(
     time_map = {"24h": 24, "7d": 168, "30d": 720}  # Convert to hours
     hours = time_map.get(time_range, 24)
 
+    # OPTIMIZATION: Use dynamic query resolution based on time range
+    step = get_optimal_vm_step(hours)  # 5m for 24h, 15m for 7d, 1h for 30d
+
     try:
         from utils.victoriametrics_client import vm_client
         import asyncio
@@ -468,13 +472,13 @@ async def get_device_history(
                 vm_client.get_device_status_history,
                 str(device.id),
                 hours,
-                "5m"
+                step  # Dynamic resolution
             )
             rtt_future = executor.submit(
                 vm_client.get_device_rtt_history,
                 str(device.id),
                 hours,
-                "5m"
+                step  # Dynamic resolution
             )
 
             # Wait for both queries to complete (runs in parallel)
