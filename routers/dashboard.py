@@ -191,7 +191,8 @@ def _get_standalone_dashboard_stats(
 
         ping = ping_lookup.get(device.ip)
         if ping:
-            status = "Up" if ping.is_reachable else "Down"
+            # PHASE 3: ping is now a dict (from VictoriaMetrics), not PingResult object
+            status = "Up" if ping.get("is_reachable") else "Down"
         else:
             status = fields.get("ping_status") or "Unknown"
 
@@ -249,22 +250,45 @@ def _get_standalone_dashboard_stats(
     }
 
 
-def _latest_ping_lookup(db: Session, ips: List[str]) -> Dict[str, PingResult]:
+def _latest_ping_lookup(db: Session, ips: List[str]) -> Dict[str, Dict[str, Any]]:
+    """
+    PHASE 3: Get latest ping results from VictoriaMetrics instead of PostgreSQL
+
+    Returns: Dict mapping IP -> ping data (compatible with PingResult structure)
+
+    NOTE: Return format changed to Dict[str, Dict] for VM compatibility.
+          Callers should access fields directly: ping['is_reachable'], ping['avg_rtt_ms']
+    """
     if not ips:
         return {}
 
-    rows = (
-        db.query(PingResult)
-        .filter(PingResult.device_ip.in_(ips))
-        .order_by(PingResult.device_ip, PingResult.timestamp.desc())
-        .all()
-    )
+    # PHASE 3: Query VictoriaMetrics instead of PostgreSQL
+    try:
+        from utils.victoriametrics_client import vm_client
+        return vm_client.get_latest_ping_for_devices(ips)
+    except Exception as e:
+        logger.warning(f"Failed to query VictoriaMetrics for ping data, falling back to PostgreSQL: {e}")
+        # FALLBACK: Keep PostgreSQL query as backup during Phase 3 transition
+        rows = (
+            db.query(PingResult)
+            .filter(PingResult.device_ip.in_(ips))
+            .order_by(PingResult.device_ip, PingResult.timestamp.desc())
+            .all()
+        )
 
-    lookup: Dict[str, PingResult] = {}
-    for row in rows:
-        ip = row.device_ip
-        if ip and ip not in lookup:
-            lookup[ip] = row
-    return lookup
+        lookup: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            ip = row.device_ip
+            if ip and ip not in lookup:
+                # Convert PingResult to dict format for compatibility
+                lookup[ip] = {
+                    "is_reachable": row.is_reachable,
+                    "avg_rtt_ms": row.avg_rtt_ms,
+                    "packet_loss": row.packet_loss_percent,
+                    "timestamp": int(row.timestamp.timestamp()) if row.timestamp else None,
+                    "device_ip": row.device_ip,
+                    "device_name": row.device_name
+                }
+        return lookup
 
 

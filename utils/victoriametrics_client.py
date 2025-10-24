@@ -506,6 +506,83 @@ class VictoriaMetricsClient:
 
         return []
 
+    def get_latest_ping_for_devices(self, device_ips: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        Get the latest ping results for multiple devices in a single query.
+        This replaces PostgreSQL _latest_ping_lookup with VictoriaMetrics.
+
+        PHASE 3: Optimized bulk query for device list/dashboard APIs
+
+        Args:
+            device_ips: List of device IP addresses
+
+        Returns:
+            Dict mapping IP -> latest ping data
+            Example: {
+                "10.159.25.12": {
+                    "is_reachable": True,
+                    "avg_rtt_ms": 5.2,
+                    "packet_loss": 0.0,
+                    "timestamp": 1234567890,
+                    "device_name": "Samtredia-PayBox"
+                }
+            }
+        """
+        if not device_ips:
+            return {}
+
+        # Build regex for device_ip filter (matches any of the provided IPs)
+        # Use regex to avoid query length limits with hundreds of devices
+        ip_regex = "|".join([ip.replace(".", "\\.") for ip in device_ips])
+
+        # Query all 3 ping metrics for the devices
+        queries = {
+            "status": f'device_ping_status{{device_ip=~"{ip_regex}"}}',
+            "rtt": f'device_ping_rtt_ms{{device_ip=~"{ip_regex}"}}',
+            "loss": f'device_ping_packet_loss{{device_ip=~"{ip_regex}"}}'
+        }
+
+        results = {}
+
+        # Execute queries for each metric type
+        for metric_type, query in queries.items():
+            try:
+                result = self.query(query)
+                if result.get("status") == "success":
+                    data = result.get("data", {}).get("result", [])
+                    for item in data:
+                        device_ip = item["metric"].get("device_ip")
+                        if device_ip:
+                            if device_ip not in results:
+                                results[device_ip] = {
+                                    "device_ip": device_ip,
+                                    "device_name": item["metric"].get("device_name", "Unknown"),
+                                    "device_id": item["metric"].get("device_id"),
+                                    "is_reachable": None,
+                                    "avg_rtt_ms": None,
+                                    "packet_loss": None,
+                                    "timestamp": None
+                                }
+
+                            # Parse value and timestamp
+                            value = float(item["value"][1])
+                            timestamp = int(item["value"][0])
+
+                            # Update the appropriate field
+                            if metric_type == "status":
+                                results[device_ip]["is_reachable"] = value == 1.0
+                                results[device_ip]["timestamp"] = timestamp
+                            elif metric_type == "rtt":
+                                results[device_ip]["avg_rtt_ms"] = value
+                            elif metric_type == "loss":
+                                results[device_ip]["packet_loss"] = value
+
+            except Exception as e:
+                logger.warning(f"Failed to query {metric_type} for devices: {e}")
+                continue
+
+        return results
+
     def get_stats(self) -> Dict[str, int]:
         """
         Get client performance statistics
