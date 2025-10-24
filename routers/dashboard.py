@@ -7,7 +7,7 @@ import asyncio
 import concurrent.futures
 import sqlite3
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
