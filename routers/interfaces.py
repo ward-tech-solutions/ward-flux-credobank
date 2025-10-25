@@ -11,10 +11,10 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from database import get_db
+from database import get_db, User
 from monitoring.models import DeviceInterface, InterfaceMetricsSummary, StandaloneDevice
 from monitoring.tasks_interface_discovery import discover_device_interfaces_task, discover_all_interfaces_task
-from routers.auth import get_current_user
+from auth import get_current_active_user
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ def list_interfaces(
     limit: int = Query(100, ge=1, le=1000, description="Max results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     List network interfaces with optional filtering
@@ -169,7 +169,7 @@ def list_interfaces(
 def get_interface_summary(
     device_id: Optional[str] = Query(None, description="Filter by device ID"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get interface statistics summary
@@ -257,7 +257,7 @@ def get_interface_summary(
 def get_device_interfaces(
     device_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get all interfaces for a specific device
@@ -307,7 +307,7 @@ def get_device_interfaces(
 @router.get("/critical", response_model=List[InterfaceResponse])
 def get_critical_interfaces(
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get all critical interfaces (ISP uplinks, core trunks, etc.)
@@ -346,7 +346,7 @@ def get_critical_interfaces(
 def get_isp_interfaces(
     isp_provider: Optional[str] = Query(None, description="Filter by ISP (magti, silknet, etc.)"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get all ISP interfaces
@@ -392,7 +392,7 @@ def get_isp_interfaces(
 def trigger_device_discovery(
     device_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Trigger interface discovery for a single device
@@ -433,7 +433,7 @@ def trigger_device_discovery(
 
 @router.post("/discover/all", response_model=DiscoveryTriggerResponse)
 def trigger_all_discovery(
-    current_user=Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Trigger interface discovery for ALL enabled devices
@@ -467,7 +467,7 @@ def update_interface(
     monitoring_enabled: Optional[bool] = None,
     notes: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Update interface configuration
