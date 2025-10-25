@@ -6,7 +6,7 @@ Database models for standalone monitoring system
 import uuid
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, JSON, UUID as SQLAlchemyUUID, Enum as SQLAlchemyEnum, func
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, JSON, UUID as SQLAlchemyUUID, Enum as SQLAlchemyEnum, func, Float, BigInteger
 from database import Base
 
 
@@ -296,6 +296,101 @@ class MetricBaseline(Base):
     # Metadata
     sample_count = Column(Integer)
     last_updated = Column(DateTime)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ============================================
+# Interface Discovery Models
+# ============================================
+
+class DeviceInterface(Base):
+    """Network interface discovered via SNMP (IF-MIB)"""
+    __tablename__ = "device_interfaces"
+
+    # Primary key
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Foreign key to devices
+    device_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("standalone_devices.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # SNMP interface data (from IF-MIB)
+    if_index = Column(Integer, nullable=False)  # ifIndex: Unique interface number
+    if_name = Column(String(255))  # ifName: Gi0/0/0, Fa0/1, etc. (from ifXTable)
+    if_descr = Column(String(255))  # ifDescr: Interface description (legacy)
+    if_alias = Column(String(500))  # ifAlias: User-configured description (CRITICAL - contains ISP info!)
+    if_type = Column(String(100))  # ifType: ethernet, tunnel, loopback, etc.
+
+    # Parsed/classified data (from interface_parser.py)
+    interface_type = Column(String(50))  # isp, trunk, access, server_link, branch_link, other
+    isp_provider = Column(String(50))  # magti, silknet, veon, beeline, geocell, other
+    is_critical = Column(Boolean, default=False)  # Critical interfaces (ISP uplinks)
+    parser_confidence = Column(Float)  # Parser confidence score (0.0 - 1.0)
+
+    # Interface status (from SNMP)
+    admin_status = Column(Integer)  # ifAdminStatus: 1=up, 2=down, 3=testing
+    oper_status = Column(Integer)  # ifOperStatus: 1=up, 2=down, 3=testing, 4=unknown, 5=dormant, 6=notPresent, 7=lowerLayerDown
+    speed = Column(BigInteger)  # ifSpeed: Interface speed in bits/second
+    mtu = Column(Integer)  # ifMtu: Maximum transmission unit
+    duplex = Column(String(20))  # full, half, auto (if available from proprietary MIBs)
+
+    # MAC address and physical info
+    phys_address = Column(String(17))  # ifPhysAddress: MAC address (00:11:22:33:44:55)
+
+    # Topology and relationships
+    connected_to_device_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("standalone_devices.id", ondelete="SET NULL"))
+    connected_to_interface_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("device_interfaces.id", ondelete="SET NULL"))
+    lldp_neighbor_name = Column(String(255))  # LLDP neighbor device name
+    lldp_neighbor_port = Column(String(255))  # LLDP neighbor port
+
+    # Discovery metadata
+    discovered_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_status_change = Column(DateTime)  # When oper_status last changed
+
+    # Configuration
+    enabled = Column(Boolean, default=True)  # Whether to monitor this interface
+    monitoring_enabled = Column(Boolean, default=True)  # Whether to collect metrics for this interface
+
+    # Tags and custom fields
+    tags = Column(JSON)  # ["critical", "isp", "primary-uplink"]
+    custom_fields = Column(JSON)  # Flexible key-value storage
+
+    # Notes
+    notes = Column(Text)  # User notes about this interface
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class InterfaceMetricsSummary(Base):
+    """Cached interface metrics summary (from VictoriaMetrics)"""
+    __tablename__ = "interface_metrics_summary"
+
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    interface_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("device_interfaces.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+
+    # Traffic metrics (last 24 hours)
+    avg_in_mbps = Column(Float)  # Average inbound traffic (Mbps)
+    avg_out_mbps = Column(Float)  # Average outbound traffic (Mbps)
+    max_in_mbps = Column(Float)  # Peak inbound traffic (Mbps)
+    max_out_mbps = Column(Float)  # Peak outbound traffic (Mbps)
+    total_in_gb = Column(Float)  # Total inbound traffic (GB)
+    total_out_gb = Column(Float)  # Total outbound traffic (GB)
+
+    # Error metrics (last 24 hours)
+    in_errors = Column(Integer)  # Input errors
+    out_errors = Column(Integer)  # Output errors
+    in_discards = Column(Integer)  # Input discards
+    out_discards = Column(Integer)  # Output discards
+
+    # Utilization
+    utilization_percent = Column(Float)  # Interface utilization (%)
+
+    # Timestamps
+    calculated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

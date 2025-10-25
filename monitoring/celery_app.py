@@ -92,6 +92,17 @@ app.conf.beat_schedule = {
         "task": "monitoring.tasks.check_worker_health",
         "schedule": 300.0,  # Every 5 minutes
     },
+    # Discover interfaces on all devices every hour
+    "discover-all-interfaces": {
+        "task": "monitoring.tasks.discover_all_interfaces",
+        "schedule": crontab(minute=0),  # Every hour at :00
+    },
+    # Cleanup old interfaces every day at 4 AM
+    "cleanup-old-interfaces": {
+        "task": "monitoring.tasks.cleanup_old_interfaces",
+        "schedule": crontab(hour=4, minute=0),
+        "kwargs": {"days_threshold": 7},  # Remove interfaces not seen in 7 days
+    },
 }
 
 # Auto-discover tasks

@@ -223,6 +223,7 @@ from routers import (
     diagnostics,
     discovery,
     infrastructure,
+    interfaces,
     monitoring,
     reports,
     settings,
@@ -249,6 +250,7 @@ app.include_router(diagnostics.router)
 app.include_router(websockets.router)
 app.include_router(infrastructure.router)
 app.include_router(monitoring.router)
+app.include_router(interfaces.router)
 
 # ============================================
 # Security Middleware
