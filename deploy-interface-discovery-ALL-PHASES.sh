@@ -34,7 +34,7 @@ VM_CONTAINER="wardops-victoriametrics-prod"
 # Deployment options
 DEPLOY_PHASE1=${DEPLOY_PHASE1:-true}
 DEPLOY_PHASE2=${DEPLOY_PHASE2:-true}
-DEPLOY_PHASE3=${DEPLOY_PHASE3:-false}  # Optional
+DEPLOY_PHASE3=${DEPLOY_PHASE3:-true}  # Topology & baselines (fully implemented)
 
 echo "Deployment Configuration:"
 echo "  Phase 1 (Discovery):     $DEPLOY_PHASE1"
@@ -89,13 +89,26 @@ if [ "$DEPLOY_PHASE1" = "true" ]; then
     echo "=========================================="
     echo "Creating device_interfaces table..."
 
-    python3 migrations/run_010_migration.py
+    # Run migration SQL directly via psql in container
+    docker exec $DB_CONTAINER psql -U ward_admin -d ward_ops -f /tmp/010_migration.sql 2>&1 | tee /tmp/migration_010.log
 
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ Phase 1 migration completed${NC}"
+    # Copy migration file to container first if needed
+    if [ ! -f /tmp/010_migration.sql ]; then
+        docker cp migrations/010_add_device_interfaces.sql $DB_CONTAINER:/tmp/010_migration.sql
+        docker exec $DB_CONTAINER psql -U ward_admin -d ward_ops -f /tmp/010_migration.sql 2>&1 | tee /tmp/migration_010.log
+    fi
+
+    if grep -q "ERROR" /tmp/migration_010.log; then
+        # Check if error is "already exists" which is OK
+        if grep -q "already exists" /tmp/migration_010.log; then
+            echo -e "${YELLOW}⚠️  Tables already exist (skipping)${NC}"
+        else
+            echo -e "${RED}❌ Phase 1 migration failed${NC}"
+            cat /tmp/migration_010.log
+            exit 1
+        fi
     else
-        echo -e "${RED}❌ Phase 1 migration failed${NC}"
-        exit 1
+        echo -e "${GREEN}✅ Phase 1 migration completed${NC}"
     fi
 
     # Verify tables
@@ -140,10 +153,54 @@ else
 fi
 
 echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}PHASE 3: Topology & Baselines${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+if [ "$DEPLOY_PHASE3" = "true" ]; then
+    echo ""
+    echo -e "${YELLOW}Step 4: Run Phase 3 Database Migration${NC}"
+    echo "=========================================="
+    echo "Creating interface_baselines table..."
+
+    # Copy migration file to container
+    docker cp migrations/011_add_phase3_tables.sql $DB_CONTAINER:/tmp/011_migration.sql
+
+    # Run migration
+    docker exec $DB_CONTAINER psql -U ward_admin -d ward_ops -f /tmp/011_migration.sql 2>&1 | tee /tmp/migration_011.log
+
+    if grep -q "ERROR" /tmp/migration_011.log; then
+        # Check if error is "already exists" which is OK
+        if grep -q "already exists" /tmp/migration_011.log; then
+            echo -e "${YELLOW}⚠️  Tables already exist (skipping)${NC}"
+        else
+            echo -e "${RED}❌ Phase 3 migration failed${NC}"
+            cat /tmp/migration_011.log
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}✅ Phase 3 migration completed${NC}"
+    fi
+
+    # Verify table
+    TABLE_EXISTS=$(docker exec $DB_CONTAINER psql -U ward_admin -d ward_ops -t -c \
+        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'interface_baselines')")
+
+    if echo "$TABLE_EXISTS" | grep -q "t"; then
+        echo -e "${GREEN}✅ interface_baselines table verified${NC}"
+    else
+        echo -e "${RED}❌ interface_baselines table not found${NC}"
+        exit 1
+    fi
+else
+    echo -e "${YELLOW}⏭  Phase 3 skipped${NC}"
+fi
+
+echo ""
 echo -e "${YELLOW}Step 5: Rebuild API Container${NC}"
 echo "=========================================="
 
-echo "Building new API image (includes Phase 1 + 2 code)..."
+echo "Building new API image (includes all phases)..."
 docker-compose -f $COMPOSE_FILE build api
 
 if [ $? -eq 0 ]; then
