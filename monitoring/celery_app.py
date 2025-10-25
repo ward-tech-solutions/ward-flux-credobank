@@ -118,6 +118,23 @@ app.conf.beat_schedule = {
         "task": "monitoring.tasks.check_interface_thresholds",
         "schedule": 60.0,  # Every minute
     },
+    # PHASE 3: Topology & Analytics
+    # Discover network topology daily at 5 AM
+    "discover-topology": {
+        "task": "monitoring.tasks.discover_all_topology",
+        "schedule": crontab(hour=5, minute=0),  # Daily at 5:00 AM
+    },
+    # Learn traffic baselines weekly on Sunday at 6 AM
+    "learn-baselines": {
+        "task": "monitoring.tasks.learn_all_baselines",
+        "schedule": crontab(hour=6, minute=0, day_of_week=0),  # Sunday at 6:00 AM
+        "kwargs": {"lookback_days": 14},
+    },
+    # Check for anomalies every 5 minutes
+    "check-anomalies": {
+        "task": "monitoring.tasks.check_anomalies",
+        "schedule": 300.0,  # Every 5 minutes
+    },
 }
 
 # Auto-discover tasks

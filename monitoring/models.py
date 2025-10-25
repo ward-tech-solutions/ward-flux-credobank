@@ -394,3 +394,39 @@ class InterfaceMetricsSummary(Base):
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class InterfaceBaseline(Base):
+    """Learned traffic baselines for anomaly detection"""
+    __tablename__ = "interface_baselines"
+
+    id = Column(SQLAlchemyUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    interface_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("device_interfaces.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Time context
+    hour_of_day = Column(Integer, nullable=False)  # 0-23
+    day_of_week = Column(Integer, nullable=False)  # 0-6 (Monday=0)
+
+    # Traffic baselines (inbound)
+    avg_in_mbps = Column(Float)
+    std_dev_in_mbps = Column(Float)
+    min_in_mbps = Column(Float)
+    max_in_mbps = Column(Float)
+
+    # Traffic baselines (outbound)
+    avg_out_mbps = Column(Float)
+    std_dev_out_mbps = Column(Float)
+    min_out_mbps = Column(Float)
+    max_out_mbps = Column(Float)
+
+    # Error rate baselines
+    avg_error_rate = Column(Float)
+    std_dev_error_rate = Column(Float)
+
+    # Metadata
+    sample_count = Column(Integer)  # Number of samples used for baseline
+    confidence = Column(Float)  # 0.0-1.0 (more samples = higher confidence)
+    last_updated = Column(DateTime)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
