@@ -241,12 +241,12 @@ fi
 
 # Restart SNMP worker
 echo "Restarting SNMP worker..."
-docker-compose -f $COMPOSE_FILE restart worker-snmp
+docker-compose -f $COMPOSE_FILE restart celery-worker-snmp
 echo -e "${GREEN}✅ SNMP worker restarted${NC}"
 
 # Restart Celery Beat
 echo "Restarting Celery Beat..."
-docker-compose -f $COMPOSE_FILE restart beat
+docker-compose -f $COMPOSE_FILE restart celery-beat
 echo -e "${GREEN}✅ Celery Beat restarted${NC}"
 
 sleep 3
