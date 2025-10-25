@@ -103,6 +103,21 @@ app.conf.beat_schedule = {
         "schedule": crontab(hour=4, minute=0),
         "kwargs": {"days_threshold": 7},  # Remove interfaces not seen in 7 days
     },
+    # Collect interface metrics every 5 minutes
+    "collect-interface-metrics": {
+        "task": "monitoring.tasks.collect_all_interface_metrics",
+        "schedule": 300.0,  # Every 5 minutes
+    },
+    # Update interface metrics summaries every 15 minutes
+    "update-interface-summaries": {
+        "task": "monitoring.tasks.update_interface_metrics_summaries",
+        "schedule": 900.0,  # Every 15 minutes
+    },
+    # Check interface thresholds every minute
+    "check-interface-thresholds": {
+        "task": "monitoring.tasks.check_interface_thresholds",
+        "schedule": 60.0,  # Every minute
+    },
 }
 
 # Auto-discover tasks
