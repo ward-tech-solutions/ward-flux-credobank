@@ -17,6 +17,25 @@ from utils.victoriametrics_client import vm_client  # PHASE 2: VictoriaMetrics i
 logger = logging.getLogger(__name__)
 
 
+def clear_device_list_cache():
+    """
+    Clear Redis cache for device list API
+    Called when device status changes (UP/DOWN) to ensure fresh data
+    """
+    try:
+        from utils.cache import get_redis_client
+        redis_client = get_redis_client()
+        if redis_client:
+            # Clear all device list cache keys
+            pattern = "devices:list:*"
+            keys = redis_client.keys(pattern)
+            if keys:
+                redis_client.delete(*keys)
+                logger.info(f"Cleared {len(keys)} device list cache entries after status change")
+    except Exception as e:
+        logger.debug(f"Cache clear error (non-critical): {e}")
+
+
 def utcnow():
     """Get current UTC time with timezone info"""
     return datetime.now(timezone.utc)
@@ -96,6 +115,7 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
 
         # Process results
         ping_count = 0
+        cache_clear_needed = False  # Track if any device status changed
         for device_id, device_ip, result in zip(device_ids, device_ips, results):
             if isinstance(result, Exception):
                 logger.error(f"Error pinging {device_ip}: {result}")
@@ -179,6 +199,8 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
                 logger.error(f"VictoriaMetrics write failed for {device_ip}: {vm_err}")
 
             # Handle state transitions
+            status_changed = False
+
             if current_state and not previous_state:
                 # Device came UP
                 if device.down_since:
@@ -191,6 +213,7 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
                     for alert in active_alerts:
                         alert.resolved_at = utcnow()
                 device.down_since = None
+                status_changed = True
 
             elif not current_state and previous_state:
                 # Device went DOWN (was UP, now DOWN)
@@ -211,15 +234,26 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
                     notifications_sent=[]
                 )
                 db.add(new_alert)
+                status_changed = True
 
             elif not current_state and device.down_since is None:
                 # Device is DOWN but down_since not set (edge case - should be rare)
                 device.down_since = utcnow()
                 logger.warning(f"⚠️  Device {device.name} ({device_ip}) is DOWN but down_since was NULL - setting timestamp")
+                status_changed = True
+
+            # Clear device list cache if status changed
+            if status_changed:
+                cache_clear_needed = True
 
             # If device is DOWN and down_since already set, preserve the timestamp (don't reset it)
 
         db.commit()
+
+        # Clear device list cache if any status changed
+        if cache_clear_needed:
+            clear_device_list_cache()
+
         logger.info(f"Batch processed {ping_count} devices")
 
         return {"devices_pinged": ping_count, "batch_size": len(device_ids)}
