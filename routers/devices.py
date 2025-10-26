@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -261,7 +261,7 @@ def _get_standalone_devices(
 
         # Get ping metrics (response time, last check) from PingResult
         ping_response_time = None
-        last_check = None
+        last_check = None  # Initialize before any conditional blocks
         if ping:
             ping_response_time = ping.avg_rtt_ms
             last_check = int(ping.timestamp.timestamp()) if ping.timestamp else None
@@ -272,7 +272,7 @@ def _get_standalone_devices(
                 try:
                     last_check = int(datetime.fromisoformat(synced_at).timestamp())
                 except ValueError:
-                    last_check = None
+                    last_check = None  # Keep None on parse error
 
         payload.append({
             "hostid": str(device.id),

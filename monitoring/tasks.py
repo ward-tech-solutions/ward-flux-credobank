@@ -631,11 +631,13 @@ def run_scheduled_discovery(self):
 
             except Exception as e:
                 logger.error(f"Error running discovery rule {rule.name}: {e}", exc_info=True)
+                db.rollback()  # Rollback on error
 
         db.commit()
 
     except Exception as e:
         logger.error(f"Error in scheduled discovery: {e}", exc_info=True)
+        db.rollback()  # Rollback on error
     finally:
         db.close()
 

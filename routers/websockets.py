@@ -263,6 +263,9 @@ async def websocket_router_interfaces(websocket: WebSocket, hostid: str):
                 finally:
                     session.close()
 
+        # Initialize task variable before try block
+        task = None
+
         # Start background task
         task = asyncio.create_task(stream_interfaces())
 
@@ -283,14 +286,15 @@ async def websocket_router_interfaces(websocket: WebSocket, hostid: str):
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected for router {hostid}")
-        task.cancel()
+        if task:
+            task.cancel()
     except Exception as e:
         logger.info(f"WebSocket error for router {hostid}: {e}")
-        try:
-            task.cancel()
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Error: {e}")
-            pass
+        if task:
+            try:
+                task.cancel()
+            except Exception as cancel_error:
+                logger.error(f"Error cancelling task: {cancel_error}")
 
 
 @router.websocket("/ws/notifications")
