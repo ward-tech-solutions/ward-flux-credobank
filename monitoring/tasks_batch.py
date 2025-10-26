@@ -47,7 +47,15 @@ def detect_and_handle_flapping(device, current_state, previous_state, db):
 
         # Count status changes in last 5 minutes
         five_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
-        recent_changes = [t for t in (device.status_change_times or []) if t > five_minutes_ago]
+        # Ensure all timestamps are timezone-aware for comparison
+        recent_changes = []
+        if device.status_change_times:
+            for t in device.status_change_times:
+                # Make timezone-aware if needed
+                if t.tzinfo is None:
+                    t = t.replace(tzinfo=timezone.utc)
+                if t > five_minutes_ago:
+                    recent_changes.append(t)
         change_count = len(recent_changes)
 
         # Determine flapping status
