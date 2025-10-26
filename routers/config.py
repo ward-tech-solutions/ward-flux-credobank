@@ -31,7 +31,9 @@ async def get_zabbix_hostgroups(request: Request, current_user: User = Depends(g
 @router.get("/monitored-hostgroups")
 async def get_monitored_hostgroups(request: Request, current_user: User = Depends(get_current_active_user)):
     """Get currently monitored host groups from DB"""
-    conn = sqlite3.connect("data/ward_ops.db")
+    import os
+    db_path = os.getenv("SQLITE_DB_PATH", "data/ward_ops.db")
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
@@ -53,7 +55,9 @@ async def save_monitored_hostgroups(request: Request, current_user: User = Depen
     data = await request.json()
     groups = data.get("groups", [])
 
-    conn = sqlite3.connect("data/ward_ops.db")
+    import os
+    db_path = os.getenv("SQLITE_DB_PATH", "data/ward_ops.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Deactivate all existing
@@ -78,7 +82,9 @@ async def save_monitored_hostgroups(request: Request, current_user: User = Depen
 @router.get("/georgian-cities")
 async def get_georgian_cities(request: Request, current_user: User = Depends(get_current_active_user)):
     """Get all Georgian cities with regions and coordinates"""
-    conn = sqlite3.connect("data/ward_ops.db")
+    import os
+    db_path = os.getenv("SQLITE_DB_PATH", "data/ward_ops.db")
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 

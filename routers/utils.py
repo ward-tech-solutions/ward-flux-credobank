@@ -31,7 +31,9 @@ def get_zabbix_client(request):
 
 def get_monitored_groupids():
     """Get list of monitored group IDs from database"""
-    conn = sqlite3.connect("data/ward_ops.db")
+    import os
+    db_path = os.getenv("SQLITE_DB_PATH", "data/ward_ops.db")
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 

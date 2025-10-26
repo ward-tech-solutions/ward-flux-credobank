@@ -6,7 +6,7 @@ Database models for standalone monitoring system
 import uuid
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, JSON, UUID as SQLAlchemyUUID, Enum as SQLAlchemyEnum, func, Float, BigInteger
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, JSON, UUID as SQLAlchemyUUID, Enum as SQLAlchemyEnum, func, Float, BigInteger, ARRAY
 from database import Base
 
 
@@ -89,6 +89,13 @@ class StandaloneDevice(Base):
 
     # Downtime tracking
     down_since = Column(DateTime)  # When the device first went down (set when Up -> Down, cleared when Down -> Up)
+
+    # Flapping detection fields
+    is_flapping = Column(Boolean, default=False, nullable=False)  # Currently flapping?
+    flap_count = Column(Integer, default=0)  # Number of status changes in monitoring window
+    last_flap_detected = Column(DateTime)  # Last time flapping was detected
+    flapping_since = Column(DateTime)  # When flapping started
+    status_change_times = Column(ARRAY(DateTime))  # Array of recent status change timestamps
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -10,11 +10,123 @@ import time
 from celery import shared_task
 from database import SessionLocal
 from monitoring.models import StandaloneDevice
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 from utils.victoriametrics_client import vm_client  # PHASE 2: VictoriaMetrics integration
+from collections import deque
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
+
+
+def detect_and_handle_flapping(device, current_state, previous_state, db):
+    """
+    Detect if a device is flapping and handle it appropriately
+    Flapping = 3+ status changes in last 5 minutes
+
+    Returns: (is_flapping, should_create_alert)
+    """
+    try:
+        # Record this status change if it's different from previous
+        if current_state != previous_state:
+            # Log status change to database
+            db.execute(text("""
+                INSERT INTO device_status_history (device_id, old_status, new_status, timestamp)
+                VALUES (:device_id, :old_status, :new_status, NOW())
+            """), {
+                'device_id': str(device.id),
+                'old_status': 'UP' if previous_state else 'DOWN',
+                'new_status': 'UP' if current_state else 'DOWN'
+            })
+
+            # Update status_change_times array (keep last 10 changes)
+            if device.status_change_times is None:
+                device.status_change_times = []
+
+            device.status_change_times = (device.status_change_times[-9:] if device.status_change_times else []) + [datetime.now(timezone.utc)]
+
+        # Count status changes in last 5 minutes
+        five_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
+        recent_changes = [t for t in (device.status_change_times or []) if t > five_minutes_ago]
+        change_count = len(recent_changes)
+
+        # Determine flapping status
+        was_flapping = device.is_flapping
+
+        if change_count >= 3:
+            # Device is flapping
+            if not was_flapping:
+                # Just started flapping
+                device.is_flapping = True
+                device.flapping_since = datetime.now(timezone.utc)
+                device.flap_count = change_count
+                device.last_flap_detected = datetime.now(timezone.utc)
+                logger.warning(f"⚠️ FLAPPING STARTED: {device.name} ({device.ip}) - {change_count} changes in 5 minutes")
+
+                # Create a single flapping alert instead of individual UP/DOWN alerts
+                from monitoring.models import AlertHistory, AlertSeverity
+                import uuid
+
+                # Resolve any existing UP/DOWN alerts
+                db.execute(text("""
+                    UPDATE alert_history
+                    SET resolved_at = NOW()
+                    WHERE device_id = :device_id
+                    AND resolved_at IS NULL
+                    AND rule_name IN ('Device Unreachable', 'Device Recovered')
+                """), {'device_id': str(device.id)})
+
+                # Create flapping alert
+                flapping_alert = AlertHistory(
+                    id=uuid.uuid4(),
+                    device_id=device.id,
+                    rule_name="Device Flapping",
+                    severity=AlertSeverity.WARNING,
+                    message=f"Device {device.name} is flapping - {change_count} status changes in 5 minutes",
+                    value=str(change_count),
+                    threshold="3",
+                    triggered_at=datetime.now(timezone.utc),
+                    acknowledged=False,
+                    notifications_sent=[]
+                )
+                db.add(flapping_alert)
+            else:
+                # Update flapping stats
+                device.flap_count = change_count
+                device.last_flap_detected = datetime.now(timezone.utc)
+                logger.info(f"🔄 Device {device.name} still flapping - {change_count} changes")
+
+            # Don't create normal UP/DOWN alerts while flapping
+            return True, False
+
+        else:
+            # Not flapping or no longer flapping
+            if was_flapping and change_count < 2:
+                # Was flapping but has stabilized
+                device.is_flapping = False
+                device.flapping_since = None
+                device.flap_count = 0
+                logger.info(f"✅ FLAPPING STOPPED: {device.name} ({device.ip}) has stabilized")
+
+                # Resolve flapping alert
+                db.execute(text("""
+                    UPDATE alert_history
+                    SET resolved_at = NOW()
+                    WHERE device_id = :device_id
+                    AND resolved_at IS NULL
+                    AND rule_name = 'Device Flapping'
+                """), {'device_id': str(device.id)})
+
+                # Allow normal alerts again
+                return False, True
+
+            # Not flapping - proceed with normal alerting
+            return False, True
+
+    except Exception as e:
+        logger.error(f"Error in flapping detection for {device.name}: {e}")
+        # On error, allow normal alerting
+        return False, True
 
 
 def clear_device_list_cache():
@@ -202,42 +314,53 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
             except Exception as vm_err:
                 logger.error(f"VictoriaMetrics write failed for {device_ip}: {vm_err}")
 
+            # FLAPPING DETECTION: Check for flapping before handling transitions
+            is_flapping, should_create_alert = detect_and_handle_flapping(
+                device, current_state, previous_state, db
+            )
+
             # Handle state transitions
             status_changed = False
 
             if current_state and not previous_state:
                 # Device came UP
                 if device.down_since:
-                    logger.info(f"✅ Device {device.name} ({device_ip}) RECOVERED")
-                    # Resolve alerts
-                    active_alerts = db.query(AlertHistory).filter(
-                        AlertHistory.device_id == device_uuid,
-                        AlertHistory.resolved_at.is_(None)
-                    ).all()
-                    for alert in active_alerts:
-                        alert.resolved_at = utcnow()
+                    if not is_flapping:
+                        logger.info(f"✅ Device {device.name} ({device_ip}) RECOVERED")
+                        # Resolve alerts only if not flapping
+                        if should_create_alert:
+                            active_alerts = db.query(AlertHistory).filter(
+                                AlertHistory.device_id == device_uuid,
+                                AlertHistory.resolved_at.is_(None),
+                                AlertHistory.rule_name == "Device Unreachable"
+                            ).all()
+                            for alert in active_alerts:
+                                alert.resolved_at = utcnow()
                 device.down_since = None
                 status_changed = True
 
             elif not current_state and previous_state:
                 # Device went DOWN (was UP, now DOWN)
                 device.down_since = utcnow()
-                logger.warning(f"❌ Device {device.name} ({device_ip}) went DOWN")
 
-                # Create alert
-                new_alert = AlertHistory(
-                    id=uuid.uuid4(),
-                    device_id=device_uuid,
-                    rule_name="Device Unreachable",
-                    severity=AlertSeverity.CRITICAL,
-                    message=f"Device {device.name} is not responding to ICMP ping",
-                    value="0",
-                    threshold="1",
-                    triggered_at=utcnow(),
-                    acknowledged=False,
-                    notifications_sent=[]
-                )
-                db.add(new_alert)
+                if not is_flapping:
+                    logger.warning(f"❌ Device {device.name} ({device_ip}) went DOWN")
+
+                    # Create alert only if not flapping
+                    if should_create_alert:
+                        new_alert = AlertHistory(
+                            id=uuid.uuid4(),
+                            device_id=device_uuid,
+                            rule_name="Device Unreachable",
+                            severity=AlertSeverity.CRITICAL,
+                            message=f"Device {device.name} is not responding to ICMP ping",
+                            value="0",
+                            threshold="1",
+                            triggered_at=utcnow(),
+                            acknowledged=False,
+                            notifications_sent=[]
+                        )
+                        db.add(new_alert)
                 status_changed = True
 
             elif not current_state and device.down_since is None:
