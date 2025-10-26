@@ -247,19 +247,26 @@ def _get_standalone_devices(
             branch_name = branch_obj.display_name
             region_name = branch_obj.region or ""
 
-        ping_status = "Unknown"
+        # CRITICAL FIX: Use device.down_since as the SOURCE OF TRUTH for status
+        # The down_since field is updated by the monitoring worker and is always current
+        # Previously this was using PingResult.is_reachable which could be stale
+        if device.down_since is not None:
+            # Device is DOWN - down_since timestamp exists
+            ping_status = "Down"
+            available = "Unavailable"
+        else:
+            # Device is UP - down_since is NULL
+            ping_status = "Up"
+            available = "Available"
+
+        # Get ping metrics (response time, last check) from PingResult
         ping_response_time = None
         last_check = None
-        available = "Unknown"
         if ping:
-            ping_status = "Up" if ping.is_reachable else "Down"
             ping_response_time = ping.avg_rtt_ms
             last_check = int(ping.timestamp.timestamp()) if ping.timestamp else None
-            available = "Available" if ping.is_reachable else "Unavailable"
         else:
-            ping_status = fields.get("ping_status", "Unknown")
             ping_response_time = fields.get("ping_response_time")
-            available = fields.get("available", "Unknown")
             synced_at = fields.get("synced_at")
             if synced_at:
                 try:
@@ -323,19 +330,26 @@ def _standalone_device_to_payload(db: Session, device: StandaloneDevice) -> Dict
             branch_name = branch.display_name
             region_name = branch.region or ""
 
-    ping_status = "Unknown"
+    # CRITICAL FIX: Use device.down_since as the SOURCE OF TRUTH for status
+    # The down_since field is updated by the monitoring worker and is always current
+    # Previously this was using PingResult.is_reachable which could be stale
+    if device.down_since is not None:
+        # Device is DOWN - down_since timestamp exists
+        ping_status = "Down"
+        available = "Unavailable"
+    else:
+        # Device is UP - down_since is NULL
+        ping_status = "Up"
+        available = "Available"
+
+    # Get ping metrics (response time, last check) from PingResult
     ping_response_time = None
     last_check = None
-    available = "Unknown"
     if ping:
-        ping_status = "Up" if ping.is_reachable else "Down"
         ping_response_time = ping.avg_rtt_ms
         last_check = int(ping.timestamp.timestamp()) if ping.timestamp else None
-        available = "Available" if ping.is_reachable else "Unavailable"
     else:
-        ping_status = fields.get("ping_status", "Unknown")
         ping_response_time = fields.get("ping_response_time")
-        available = fields.get("available", "Unknown")
         synced_at = fields.get("synced_at")
         if synced_at:
             try:
