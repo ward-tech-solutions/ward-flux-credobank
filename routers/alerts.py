@@ -254,9 +254,20 @@ async def get_alerts(
     elif status == "active":
         query = query.filter(AlertHistory.resolved_at.is_(None))
 
-    # Filter by severity
+    # Filter by severity (case-insensitive, map to enum)
     if severity:
-        query = query.filter(AlertHistory.severity == severity.upper())
+        try:
+            from monitoring.models import AlertSeverity
+            sev_enum = AlertSeverity(severity.lower())
+            query = query.filter(AlertHistory.severity == sev_enum)
+        except Exception:
+            # Unknown severity provided; return empty result consistently
+            return {
+                "alerts": [],
+                "total": 0,
+                "limit": limit,
+                "offset": offset,
+            }
 
     # Order by most recent first
     query = query.order_by(desc(AlertHistory.triggered_at))
@@ -317,7 +328,18 @@ async def get_alerts(
     elif status == "active":
         count_query = count_query.filter(AlertHistory.resolved_at.is_(None))
     if severity:
-        count_query = count_query.filter(AlertHistory.severity == severity.upper())
+        try:
+            from monitoring.models import AlertSeverity
+            sev_enum = AlertSeverity(severity.lower())
+            count_query = count_query.filter(AlertHistory.severity == sev_enum)
+        except Exception:
+            total = 0
+            return {
+                "alerts": [],
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+            }
 
     total = count_query.count()
 

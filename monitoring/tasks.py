@@ -805,8 +805,16 @@ def evaluate_alert_rules(self):
                     
                     if should_trigger and not existing_alert:
                         # ALERT DEDUPLICATION: Check if we should suppress this alert
+                        try:
+                            from monitoring.models import AlertSeverity as _AlertSeverity
+                            new_sev = _AlertSeverity(rule.severity.lower())
+                        except Exception:
+                            # Default to MEDIUM if rule severity string is unexpected
+                            from monitoring.models import AlertSeverity as _AlertSeverity
+                            new_sev = _AlertSeverity.MEDIUM
+
                         if not AlertDeduplicator.should_create_alert(
-                            device.id, rule.name, rule.severity, db
+                            device.id, rule.name, new_sev, db
                         ):
                             logger.info(f"Suppressing duplicate alert: {rule.name} for {device.name}")
                             continue
@@ -817,7 +825,7 @@ def evaluate_alert_rules(self):
                             rule_id=rule.id,
                             device_id=device.id,
                             rule_name=rule.name,
-                            severity=rule.severity,
+                            severity=new_sev,
                             message=alert_message,
                             value=alert_value,
                             threshold=rule.expression,
@@ -829,7 +837,7 @@ def evaluate_alert_rules(self):
 
                         # Auto-resolve lower-severity duplicate alerts
                         AlertDeduplicator.resolve_lower_severity_alerts(
-                            device.id, rule.name, rule.severity, db
+                            device.id, rule.name, new_sev, db
                         )
 
                         triggered_count += 1

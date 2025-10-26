@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE = '/api/v1'
+const API_BASE = (import.meta as any).env?.VITE_API_URL || '/api/v1'
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
@@ -11,14 +11,13 @@ export const apiClient = axios.create({
 })
 
 // Request interceptor
-apiClient.interceptors.request.use(
-  (config) => {
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    (config.headers as any).Authorization = `Bearer ${token}`
   }
-)
+  return config
+})
 
 // Response interceptor for error handling
 apiClient.interceptors.response.use(

@@ -224,13 +224,15 @@ from routers import (
     discovery,
     infrastructure,
     interfaces,
-    monitoring,
     reports,
     settings,
     snmp_credentials,
     templates,
     websockets,
 )
+
+# Feature flags / runtime gates
+ENABLE_ZABBIX_ROUTES = os.getenv("ENABLE_ZABBIX_ROUTES", "false").lower() == "true"
 
 app.include_router(auth.router)
 app.include_router(config.router)
@@ -249,8 +251,12 @@ app.include_router(dashboard.router)
 app.include_router(diagnostics.router)
 app.include_router(websockets.router)
 app.include_router(infrastructure.router)
-app.include_router(monitoring.router)
 app.include_router(interfaces.router)
+
+# Zabbix-dependent routes are disabled by default in standalone mode
+if ENABLE_ZABBIX_ROUTES:
+    from routers import monitoring as monitoring
+    app.include_router(monitoring.router)
 
 # ============================================
 # Security Middleware
@@ -496,6 +502,15 @@ async def simple_health_check(request: Request):
 @app.get("/api/dashboard-stats")
 async def api_dashboard_stats_legacy(request: Request, region: Optional[str] = None):
     """Legacy route - no auth for backward compatibility"""
+    if not ENABLE_ZABBIX_ROUTES:
+        return JSONResponse(
+            status_code=410,
+            content={
+                "error": "Zabbix integration disabled",
+                "message": "This endpoint is not available in standalone mode.",
+            },
+        )
+
     zabbix = request.app.state.zabbix
 
     # Run sync methods in thread pool
@@ -617,13 +632,21 @@ async def api_search_legacy(
 
 @app.get("/api/topology")
 async def api_topology_legacy(
-    request: Request,
     view: str = "hierarchical",
     limit: int = 200,
     region: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
 ):
+    """Topology view - back-compat route. Proxies to v1 without auth."""
+    from routers.infrastructure import get_topology as v1_topology
+    from types import SimpleNamespace
+    from database import UserRole
+
+    # Use admin-like pseudo user to avoid filtering for public topology view
+    pseudo_user = SimpleNamespace(role=UserRole.ADMIN, branches=None, region=None)
+    return await v1_topology(view=view, limit=limit, region=region, db=db, current_user=pseudo_user)
+    return await v1_topology(view=view, limit=limit, region=region, db=db, current_user=pseudo_user)
+    
     """Topology view - using standalone devices (no Zabbix)"""
     from monitoring.models import StandaloneDevice
     from database import PingResult

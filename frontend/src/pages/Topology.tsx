@@ -302,21 +302,10 @@ export default function Topology() {
     try {
       setLoading(true)
 
-      // Build URL with optional device filter
-      let url = '/api/topology?view=hierarchical&limit=200'
-      if (selectedDeviceId) {
-        // Loading topology for selected device
-        // Note: Backend would need to support device filtering in the future
-        // For now, we'll filter on the frontend
-      }
-
-      const response = await fetch(url)
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data: TopologyData = await response.json()
+      // Load topology via authenticated API client
+      const { api } = await import('@/api/client')
+      const res = await api.getTopology({ view: 'hierarchical', limit: 200 })
+      const data: TopologyData = res.data as any
       // Data loaded successfully
 
       if (!window.vis) {

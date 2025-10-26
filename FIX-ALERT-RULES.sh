@@ -18,31 +18,32 @@ ORDER BY name;"
 # Clean up ALL old rules and start fresh
 echo ""
 echo "🗑️  Removing old/duplicate alert rules..."
-docker exec wardops-postgres-prod psql -U ward_admin -d ward_ops << 'EOF'
+# IMPORTANT: Stop on first SQL error and cascade truncate across FKs (alert_history)
+docker exec -i wardops-postgres-prod psql -v ON_ERROR_STOP=1 -U ward_admin -d ward_ops << 'EOF'
 -- First backup existing rules
 CREATE TABLE IF NOT EXISTS alert_rules_backup AS
 SELECT * FROM alert_rules;
 
 -- Clear all old rules
-TRUNCATE TABLE alert_rules;
+TRUNCATE TABLE alert_rules CASCADE;
 
 -- Insert new real-time alert rules
 INSERT INTO alert_rules (id, name, description, expression, severity, enabled, created_at, updated_at) VALUES
 -- Device connectivity (10-second detection)
-(gen_random_uuid(), 'Device Down', 'Device not responding for 10 seconds', 'ping_unreachable >= 10', 'CRITICAL', true, NOW(), NOW()),
-(gen_random_uuid(), 'Device Flapping', 'Device status changing frequently', 'status_changes >= 3 in 5min', 'HIGH', true, NOW(), NOW()),
+(gen_random_uuid(), 'Device Down', 'Device not responding for 10 seconds', 'ping_unreachable >= 10', 'critical', true, NOW(), NOW()),
+(gen_random_uuid(), 'Device Flapping', 'Device status changing frequently', 'status_changes >= 3 in 5min', 'high', true, NOW(), NOW()),
 
 -- ISP Link alerts (special handling for .5 IPs)
-(gen_random_uuid(), 'ISP Link Down', 'ISP link not responding for 10 seconds', 'ping_unreachable >= 10 AND ip LIKE %.5', 'CRITICAL', true, NOW(), NOW()),
-(gen_random_uuid(), 'ISP Link Flapping', 'ISP link unstable connection', 'status_changes >= 2 in 5min AND ip LIKE %.5', 'CRITICAL', true, NOW(), NOW()),
+(gen_random_uuid(), 'ISP Link Down', 'ISP link not responding for 10 seconds', 'ping_unreachable >= 10 AND ip LIKE ''%.5''', 'critical', true, NOW(), NOW()),
+(gen_random_uuid(), 'ISP Link Flapping', 'ISP link unstable connection', 'status_changes >= 2 in 5min AND ip LIKE ''%.5''', 'critical', true, NOW(), NOW()),
 
 -- Performance alerts
-(gen_random_uuid(), 'High Latency', 'Response time exceeds 200ms', 'avg_ping_ms > 200', 'MEDIUM', true, NOW(), NOW()),
-(gen_random_uuid(), 'ISP High Latency', 'ISP link latency exceeds 100ms', 'avg_ping_ms > 100 AND ip LIKE %.5', 'HIGH', true, NOW(), NOW()),
+(gen_random_uuid(), 'High Latency', 'Response time exceeds 200ms', 'avg_ping_ms > 200', 'medium', true, NOW(), NOW()),
+(gen_random_uuid(), 'ISP High Latency', 'ISP link latency exceeds 100ms', 'avg_ping_ms > 100 AND ip LIKE ''%.5''', 'high', true, NOW(), NOW()),
 
 -- Packet loss alerts
-(gen_random_uuid(), 'Packet Loss', 'Device experiencing packet loss', 'packet_loss > 10', 'MEDIUM', true, NOW(), NOW()),
-(gen_random_uuid(), 'ISP Packet Loss', 'ISP link packet loss detected', 'packet_loss > 5 AND ip LIKE %.5', 'CRITICAL', true, NOW(), NOW());
+(gen_random_uuid(), 'Packet Loss', 'Device experiencing packet loss', 'packet_loss > 10', 'medium', true, NOW(), NOW()),
+(gen_random_uuid(), 'ISP Packet Loss', 'ISP link packet loss detected', 'packet_loss > 5 AND ip LIKE ''%.5''', 'critical', true, NOW(), NOW());
 
 -- Show new rules
 SELECT 'New Alert Rules Created:' as status;
@@ -59,7 +60,7 @@ EOF
 # Add missing columns if needed
 echo ""
 echo "🔧 Updating alert_rules table structure..."
-docker exec wardops-postgres-prod psql -U ward_admin -d ward_ops << 'EOF'
+docker exec -i wardops-postgres-prod psql -v ON_ERROR_STOP=1 -U ward_admin -d ward_ops << 'EOF'
 -- Add columns for better rule management
 ALTER TABLE alert_rules
 ADD COLUMN IF NOT EXISTS rule_type VARCHAR(50) DEFAULT 'threshold',
@@ -87,7 +88,7 @@ EOF
 # Clear any stuck alerts from old rules
 echo ""
 echo "🧹 Cleaning up old alerts..."
-docker exec wardops-postgres-prod psql -U ward_admin -d ward_ops << 'EOF'
+docker exec -i wardops-postgres-prod psql -v ON_ERROR_STOP=1 -U ward_admin -d ward_ops << 'EOF'
 -- Resolve old alerts from deleted rules
 UPDATE alert_history
 SET resolved_at = NOW()
