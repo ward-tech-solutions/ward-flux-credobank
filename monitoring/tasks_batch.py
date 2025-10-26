@@ -31,9 +31,13 @@ def clear_device_list_cache():
             keys = redis_client.keys(pattern)
             if keys:
                 redis_client.delete(*keys)
-                logger.info(f"Cleared {len(keys)} device list cache entries after status change")
+                logger.info(f"🗑️  Cleared {len(keys)} device list cache entries after status change")
+            else:
+                logger.info(f"🗑️  Cache clearing triggered but no cache keys found (cache was already empty)")
+        else:
+            logger.warning(f"⚠️  Cache clearing triggered but Redis client is None")
     except Exception as e:
-        logger.debug(f"Cache clear error (non-critical): {e}")
+        logger.warning(f"⚠️  Cache clear error (non-critical): {e}")
 
 
 def utcnow():
@@ -252,7 +256,10 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
 
         # Clear device list cache if any status changed
         if cache_clear_needed:
+            logger.info(f"🔔 Status change detected in batch - clearing device list cache")
             clear_device_list_cache()
+        else:
+            logger.debug(f"No status changes in this batch (cache_clear_needed={cache_clear_needed})")
 
         logger.info(f"Batch processed {ping_count} devices")
 
