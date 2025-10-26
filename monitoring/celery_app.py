@@ -120,6 +120,19 @@ app.conf.beat_schedule = {
         "task": "monitoring.tasks.check_interface_thresholds",
         "schedule": 60.0,  # Every minute
     },
+
+    # REAL-TIME ALERT EVALUATION - Every 10 seconds
+    "evaluate-alerts-realtime": {
+        "task": "monitoring.alert_system.evaluate_alerts",
+        "schedule": 10.0,  # Every 10 seconds for near real-time alerting
+        "options": {"queue": "alerts"},  # High priority queue
+    },
+
+    # Cleanup duplicate alerts daily
+    "cleanup-duplicate-alerts": {
+        "task": "monitoring.alert_system.cleanup_duplicates",
+        "schedule": crontab(hour=1, minute=0),  # Daily at 1 AM
+    },
     # PHASE 3: Topology & Analytics
     # Discover network topology daily at 5 AM
     "discover-topology": {
