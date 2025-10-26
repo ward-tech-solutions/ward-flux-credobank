@@ -89,7 +89,7 @@ def detect_and_handle_flapping(device, current_state, previous_state, db):
                     id=uuid.uuid4(),
                     device_id=device.id,
                     rule_name="Device Flapping",
-                    severity=AlertSeverity.WARNING,
+                    severity=AlertSeverity.HIGH,
                     message=f"Device {device.name} is flapping - {change_count} status changes in 5 minutes",
                     value=str(change_count),
                     threshold="3",
@@ -132,7 +132,7 @@ def detect_and_handle_flapping(device, current_state, previous_state, db):
             return False, True
 
     except Exception as e:
-        logger.error(f"Error in flapping detection for {device.name}: {e}")
+        logger.error(f"Error in flapping detection for {device.name}: {str(e)}", exc_info=True)
         # On error, allow normal alerting
         return False, True
 
