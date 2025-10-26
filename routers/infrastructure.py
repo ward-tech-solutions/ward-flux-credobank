@@ -40,11 +40,14 @@ def _filter_devices_for_user(devices: List[StandaloneDevice], user: User) -> Lis
 
 def _serialize_device(device: StandaloneDevice, latest_ping: Optional[PingResult]) -> Dict:
     fields = device.custom_fields or {}
-    status = "Unknown"
-    if latest_ping:
-        status = "Up" if latest_ping.is_reachable else "Down"
-    elif fields.get("ping_status"):
-        status = fields.get("ping_status")
+    # CRITICAL FIX: Use device.down_since as SOURCE OF TRUTH for status
+    # The down_since field is updated by the monitoring worker and is always current
+    if device.down_since is not None:
+        # Device is DOWN - down_since timestamp exists
+        status = "Down"
+    else:
+        # Device is UP - down_since is NULL
+        status = "Up"
 
     return {
         "id": str(device.id),

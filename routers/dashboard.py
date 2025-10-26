@@ -189,14 +189,15 @@ def _get_standalone_dashboard_stats(
         latitude = fields.get("latitude")
         longitude = fields.get("longitude")
 
-        ping = ping_lookup.get(device.ip)
-        if ping:
-            # PHASE 3: ping is now a dict (from VictoriaMetrics), not PingResult object
-            status = "Up" if ping.get("is_reachable") else "Down"
+        # CRITICAL FIX: Use device.down_since as SOURCE OF TRUTH for status
+        # The down_since field is updated by the monitoring worker and is always current
+        # Don't rely on ping data from VictoriaMetrics which may be stale
+        if device.down_since is not None:
+            # Device is DOWN - down_since timestamp exists
+            status = "Down"
         else:
-            # PHASE 3 ROBUSTNESS: If VM fails, use device.down_since (always current!)
-            # device.down_since is updated in real-time by monitoring worker
-            status = "Down" if device.down_since else "Up"
+            # Device is UP - down_since is NULL
+            status = "Up"
 
         if status == "Up":
             online_devices += 1

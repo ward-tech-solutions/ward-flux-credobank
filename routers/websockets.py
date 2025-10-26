@@ -143,13 +143,15 @@ async def monitor_device_changes(_app: FastAPI):
                     # Skip devices without IP addresses
                     if not device.ip:
                         continue
-                    ping = ping_lookup.get(device.ip)
-                    if ping:
-                        # PHASE 3: ping is now a dict from VictoriaMetrics
-                        current_status = "Up" if ping.get("is_reachable") else "Down"
+                    # CRITICAL FIX: Use device.down_since as SOURCE OF TRUTH for status
+                    # The down_since field is updated by the monitoring worker and is always current
+                    # Don't rely on ping data from VictoriaMetrics which may be stale
+                    if device.down_since is not None:
+                        # Device is DOWN - down_since timestamp exists
+                        current_status = "Down"
                     else:
-                        # PHASE 3: Fallback to device.down_since if VM query failed
-                        current_status = "Down" if device.down_since else "Up"
+                        # Device is UP - down_since is NULL
+                        current_status = "Up"
 
                     if device_id in last_state:
                         if last_state[device_id] != current_status:
