@@ -354,12 +354,19 @@ class SNMPPoller:
         Returns:
             pysnmp auth data object
         """
-        if credentials.version == "v2c":
+        # Normalize version string (handle both "2c" and "v2c")
+        version = credentials.version.lower()
+        if version == "2c":
+            version = "v2c"
+        elif version == "3":
+            version = "v3"
+
+        if version == "v2c":
             # SNMPv2c
             community = credentials.community or "public"
             return CommunityData(community, mpModel=1)  # mpModel=1 for v2c
 
-        elif credentials.version == "v3":
+        elif version == "v3":
             # SNMPv3
             auth_protocol_map = {
                 "MD5": usmHMACMD5AuthProtocol,
