@@ -459,6 +459,102 @@ def trigger_all_discovery(
         raise HTTPException(status_code=500, detail=f"Failed to trigger discovery: {str(e)}")
 
 
+@router.get("/isp-status/bulk")
+def get_bulk_isp_status(
+    device_ips: str = Query(..., description="Comma-separated list of device IPs"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get ISP status for multiple devices in a single query (OPTIMIZED)
+
+    This endpoint uses bulk fetching to avoid N+1 queries.
+    Perfect for the Monitor page where we need ISP status for all .5 routers at once.
+
+    Query: GET /api/v1/interfaces/isp-status/bulk?device_ips=10.195.57.5,10.195.110.5
+
+    Returns:
+    {
+        "10.195.57.5": {
+            "magti": {"status": "up", "oper_status": 1, "if_name": "FastEthernet3", "last_seen": "..."},
+            "silknet": {"status": "up", "oper_status": 1, "if_name": "FastEthernet4", "last_seen": "..."}
+        },
+        "10.195.110.5": { ... }
+    }
+    """
+    try:
+        # Parse device IPs
+        ip_list = [ip.strip() for ip in device_ips.split(',') if ip.strip()]
+
+        if not ip_list:
+            raise HTTPException(status_code=400, detail="No device IPs provided")
+
+        if len(ip_list) > 200:
+            raise HTTPException(status_code=400, detail="Too many devices requested (max 200)")
+
+        # OPTIMIZATION: Single bulk query for all devices and their ISP interfaces
+        # Replaces N queries with 1 query
+        query = select(
+            StandaloneDevice.ip,
+            DeviceInterface.isp_provider,
+            DeviceInterface.oper_status,
+            DeviceInterface.if_name,
+            DeviceInterface.if_alias,
+            DeviceInterface.last_seen,
+            DeviceInterface.last_status_change
+        ).join(
+            DeviceInterface,
+            StandaloneDevice.id == DeviceInterface.device_id
+        ).where(
+            and_(
+                StandaloneDevice.ip.in_(ip_list),
+                DeviceInterface.interface_type == 'isp',
+                DeviceInterface.isp_provider.isnot(None)
+            )
+        ).order_by(
+            StandaloneDevice.ip,
+            DeviceInterface.if_index
+        )
+
+        results = db.execute(query).all()
+
+        # Build response dictionary
+        isp_status = {}
+        for ip, isp_provider, oper_status, if_name, if_alias, last_seen, last_status_change in results:
+            if ip not in isp_status:
+                isp_status[ip] = {}
+
+            # Determine status string
+            if oper_status == 1:
+                status = "up"
+            elif oper_status == 2:
+                status = "down"
+            else:
+                status = "unknown"
+
+            isp_status[ip][isp_provider] = {
+                "status": status,
+                "oper_status": oper_status,
+                "if_name": if_name,
+                "if_alias": if_alias,
+                "last_seen": last_seen.isoformat() if last_seen else None,
+                "last_status_change": last_status_change.isoformat() if last_status_change else None
+            }
+
+        # Add empty entries for devices with no ISP interfaces discovered
+        for ip in ip_list:
+            if ip not in isp_status:
+                isp_status[ip] = {}
+
+        return isp_status
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get bulk ISP status: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get bulk ISP status: {str(e)}")
+
+
 @router.patch("/{interface_id}", response_model=InterfaceResponse)
 def update_interface(
     interface_id: str,

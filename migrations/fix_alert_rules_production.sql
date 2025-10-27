@@ -1,5 +1,7 @@
 -- CRITICAL FIX: Clean up duplicate and incorrect alert rules on production
 -- This fixes the parsing errors and duplicate rules found in production
+-- Database: ward_ops
+-- User: ward_admin
 
 BEGIN;
 

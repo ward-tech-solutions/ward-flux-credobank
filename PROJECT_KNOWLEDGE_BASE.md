@@ -363,26 +363,59 @@ docker-compose -f docker-compose.production-priority-queues.yml build --no-cache
 
 ## 🎯 NEXT STEPS / TODO
 
-### ISP Monitoring Enhancement (IN PROGRESS)
-**Goal:** Individual Magti/Silknet status tracking
+### ISP Monitoring Enhancement (IN PROGRESS - Oct 27, 2025)
+**Goal:** Individual Magti/Silknet status tracking with independent GREEN/RED badges
 
 **Requirements:**
 1. ✅ Identify ISP interfaces (Interface 4=Magti, 5=Silknet)
-2. ⏳ Poll interface status via SNMP every 60s
-3. ⏳ Store individual ISP status in database
-4. ⏳ Update API to return per-ISP status
-5. ⏳ Update UI badges to show independent GREEN/RED
+2. ✅ Database infrastructure exists (`device_interfaces` table)
+3. ⏳ Run interface discovery for all 93 .5 routers
+4. ✅ API endpoint created: `/api/v1/interfaces/isp-status/bulk` (OPTIMIZED)
+5. ⏳ Update frontend to fetch and display per-ISP status
+6. ⏳ Schedule automatic interface status polling (every 60s)
 
-**Database Changes Needed:**
-- Add fields to standalone_devices:
-  - `magti_interface_status` (up/down/unknown)
-  - `silknet_interface_status` (up/down/unknown)
-  - `last_snmp_poll` (timestamp)
+**Hybrid PostgreSQL + VictoriaMetrics Architecture:**
+- ✅ **PostgreSQL**: Source of truth for current ISP interface status
+  - `device_interfaces.oper_status` (1=UP, 2=DOWN)
+  - `device_interfaces.isp_provider` ('magti', 'silknet')
+  - Bulk-fetched with single query (avoids N+1 problem)
+  - Fast indexed lookups by device IP
+- ✅ **VictoriaMetrics**: Historical time-series metrics only
+  - Interface bandwidth, packet counters, errors
+  - Adaptive query resolution (5m/15m/1h steps)
+  - Not used for real-time status (reduces query load)
 
-**SNMP Implementation:**
-- Poll OID `1.3.6.1.2.1.2.2.1.8.4` (Magti - ifOperStatus)
-- Poll OID `1.3.6.1.2.1.2.2.1.8.5` (Silknet - ifOperStatus)
-- 1 = UP, 2 = DOWN
+**New Optimized API Endpoint:**
+```bash
+GET /api/v1/interfaces/isp-status/bulk?device_ips=10.195.57.5,10.195.110.5
+```
+
+**Response:**
+```json
+{
+  "10.195.57.5": {
+    "magti": {
+      "status": "up",
+      "oper_status": 1,
+      "if_name": "FastEthernet3",
+      "if_alias": "Magti_Internet",
+      "last_seen": "2025-10-27T10:30:00Z"
+    },
+    "silknet": {
+      "status": "up",
+      "oper_status": 1,
+      "if_name": "FastEthernet4",
+      "if_alias": "Silknet_Internet",
+      "last_seen": "2025-10-27T10:30:00Z"
+    }
+  }
+}
+```
+
+**Performance Benefits:**
+- **Before**: N queries (one per .5 router) = 93 queries
+- **After**: 1 bulk query for all routers = 1 query
+- **Improvement**: 93x reduction in database queries
 
 ---
 
