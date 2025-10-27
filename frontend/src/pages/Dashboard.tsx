@@ -105,42 +105,54 @@ export default function DashboardEnhanced() {
     }
   })
 
-  const statsCards: Array<{ title: string; value: number | string; icon: LucideIcon; badgeVariant: BadgeVariant }> = [
+  const statsCards: Array<{
+    title: string;
+    value: number | string;
+    icon: LucideIcon;
+    badgeVariant: BadgeVariant;
+    onClick?: () => void;
+  }> = [
     {
       title: 'Total Devices',
       value: stats?.total_devices || 0,
       icon: Server,
       badgeVariant: 'info' as const,
+      onClick: () => navigate('/devices'),
     },
     {
       title: 'Online',
       value: stats?.online_devices || 0,
       icon: CheckCircle,
       badgeVariant: 'success' as const,
+      onClick: () => navigate('/devices?status=up'),
     },
     {
       title: 'Offline',
       value: stats?.offline_devices || 0,
       icon: XCircle,
       badgeVariant: 'danger' as const,
+      onClick: () => navigate('/devices?status=down'),
     },
     {
       title: 'System Uptime',
       value: `${stats?.uptime_percentage || 0}%`,
       icon: TrendingUp,
       badgeVariant: 'info' as const,
+      onClick: () => navigate('/monitor'),
     },
     {
       title: 'Active Alerts',
       value: stats?.active_alerts || 0,
       icon: AlertTriangle,
       badgeVariant: 'warning' as const,
+      onClick: () => navigate('/monitor'),
     },
     {
       title: 'Critical Issues',
       value: stats?.critical_alerts || 0,
       icon: AlertTriangle,
       badgeVariant: 'danger' as const,
+      onClick: () => navigate('/monitor?severity=critical'),
     },
   ]
 
@@ -186,7 +198,13 @@ export default function DashboardEnhanced() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {statsCards.map((stat, index) => (
-          <Card key={index} variant="glass" hover>
+          <Card
+            key={index}
+            variant="glass"
+            hover
+            onClick={stat.onClick}
+            className={stat.onClick ? 'cursor-pointer' : ''}
+          >
             <CardContent className="p-6 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.title}</p>
