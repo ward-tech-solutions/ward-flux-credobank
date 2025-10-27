@@ -839,15 +839,31 @@ export default function Monitor() {
           </div>
         </div>
 
-        {/* Ping Now button */}
-        <button
-          onClick={(e) => handlePing(device.hostid, e)}
-          disabled={isPinging}
-          className="absolute bottom-3 right-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-200 dark:border-gray-600"
-          title="Ping Now"
-        >
-          <Activity className="h-4 w-4 text-ward-green" />
-        </button>
+        {/* Action buttons */}
+        <div className="absolute bottom-3 right-3 flex gap-2">
+          {/* Topology button for ISP routers (.5 devices) */}
+          {isISPRouter(device.ip) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                window.location.href = `/topology?deviceId=${device.hostid}&deviceName=${encodeURIComponent(device.display_name)}`
+              }}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
+              title="View ISP Topology"
+            >
+              <Network className="h-4 w-4 text-ward-green" />
+            </button>
+          )}
+          {/* Ping Now button */}
+          <button
+            onClick={(e) => handlePing(device.hostid, e)}
+            disabled={isPinging}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-200 dark:border-gray-600"
+            title="Ping Now"
+          >
+            <Activity className="h-4 w-4 text-ward-green" />
+          </button>
+        </div>
       </div>
     )
   }
@@ -1319,15 +1335,14 @@ export default function Monitor() {
                                 <Activity className="h-4 w-4 text-ward-green" />
                               )}
                             </button>
-                            {(device.device_type?.toLowerCase().includes('router') ||
-                              device.device_type?.toLowerCase().includes('switch')) && (
+                            {isISPRouter(device.ip) && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   window.location.href = `/topology?deviceId=${device.hostid}&deviceName=${encodeURIComponent(device.display_name)}`
                                 }}
                                 className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                                title="Topology"
+                                title="View ISP Topology"
                               >
                                 <Network className="h-4 w-4 text-ward-green" />
                               </button>
