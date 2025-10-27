@@ -8,20 +8,11 @@ echo "🚀 WARD OPS Starting..."
 echo "Environment: ${ENVIRONMENT:-development}"
 echo "Python version: $(python3 --version)"
 
-# Wait for database to be ready
+# Wait a bit for database to be ready (docker-compose depends_on handles most of this)
 if [ -n "$DATABASE_URL" ]; then
-    echo "⏳ Waiting for database..."
-
-    # Extract database host from DATABASE_URL
-    DB_HOST=$(echo $DATABASE_URL | sed -n 's/.*@\([^:]*\):.*/\1/p')
-
-    # Wait for PostgreSQL to be ready
-    until pg_isready -h "$DB_HOST" -U ward_admin > /dev/null 2>&1; do
-        echo "   Database is unavailable - sleeping"
-        sleep 1
-    done
-
-    echo "✅ Database is ready!"
+    echo "⏳ Waiting for database (5 seconds)..."
+    sleep 5
+    echo "✅ Proceeding with startup"
 fi
 
 # Run database migrations for API and Beat services
