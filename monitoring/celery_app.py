@@ -122,16 +122,17 @@ app.conf.beat_schedule = {
     },
 
     # REAL-TIME ALERT EVALUATION - Every 10 seconds
+    # Using FIXED evaluator that doesn't parse SQL expressions
     "evaluate-alerts-realtime": {
-        "task": "monitoring.alert_system.evaluate_alerts",
+        "task": "monitoring.alert_evaluator.evaluate_all_alerts",  # Fixed evaluator
         "schedule": 10.0,  # Every 10 seconds for near real-time alerting
         "options": {"queue": "alerts"},  # High priority queue
     },
 
-    # Cleanup duplicate alerts daily
-    "cleanup-duplicate-alerts": {
-        "task": "monitoring.alert_system.cleanup_duplicates",
-        "schedule": crontab(hour=1, minute=0),  # Daily at 1 AM
+    # Cleanup stale alerts hourly
+    "cleanup-stale-alerts": {
+        "task": "monitoring.alert_evaluator.cleanup_stale_alerts",
+        "schedule": 3600.0,  # Every hour
     },
     # PHASE 3: Topology & Analytics
     # Discover network topology daily at 5 AM
