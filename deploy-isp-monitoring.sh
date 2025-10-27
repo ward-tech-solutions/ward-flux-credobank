@@ -35,24 +35,55 @@ echo ""
 
 # Trigger discovery
 echo "Triggering interface discovery..."
-docker exec wardops-worker-snmp-prod python3 << EOF
+docker exec wardops-worker-snmp-prod python3 << 'EOF'
 import sys
+import logging
 sys.path.insert(0, '/app')
 
-from monitoring.tasks_interface_discovery import discover_device_interfaces_task
+# Enable verbose logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
-print("Discovering interfaces for device $DEVICE_ID...")
-result = discover_device_interfaces_task('$DEVICE_ID')
+try:
+    from monitoring.tasks_interface_discovery import discover_device_interfaces_task
 
-print("\nDiscovery Result:")
-print(f"  Success: {result.get('success', False)}")
-print(f"  Device IP: {result.get('device_ip', 'N/A')}")
-print(f"  Interfaces Found: {result.get('interfaces_found', 0)}")
-print(f"  Interfaces Saved: {result.get('interfaces_saved', 0)}")
-print(f"  Critical Interfaces: {result.get('critical_interfaces', 0)}")
-print(f"  ISP Interfaces: {result.get('isp_interfaces', [])}")
-if result.get('error'):
-    print(f"  ERROR: {result['error']}")
+    device_id = '$DEVICE_ID'
+    print(f"\n{'='*60}")
+    print(f"Discovering interfaces for device {device_id}...")
+    print(f"{'='*60}\n")
+
+    result = discover_device_interfaces_task(device_id)
+
+    print(f"\n{'='*60}")
+    print("Discovery Result:")
+    print(f"{'='*60}")
+    print(f"  Success: {result.get('success', False)}")
+    print(f"  Device IP: {result.get('device_ip', 'N/A')}")
+    print(f"  Interfaces Found: {result.get('interfaces_found', 0)}")
+    print(f"  Interfaces Saved: {result.get('interfaces_saved', 0)}")
+    print(f"  Critical Interfaces: {result.get('critical_interfaces', 0)}")
+    print(f"  ISP Interfaces: {result.get('isp_interfaces', [])}")
+    print(f"  Skipped Loopback: {result.get('skipped_loopback', 0)}")
+
+    if result.get('error'):
+        print(f"\n  ❌ ERROR: {result['error']}")
+        sys.exit(1)
+
+    if result.get('success') and result.get('interfaces_saved', 0) == 0:
+        print(f"\n  ⚠️  WARNING: Discovery succeeded but saved 0 interfaces!")
+        print(f"  This might indicate:")
+        print(f"    - No interfaces found via SNMP")
+        print(f"    - All interfaces were filtered out (loopback, etc.)")
+        print(f"    - SNMP walk returned empty results")
+
+    print(f"{'='*60}\n")
+
+except Exception as e:
+    print(f"\n❌ EXCEPTION: {e}")
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 EOF
 
