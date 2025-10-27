@@ -36,16 +36,16 @@ echo "[entrypoint] Seeding database at ${DATABASE_URL}"
 # Run SQL migrations first (creates tables like georgian_regions, georgian_cities, etc.)
 if [[ "${DATABASE_URL}" == postgresql://* ]] || [[ "${DATABASE_URL}" == postgres://* ]]; then
   echo "[entrypoint] Running PostgreSQL migrations..."
-  PYTHONPATH=/app python3 /app/scripts/run_sql_migrations.py
+  PYTHONPATH=/app python3 /app/scripts/migration/run_sql_migrations.py
 fi
 
 # Seed core data (users, system config, monitoring profiles)
-PYTHONPATH=/app python3 /app/scripts/seed_core.py --database-url "${DATABASE_URL}" --seeds-dir "seeds/core"
+PYTHONPATH=/app python3 /app/scripts/migration/seed_core.py --database-url "${DATABASE_URL}" --seeds-dir "seeds/core"
 
 # Seed CredoBank data (875 devices, 128 branches, alert rules, Georgian regions/cities)
 if [[ -d "/app/seeds/credobank" ]]; then
   echo "[entrypoint] Seeding CredoBank data (875 devices, 128 branches, alerts, Georgian regions/cities)"
-  PYTHONPATH=/app python3 /app/scripts/seed_credobank.py --database-url "${DATABASE_URL}" --seeds-dir "seeds/credobank"
+  PYTHONPATH=/app python3 /app/scripts/migration/seed_credobank.py --database-url "${DATABASE_URL}" --seeds-dir "seeds/credobank"
 fi
 
 exec "$@"
