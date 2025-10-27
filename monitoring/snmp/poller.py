@@ -154,8 +154,8 @@ class SNMPPoller:
             auth_data = self._build_auth_data(credentials)
             target = UdpTransportTarget((ip, port), timeout=self.timeout, retries=self.retries)
 
-            # Use async bulkCmd - pysnmp asyncio API
-            async for (error_indication, error_status, error_index, var_binds) in bulkCmd(
+            # Create bulk command iterator
+            iterator = bulkCmd(
                 SnmpEngine(),
                 auth_data,
                 target,
@@ -163,7 +163,10 @@ class SNMPPoller:
                 0, 25,  # Non-repeaters=0, Max-repetitions=25
                 ObjectType(ObjectIdentity(oid)),
                 lexicographicMode=False
-            ):
+            )
+
+            # Iterate through results
+            async for (error_indication, error_status, error_index, var_binds) in iterator:
                 if error_indication:
                     logger.warning(f"SNMP WALK error for {ip} OID {oid}: {error_indication}")
                     break
