@@ -50,6 +50,19 @@ const getDeviceIcon = (deviceType: string) => {
   return Server // default
 }
 
+// ISP Detection - Devices ending with .5 are ISP links
+const getISPType = (ip: string): 'magti' | 'silknet' | null => {
+  if (!ip || !ip.endsWith('.5')) return null
+
+  // Magti IP ranges: 10.195.x.5
+  if (ip.startsWith('10.195.')) return 'magti'
+
+  // Silknet IP ranges: 10.199.x.5
+  if (ip.startsWith('10.199.')) return 'silknet'
+
+  return null
+}
+
 const calculateDowntime = (device: Device) => {
   // Priority 1: Use triggers if available (most accurate for Zabbix-monitored devices)
   if (device.triggers && device.triggers.length > 0) {
@@ -752,7 +765,7 @@ export default function Monitor() {
               {device.ip}
             </p>
             {/* Monitoring Type Badges */}
-            <div className="flex items-center gap-1.5 mt-1.5">
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700">
                 <Activity className="h-3 w-3" />
                 ICMP
@@ -763,6 +776,49 @@ export default function Monitor() {
                   SNMP
                 </span>
               )}
+              {/* ISP Indicator for .5 IPs */}
+              {(() => {
+                const ispType = getISPType(device.ip)
+                if (!ispType) return null
+
+                const ispConfig = {
+                  magti: {
+                    name: 'Magti',
+                    bgColor: isDown
+                      ? 'bg-red-100 dark:bg-red-900/30'
+                      : 'bg-purple-100 dark:bg-purple-900/30',
+                    textColor: isDown
+                      ? 'text-red-700 dark:text-red-300'
+                      : 'text-purple-700 dark:text-purple-300',
+                    borderColor: isDown
+                      ? 'border-red-300 dark:border-red-700'
+                      : 'border-purple-300 dark:border-purple-700',
+                    icon: '📡'
+                  },
+                  silknet: {
+                    name: 'Silknet',
+                    bgColor: isDown
+                      ? 'bg-red-100 dark:bg-red-900/30'
+                      : 'bg-orange-100 dark:bg-orange-900/30',
+                    textColor: isDown
+                      ? 'text-red-700 dark:text-red-300'
+                      : 'text-orange-700 dark:text-orange-300',
+                    borderColor: isDown
+                      ? 'border-red-300 dark:border-red-700'
+                      : 'border-orange-300 dark:border-orange-700',
+                    icon: '🌐'
+                  }
+                }
+
+                const config = ispConfig[ispType]
+                return (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${config.bgColor} ${config.textColor} border ${config.borderColor}`}>
+                    <span>{config.icon}</span>
+                    <span className="font-bold">{config.name}</span>
+                    {isDown && <span className="text-[10px]">DOWN</span>}
+                  </span>
+                )
+              })()}
             </div>
             {isDown ? (
               <div className="flex items-center gap-1 mt-2 text-red-600 dark:text-red-400">
