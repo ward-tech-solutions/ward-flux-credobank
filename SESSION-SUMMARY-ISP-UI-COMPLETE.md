@@ -156,15 +156,12 @@ cd /home/wardops/ward-flux-credobank
 git pull origin main
 
 # Rebuild API container (includes React frontend)
-docker compose -f docker-compose.production-priority-queues.yml stop api
-docker compose -f docker-compose.production-priority-queues.yml rm -f api
-docker compose -f docker-compose.production-priority-queues.yml build --no-cache api
-docker compose -f docker-compose.production-priority-queues.yml up -d api
-
-# Wait for API to start
-sleep 15
-
-# Check API logs
+# NOTE: Use "docker compose" (with space) not "docker-compose" (with hyphen)
+docker compose -f docker-compose.production-priority-queues.yml stop api && \
+docker compose -f docker-compose.production-priority-queues.yml rm -f api && \
+docker compose -f docker-compose.production-priority-queues.yml build --no-cache api && \
+docker compose -f docker-compose.production-priority-queues.yml up -d api && \
+sleep 15 && \
 docker logs wardops-api-prod --tail 20
 ```
 
