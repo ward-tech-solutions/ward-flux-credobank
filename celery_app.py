@@ -211,6 +211,7 @@ app.conf.beat_schedule = {
     'collect-interface-metrics': {
         'task': 'monitoring.tasks.collect_all_interface_metrics',
         'schedule': 60.0,  # Every 60 seconds (keeps ISP status current)
+        'options': {'queue': 'snmp', 'routing_key': 'snmp', 'priority': 3}
     },
 
     # Cleanup old ping results daily at 3:00 AM
