@@ -780,10 +780,6 @@ export default function Monitor() {
             </p>
             {/* Monitoring Type Badges */}
             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700">
-                <Activity className="h-3 w-3" />
-                ICMP
-              </span>
               {device.snmp_community && device.snmp_community.trim() !== '' && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700">
                   <Network className="h-3 w-3" />
@@ -802,19 +798,19 @@ export default function Monitor() {
 
                 return (
                   <>
-                    {/* Magti Badge - Independent status */}
+                    {/* Magti Badge - GREEN when UP, RED when DOWN */}
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
                       magtiIsUp
-                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700'
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700'
                         : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
                     } border`} title={`Magti: ${magtiStatus.toUpperCase()}${ispStatus?.magti ? ` (${ispStatus.magti.if_name})` : ''}`}>
                       <Radio className="h-3 w-3" />
                       <span className="font-bold">Magti</span>
                     </span>
-                    {/* Silknet Badge - Independent status */}
+                    {/* Silknet Badge - GREEN when UP, RED when DOWN */}
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
                       silknetIsUp
-                        ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700'
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700'
                         : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
                     } border`} title={`Silknet: ${silknetStatus.toUpperCase()}${ispStatus?.silknet ? ` (${ispStatus.silknet.if_name})` : ''}`}>
                       <Globe className="h-3 w-3" />
