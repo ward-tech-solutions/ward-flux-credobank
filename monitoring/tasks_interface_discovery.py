@@ -381,8 +381,8 @@ def discover_device_interfaces_task(self, device_id: str):
                 'device_id': device_id
             }
 
-        # Decrypt community string
-        snmp_community = decrypt_credential(snmp_cred.community_encrypted) if snmp_cred.community_encrypted else 'public'
+        # Get community string (stored as plaintext, despite column name)
+        snmp_community = snmp_cred.community_encrypted or 'public'
         snmp_version = snmp_cred.version or 'v2c'
         snmp_port = 161
 
@@ -455,8 +455,8 @@ def discover_all_interfaces_task(self):
 
         for device, snmp_cred in devices_with_snmp:
             try:
-                # Decrypt community string
-                snmp_community = decrypt_credential(snmp_cred.community_encrypted) if snmp_cred.community_encrypted else 'public'
+                # Get community string (stored as plaintext, despite column name)
+                snmp_community = snmp_cred.community_encrypted or 'public'
                 snmp_version = snmp_cred.version or 'v2c'
                 snmp_port = 161
 
