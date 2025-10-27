@@ -16,8 +16,9 @@ from database import get_db, User
 from auth import get_current_active_user, require_tech_or_admin
 from models import (
     DiscoveryRule, DiscoveryResult, DiscoveryJob,
-    NetworkTopology, DiscoveryCredential, StandaloneDevice
+    NetworkTopology, DiscoveryCredential
 )
+from monitoring.models import StandaloneDevice
 from monitoring.discovery.network_scanner import NetworkScanner, PingResult
 from monitoring.discovery.snmp_scanner import SNMPScanner, SNMPDiscoveryResult
 # from monitoring.encryption import encrypt_credential, decrypt_credential
