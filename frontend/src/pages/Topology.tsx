@@ -6,7 +6,7 @@ import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import { Badge } from '@/components/ui/Badge'
 import { LoadingSpinner } from '@/components/ui/Loading'
-import { devicesAPI, type Device } from '@/services/api'
+import { devicesAPI, interfacesAPI, type Device } from '@/services/api'
 import {
   Network,
   Search,
@@ -139,14 +139,75 @@ export default function Topology() {
     queryFn: () => devicesAPI.getAll(),
   })
 
-  // Filter to only show Routers and Switches
+  // Filter to ONLY show ISP Routers (.5 devices)
+  // Phase 1: Show ISP routers with interface status from PostgreSQL
   const networkDevices = useMemo(() => {
     if (!allDevices?.data) return []
     return allDevices.data.filter((d: Device) => {
-      const type = d.device_type?.toLowerCase() || ''
-      return type.includes('router') || type.includes('switch') || type.includes('core')
+      // ONLY show devices with IPs ending in .5 (ISP routers)
+      return d.ip && d.ip.endsWith('.5')
     }).sort((a, b) => a.display_name.localeCompare(b.display_name))
   }, [allDevices])
+
+  // Get IPs for ISP status query
+  const ispRouterIPs = useMemo(() => {
+    return networkDevices.map((d: Device) => d.ip).filter(Boolean)
+  }, [networkDevices])
+
+  // Fetch ISP interface status (Magti/Silknet) for all ISP routers
+  const { data: ispStatusData } = useQuery({
+    queryKey: ['isp-status-topology', ispRouterIPs],
+    queryFn: async () => {
+      if (ispRouterIPs.length === 0) return {}
+      const response = await interfacesAPI.getBulkISPStatus(ispRouterIPs)
+      return response.data
+    },
+    enabled: ispRouterIPs.length > 0,
+    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 25000,
+  })
+
+  // Update node labels when ISP status changes
+  useEffect(() => {
+    if (!nodesRef.current || !ispStatusData) return
+
+    const nodesToUpdate = nodesRef.current.get().filter((node: any) => {
+      const titleLines = node.title?.split('\n') || []
+      const ipAddress = titleLines.length > 1 ? titleLines[1] : ''
+      return ipAddress && ipAddress.endsWith('.5')
+    })
+
+    nodesToUpdate.forEach((node: any) => {
+      const titleLines = node.title?.split('\n') || []
+      const ipAddress = titleLines.length > 1 ? titleLines[1] : ''
+      const displayLabel = node.label?.split('\n')[0] || ''
+
+      let enhancedLabel = node.label?.split('\n').slice(0, 2).join('\n') || displayLabel
+      let enhancedTitle = titleLines.slice(0, 3).join('\n')
+
+      if (ispStatusData[ipAddress]) {
+        const ispStatus = ispStatusData[ipAddress]
+        const statusLines: string[] = []
+
+        if (ispStatus.magti) {
+          const icon = ispStatus.magti.status === 'up' ? '🟢' : '🔴'
+          statusLines.push(`${icon} Magti: ${ispStatus.magti.status.toUpperCase()}`)
+        }
+
+        if (ispStatus.silknet) {
+          const icon = ispStatus.silknet.status === 'up' ? '🟢' : '🔴'
+          statusLines.push(`${icon} Silknet: ${ispStatus.silknet.status.toUpperCase()}`)
+        }
+
+        if (statusLines.length > 0) {
+          enhancedLabel += '\n' + statusLines.join(' | ')
+          enhancedTitle += '\n\nISP Links:\n' + statusLines.join('\n')
+        }
+      }
+
+      nodesRef.current.update({ id: node.id, label: enhancedLabel, title: enhancedTitle })
+    })
+  }, [ispStatusData])
 
   // Load vis.js library first
   useEffect(() => {
@@ -393,7 +454,7 @@ export default function Topology() {
 
       }
 
-      // Enhance nodes with device-specific icons and extract IP for label
+      // Enhance nodes with device-specific icons and ISP status
       const enhancedNodes = filteredNodes.map((node: DeviceNode) => {
         const deviceType = node.deviceType || 'Unknown'
 
@@ -414,11 +475,39 @@ export default function Topology() {
         if (!displayLabel && node.title) {
           displayLabel = node.title.split('\n')[0]  // Use first line from title if label is empty
         }
-        const labelWithIP = ipAddress ? `${displayLabel}\n${ipAddress}` : displayLabel
+
+        // Add ISP interface status to label for .5 routers
+        let enhancedLabel = ipAddress ? `${displayLabel}\n${ipAddress}` : displayLabel
+        let enhancedTitle = node.title || ''
+
+        // If this is an ISP router (.5), add Magti/Silknet status
+        if (ipAddress && ipAddress.endsWith('.5') && ispStatusData?.[ipAddress]) {
+          const ispStatus = ispStatusData[ipAddress]
+          const statusLines: string[] = []
+
+          // Magti status
+          if (ispStatus.magti) {
+            const icon = ispStatus.magti.status === 'up' ? '🟢' : '🔴'
+            statusLines.push(`${icon} Magti: ${ispStatus.magti.status.toUpperCase()}`)
+          }
+
+          // Silknet status
+          if (ispStatus.silknet) {
+            const icon = ispStatus.silknet.status === 'up' ? '🟢' : '🔴'
+            statusLines.push(`${icon} Silknet: ${ispStatus.silknet.status.toUpperCase()}`)
+          }
+
+          // Add to label and title
+          if (statusLines.length > 0) {
+            enhancedLabel += '\n' + statusLines.join(' | ')
+            enhancedTitle += '\n\nISP Links:\n' + statusLines.join('\n')
+          }
+        }
 
         return {
           ...node,
-          label: labelWithIP,  // Add IP address to label
+          label: enhancedLabel,
+          title: enhancedTitle,
           shape: visualization.shape,
           icon: {
             code: visualization.unicode,
