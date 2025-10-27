@@ -98,6 +98,9 @@ class StandaloneDeviceResponse(BaseModel):
     ssh_username: Optional[str] = None
     ssh_enabled: Optional[bool] = True
 
+    # ISP Interface Status
+    isp_interfaces: Optional[List[dict]] = None  # List of {provider: str, status: str, name: str}
+
     @classmethod
     def from_model(cls, obj: StandaloneDevice, ping_result = None, db: Session = None):
         """
@@ -156,6 +159,25 @@ class StandaloneDeviceResponse(BaseModel):
             ping_response_time = fields.get("ping_response_time")
             last_ping_timestamp = fields.get("synced_at")
 
+        # Get ISP interface status
+        isp_interfaces = []
+        if db:
+            from monitoring.models import DeviceInterface
+            isp_query = db.query(DeviceInterface).filter(
+                DeviceInterface.device_id == obj.id,
+                DeviceInterface.interface_type == 'isp'
+            ).all()
+
+            for iface in isp_query:
+                # Determine interface status from oper_status (1=up, 2=down)
+                status = "up" if iface.oper_status == 1 else "down"
+                isp_interfaces.append({
+                    "provider": iface.isp_provider,
+                    "status": status,
+                    "name": iface.if_name or f"if{iface.if_index}",
+                    "alias": iface.if_alias
+                })
+
         data = {
             'id': str(obj.id),
             'name': obj.normalized_name or obj.name,
@@ -189,6 +211,7 @@ class StandaloneDeviceResponse(BaseModel):
             'ssh_port': obj.ssh_port or 22,
             'ssh_username': obj.ssh_username,
             'ssh_enabled': obj.ssh_enabled if obj.ssh_enabled is not None else True,
+            'isp_interfaces': isp_interfaces if isp_interfaces else None,
         }
         return cls(**data)
 
