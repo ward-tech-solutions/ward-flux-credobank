@@ -57,7 +57,6 @@ RUN apt-get update && apt-get install -y \
     libpq5 \
     libsnmp40 \
     snmp \
-    snmp-mibs-downloader \
     curl \
     iputils-ping \
     mtr-tiny \
