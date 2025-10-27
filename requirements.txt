@@ -23,7 +23,7 @@ alembic>=1.13.1
 psycopg2-binary>=2.9.9  # PostgreSQL adapter
 
 # Standalone Monitoring Engine
-pysnmp-lextudio>=5.0.28  # Modern async SNMP library
+pysnmp-lextudio>=6.1.0  # SNMP library (still maintained in 2025, despite deprecation warnings)
 pyasn1>=0.5.1  # Required for SNMP
 icmplib>=3.0.4  # Async ICMP (ping) library
 celery[redis]>=5.3.4  # Distributed task queue

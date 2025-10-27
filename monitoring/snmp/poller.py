@@ -10,11 +10,12 @@ import threading
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 
-# pysnmp-lextudio uses v3arch.asyncio for async operations
-from pysnmp.hlapi.v3arch.asyncio import (
-    get_cmd,
-    next_cmd,
-    bulk_cmd,
+# pysnmp 6.x (2025) - Use asyncio API with CamelCase functions
+# Note: Despite deprecation warnings, pysnmp-lextudio 6.x uses asyncio module
+from pysnmp.hlapi.asyncio import (
+    getCmd,
+    nextCmd,
+    bulkCmd,
     SnmpEngine,
     CommunityData,
     UdpTransportTarget,
@@ -97,7 +98,7 @@ class SNMPPoller:
             target = UdpTransportTarget((ip, port), timeout=self.timeout, retries=self.retries)
 
             # Perform GET
-            error_indication, error_status, error_index, var_binds = await get_cmd(
+            error_indication, error_status, error_index, var_binds = await getCmd(
                 SnmpEngine(),
                 auth_data,
                 target,
@@ -148,8 +149,8 @@ class SNMPPoller:
             auth_data = self._build_auth_data(credentials)
             target = UdpTransportTarget((ip, port), timeout=self.timeout, retries=self.retries)
 
-            # Use async bulk_cmd - pysnmp-lextudio v3arch.asyncio API
-            async for (error_indication, error_status, error_index, var_binds) in bulk_cmd(
+            # Use async bulkCmd - pysnmp asyncio API
+            async for (error_indication, error_status, error_index, var_binds) in bulkCmd(
                 SnmpEngine(),
                 auth_data,
                 target,
@@ -214,10 +215,10 @@ class SNMPPoller:
             # Build OID objects
             oid_objects = [ObjectType(ObjectIdentity(oid)) for oid in oids]
 
-            # Use GETBULK for SNMPv2c/v3, fall back to get_cmd for SNMPv1
+            # Use GETBULK for SNMPv2c/v3, fall back to getCmd for SNMPv1
             if credentials.version == "v1":
                 # SNMPv1 doesn't support GETBULK, use multiple GET
-                error_indication, error_status, error_index, var_binds = await get_cmd(
+                error_indication, error_status, error_index, var_binds = await getCmd(
                     SnmpEngine(),
                     auth_data,
                     target,
@@ -227,7 +228,7 @@ class SNMPPoller:
             else:
                 # SNMPv2c/v3 - use GETBULK for better performance
                 # max-repetitions: how many rows to return per OID (we want just 1 for GET-like behavior)
-                error_indication, error_status, error_index, var_binds = await bulk_cmd(
+                error_indication, error_status, error_index, var_binds = await bulkCmd(
                     SnmpEngine(),
                     auth_data,
                     target,
