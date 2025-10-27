@@ -404,6 +404,12 @@ export default function Topology() {
       const allNodes: any[] = []
       const allEdges: any[] = []
 
+      console.log('[Topology] Building topology from data:', {
+        devices: networkDevices.length,
+        interfacesData: interfacesData ? Object.keys(interfacesData).length : 0,
+        bandwidthData: bandwidthData ? Object.keys(bandwidthData).length : 0
+      })
+
       // Build topology for each .5 router
       networkDevices.forEach((device: Device) => {
         // Create router node (Level 0)
@@ -430,10 +436,17 @@ export default function Topology() {
         // Create interface nodes (Level 1 - children of router)
         const interfaces = interfacesData?.[device.ip] || []
 
+        console.log(`[Topology] Device ${device.ip}: ${interfaces.length} interfaces`)
+
         interfaces.forEach((iface: any) => {
           const bandwidth = bandwidthData?.[device.ip]?.[iface.if_name]
           const status = iface.oper_status === 1 ? 'UP' : 'DOWN'
           const statusIcon = status === 'UP' ? '🟢' : '🔴'
+
+          console.log(`[Topology] Interface ${iface.if_name}:`, {
+            status,
+            bandwidth: bandwidth ? `${bandwidth.bandwidth_in_formatted}/${bandwidth.bandwidth_out_formatted}` : 'NO DATA'
+          })
 
           // Determine interface label type
           let ispOrType = 'LAN'
@@ -467,17 +480,20 @@ export default function Topology() {
             id: `${device.hostid}-iface-${iface.if_index}`,
             label: ifaceLabel,
             title: ifaceTitle,
-            shape: 'ellipse',
+            shape: 'box',  // Changed to box for better label visibility
             color: {
               background: status === 'UP' ? '#dcfce7' : '#fee2e2',
               border: status === 'UP' ? '#10b981' : '#ef4444',
             },
             level: 1,
             font: {
-              size: 12,
-              multi: true,
+              size: 14,  // Increased font size
+              multi: 'html',  // Enable HTML multiline
+              align: 'center',
+              color: status === 'UP' ? '#065f46' : '#991b1b',  // Dark green/red text
             },
-            size: 30,
+            margin: 10,  // Add margin for text
+            widthConstraint: { minimum: 150, maximum: 200 },  // Set width for text wrapping
           }
           allNodes.push(ifaceNode)
 
