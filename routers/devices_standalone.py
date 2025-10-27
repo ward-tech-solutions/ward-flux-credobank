@@ -159,20 +159,47 @@ class StandaloneDeviceResponse(BaseModel):
             ping_response_time = fields.get("ping_response_time")
             last_ping_timestamp = fields.get("synced_at")
 
-        # Get ISP interface status
+        # Get ISP interface status (HYBRID: PostgreSQL for names, VictoriaMetrics for status)
         isp_interfaces = []
-        if db:
+        if db and obj.ip:
             from monitoring.models import DeviceInterface
+            from utils.victoriametrics_client import VictoriaMetricsClient
+
+            # Get interface metadata from PostgreSQL (names, aliases)
             isp_query = db.query(DeviceInterface).filter(
                 DeviceInterface.device_id == obj.id,
                 DeviceInterface.interface_type == 'isp'
             ).all()
 
+            # Get real-time status from VictoriaMetrics
+            vm_status = {}
+            if isp_query:
+                try:
+                    vm_client = VictoriaMetricsClient()
+                    query = f'interface_oper_status{{device_ip="{obj.ip}",isp_provider!=""}}'
+                    result = vm_client.query(query)
+
+                    if result.get("status") == "success":
+                        for series in result.get("data", {}).get("result", []):
+                            metric = series.get("metric", {})
+                            value = series.get("value", [None, None])
+                            provider = metric.get("isp_provider")
+                            oper_status = int(float(value[1])) if value[1] is not None else 0
+
+                            if provider:
+                                vm_status[provider] = oper_status
+                except Exception as e:
+                    logger.warning(f"Failed to get VM status for {obj.ip}: {e}")
+
+            # Combine PostgreSQL metadata with VictoriaMetrics status
             for iface in isp_query:
-                # Determine interface status from oper_status (1=up, 2=down)
-                status = "up" if iface.oper_status == 1 else "down"
+                provider = iface.isp_provider
+                # Use VictoriaMetrics status if available (real-time), fallback to PostgreSQL
+                oper_status = vm_status.get(provider, iface.oper_status)
+                status = "up" if oper_status == 1 else "down"
+
                 isp_interfaces.append({
-                    "provider": iface.isp_provider,
+                    "provider": provider,
                     "status": status,
                     "name": iface.if_name or f"if{iface.if_index}",
                     "alias": iface.if_alias
