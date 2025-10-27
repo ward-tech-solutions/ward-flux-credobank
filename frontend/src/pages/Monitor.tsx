@@ -35,6 +35,8 @@ import {
   ChevronUp,
   Loader2,
   Activity,
+  Radio,
+  Globe,
 } from 'lucide-react'
 
 // Professional icon mapping using Lucide React icons
@@ -784,6 +786,7 @@ export default function Monitor() {
                 const ispConfig = {
                   magti: {
                     name: 'Magti',
+                    Icon: Radio,
                     bgColor: isDown
                       ? 'bg-red-100 dark:bg-red-900/30'
                       : 'bg-purple-100 dark:bg-purple-900/30',
@@ -793,10 +796,10 @@ export default function Monitor() {
                     borderColor: isDown
                       ? 'border-red-300 dark:border-red-700'
                       : 'border-purple-300 dark:border-purple-700',
-                    icon: '📡'
                   },
                   silknet: {
                     name: 'Silknet',
+                    Icon: Globe,
                     bgColor: isDown
                       ? 'bg-red-100 dark:bg-red-900/30'
                       : 'bg-orange-100 dark:bg-orange-900/30',
@@ -806,14 +809,14 @@ export default function Monitor() {
                     borderColor: isDown
                       ? 'border-red-300 dark:border-red-700'
                       : 'border-orange-300 dark:border-orange-700',
-                    icon: '🌐'
                   }
                 }
 
                 const config = ispConfig[ispType]
+                const ISPIcon = config.Icon
                 return (
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${config.bgColor} ${config.textColor} border ${config.borderColor}`}>
-                    <span>{config.icon}</span>
+                    <ISPIcon className="h-3 w-3" />
                     <span className="font-bold">{config.name}</span>
                     {isDown && <span className="text-[10px]">DOWN</span>}
                   </span>
