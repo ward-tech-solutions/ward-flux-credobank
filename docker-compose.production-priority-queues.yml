@@ -61,7 +61,7 @@ services:
       VICTORIA_URL: http://victoriametrics:8428
       DEFAULT_ADMIN_PASSWORD: admin123
       SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      WARD_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       ENVIRONMENT: production
       MONITORING_MODE: snmp_only
     ports:
@@ -98,7 +98,7 @@ services:
       REDIS_URL: redis://:redispass@redis:6379/0
       VICTORIA_URL: http://victoriametrics:8428
       SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      WARD_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       ENVIRONMENT: production
       MONITORING_MODE: snmp_only
     depends_on:
@@ -125,7 +125,7 @@ services:
       REDIS_URL: redis://:redispass@redis:6379/0
       VICTORIA_URL: http://victoriametrics:8428
       SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      WARD_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       ENVIRONMENT: production
       MONITORING_MODE: snmp_only
     depends_on:
@@ -153,7 +153,7 @@ services:
       REDIS_URL: redis://:redispass@redis:6379/0
       VICTORIA_URL: http://victoriametrics:8428
       SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      WARD_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       ENVIRONMENT: production
       MONITORING_MODE: snmp_only
     depends_on:
@@ -181,7 +181,7 @@ services:
       REDIS_URL: redis://:redispass@redis:6379/0
       VICTORIA_URL: http://victoriametrics:8428
       SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      WARD_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       ENVIRONMENT: production
       MONITORING_MODE: snmp_only
     depends_on:
@@ -208,7 +208,7 @@ services:
       REDIS_URL: redis://:redispass@redis:6379/0
       VICTORIA_URL: http://victoriametrics:8428
       SECRET_KEY: ${SECRET_KEY:-local-prod-test-secret-key-change-me}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      WARD_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       ENVIRONMENT: production
       MONITORING_MODE: snmp_only
     depends_on:
