@@ -12,9 +12,10 @@ from sqlalchemy.dialects.postgresql import insert
 from celery import shared_task
 
 from database import SessionLocal
-from monitoring.models import StandaloneDevice, DeviceInterface, InterfaceMetricsSummary
+from monitoring.models import StandaloneDevice, DeviceInterface, InterfaceMetricsSummary, SNMPCredential
 from monitoring.interface_parser import classify_interface
 from monitoring.snmp.poller import SNMPPoller, SNMPCredentialData, SNMPResult
+from monitoring.snmp.credentials import decrypt_credential
 
 logger = logging.getLogger(__name__)
 
@@ -369,10 +370,21 @@ def discover_device_interfaces_task(self, device_id: str):
                 'device_id': device_id
             }
 
-        # Get SNMP credentials (use device-specific or default)
-        snmp_community = device.snmp_community or 'XoNaz-<h'  # Default community from environment
-        snmp_version = device.snmp_version or 'v2c'
-        snmp_port = device.snmp_port or 161
+        # Get SNMP credentials from snmp_credentials table
+        snmp_cred = db.query(SNMPCredential).filter(SNMPCredential.device_id == device_id).first()
+
+        if not snmp_cred:
+            logger.warning(f"No SNMP credentials found for device {device_id} ({device.ip}), skipping")
+            return {
+                'success': False,
+                'error': 'No SNMP credentials',
+                'device_id': device_id
+            }
+
+        # Decrypt community string
+        snmp_community = decrypt_credential(snmp_cred.community_encrypted) if snmp_cred.community_encrypted else 'public'
+        snmp_version = snmp_cred.version or 'v2c'
+        snmp_port = 161
 
         # Run discovery (async)
         discovery = InterfaceDiscovery()
@@ -424,24 +436,29 @@ def discover_all_interfaces_task(self):
     }
 
     try:
-        # Fetch all enabled devices with SNMP enabled
-        stmt = select(StandaloneDevice).where(
-            StandaloneDevice.enabled == True,
-            StandaloneDevice.snmp_community.isnot(None)
-        )
+        # Fetch all enabled devices that have SNMP credentials
+        stmt = select(StandaloneDevice).where(StandaloneDevice.enabled == True)
         devices = db.execute(stmt).scalars().all()
 
-        summary['total_devices'] = len(devices)
-        logger.info(f"Found {len(devices)} devices to discover interfaces")
+        # Filter devices with SNMP credentials
+        devices_with_snmp = []
+        for device in devices:
+            snmp_cred = db.query(SNMPCredential).filter(SNMPCredential.device_id == device.id).first()
+            if snmp_cred:
+                devices_with_snmp.append((device, snmp_cred))
+
+        summary['total_devices'] = len(devices_with_snmp)
+        logger.info(f"Found {len(devices_with_snmp)} devices with SNMP credentials to discover interfaces")
 
         # Discover interfaces for each device
         discovery = InterfaceDiscovery()
 
-        for device in devices:
+        for device, snmp_cred in devices_with_snmp:
             try:
-                snmp_community = device.snmp_community or 'XoNaz-<h'
-                snmp_version = device.snmp_version or 'v2c'
-                snmp_port = device.snmp_port or 161
+                # Decrypt community string
+                snmp_community = decrypt_credential(snmp_cred.community_encrypted) if snmp_cred.community_encrypted else 'public'
+                snmp_version = snmp_cred.version or 'v2c'
+                snmp_port = 161
 
                 result = asyncio.run(
                     discovery.discover_device_interfaces(
