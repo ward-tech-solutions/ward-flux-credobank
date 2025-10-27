@@ -28,7 +28,12 @@ app = Celery(
     'ward_flux',
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=['monitoring.tasks', 'monitoring.tasks_batch']
+    include=[
+        'monitoring.tasks',
+        'monitoring.tasks_batch',
+        'monitoring.tasks_interface_discovery',
+        'monitoring.tasks_interface_metrics'
+    ]
 )
 
 # Define exchanges and queues with priorities
