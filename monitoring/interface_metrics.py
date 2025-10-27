@@ -20,10 +20,18 @@ logger = logging.getLogger(__name__)
 
 # IF-MIB Counter OIDs (64-bit high-capacity counters)
 INTERFACE_COUNTER_OIDS = {
+    # STATUS METRICS (CRITICAL for ISP monitoring!)
+    'oper_status': '1.3.6.1.2.1.2.2.1.8',             # ⭐ Operational status (1=UP, 2=DOWN)
+    'admin_status': '1.3.6.1.2.1.2.2.1.7',            # Administrative status
+    'speed': '1.3.6.1.2.1.31.1.1.1.15',               # Interface speed (high capacity)
+
+    # TRAFFIC COUNTERS
     'if_hc_in_octets': '1.3.6.1.2.1.31.1.1.1.6',      # 64-bit inbound octets
     'if_hc_out_octets': '1.3.6.1.2.1.31.1.1.1.10',    # 64-bit outbound octets
     'if_hc_in_ucast_pkts': '1.3.6.1.2.1.31.1.1.1.7',  # Inbound unicast packets
     'if_hc_out_ucast_pkts': '1.3.6.1.2.1.31.1.1.1.11',# Outbound unicast packets
+
+    # ERROR COUNTERS
     'if_in_errors': '1.3.6.1.2.1.2.2.1.14',           # Inbound errors
     'if_out_errors': '1.3.6.1.2.1.2.2.1.20',          # Outbound errors
     'if_in_discards': '1.3.6.1.2.1.2.2.1.13',         # Inbound discards

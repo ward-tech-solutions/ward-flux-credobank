@@ -206,12 +206,13 @@ export const devicesAPI = {
 
 // Interfaces - ISP Status Monitoring
 export const interfacesAPI = {
-  // Get bulk ISP status for multiple devices (optimized - single query)
+  // Get bulk ISP status from VictoriaMetrics (NO PostgreSQL load!)
+  // This is the CORRECT implementation following architecture
   getBulkISPStatus: (deviceIps: string[]) =>
     api.get<Record<string, {
-      magti?: { status: string; oper_status: number; if_name: string; if_alias: string; last_seen: string };
-      silknet?: { status: string; oper_status: number; if_name: string; if_alias: string; last_seen: string };
-    }>>(`/interfaces/isp-status/bulk?device_ips=${deviceIps.join(',')}`),
+      magti?: { status: string; oper_status: number };
+      silknet?: { status: string; oper_status: number };
+    }>>(`/interfaces/isp-status/vm?device_ips=${deviceIps.join(',')}`),
 }
 
 // Discovery
