@@ -28,7 +28,11 @@ app = Celery(
     'ward_flux',
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=['monitoring.tasks']
+    include=[
+        'monitoring.tasks',
+        'monitoring.tasks_interface_discovery',
+        'monitoring.tasks_interface_metrics'
+    ]
 )
 
 # Define exchanges and queues with priorities
@@ -86,6 +90,30 @@ app.conf.task_routes = {
         'priority': 2
     },
 
+    # INTERFACE METRICS: Collect interface metrics (SNMP queue)
+    'monitoring.tasks.collect_all_interface_metrics': {
+        'queue': 'snmp',
+        'routing_key': 'snmp',
+        'priority': 3  # Slightly higher than regular SNMP
+    },
+    'monitoring.tasks.collect_device_interface_metrics': {
+        'queue': 'snmp',
+        'routing_key': 'snmp',
+        'priority': 3
+    },
+
+    # INTERFACE DISCOVERY: Discover interfaces (SNMP queue)
+    'monitoring.tasks.discover_all_interfaces': {
+        'queue': 'snmp',
+        'routing_key': 'snmp',
+        'priority': 2
+    },
+    'monitoring.tasks.discover_device_interfaces': {
+        'queue': 'snmp',
+        'routing_key': 'snmp',
+        'priority': 2
+    },
+
     # BACKGROUND: Maintenance tasks
     'monitoring.tasks.cleanup_old_ping_results': {
         'queue': 'maintenance',
@@ -93,6 +121,11 @@ app.conf.task_routes = {
         'priority': 0
     },
     'monitoring.tasks.cleanup_old_discovery_results': {
+        'queue': 'maintenance',
+        'routing_key': 'maintenance',
+        'priority': 0
+    },
+    'monitoring.tasks.cleanup_old_interfaces': {
         'queue': 'maintenance',
         'routing_key': 'maintenance',
         'priority': 0
@@ -174,6 +207,25 @@ app.conf.beat_schedule = {
         'task': 'monitoring.tasks.cleanup_old_discovery_results',
         'schedule': crontab(hour=2, minute=0),  # Daily at 2:00 AM
         'kwargs': {'days': 30}
+    },
+
+    # 🌐 ISP INTERFACE MONITORING - Collect interface metrics every 60 seconds
+    'collect-interface-metrics': {
+        'task': 'monitoring.tasks.collect_all_interface_metrics',
+        'schedule': 60.0,  # Every 60 seconds (real-time ISP link status)
+    },
+
+    # 🔍 INTERFACE DISCOVERY - Discover interfaces daily at 2:30 AM
+    'discover-all-interfaces': {
+        'task': 'monitoring.tasks.discover_all_interfaces',
+        'schedule': crontab(hour=2, minute=30),  # Daily at 2:30 AM
+    },
+
+    # 🧹 CLEANUP - Remove stale interfaces weekly
+    'cleanup-old-interfaces': {
+        'task': 'monitoring.tasks.cleanup_old_interfaces',
+        'schedule': crontab(hour=4, minute=0, day_of_week=0),  # Weekly on Sunday at 4:00 AM
+        'kwargs': {'days_threshold': 7}
     },
 }
 
