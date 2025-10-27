@@ -13,7 +13,7 @@ from sqlalchemy import text
 from celery import shared_task
 
 from database import SessionLocal
-from monitoring.snmp.poller import get_snmp_poller, SNMPCredentialData
+from monitoring.snmp.poller import SNMPPoller, SNMPCredentialData
 from monitoring.snmp.credentials import decrypt_credential
 from monitoring.snmp.oids import get_vendor_oids
 from monitoring.victoria.client import get_victoria_client
@@ -102,7 +102,7 @@ def poll_device_snmp(self, device_id: str):
         db = None    # Prevent double-close in finally block
 
         # Initialize clients (AFTER closing database)
-        snmp_poller = get_snmp_poller()
+        snmp_poller = SNMPPoller()
         vm_client = get_victoria_client()
 
         # Poll each monitoring item
