@@ -212,7 +212,7 @@ export const interfacesAPI = {
     api.get<Record<string, {
       magti?: { status: string; oper_status: number };
       silknet?: { status: string; oper_status: number };
-    }>>(`/interfaces/isp-status/vm?device_ips=${deviceIps.join(',')}`),
+    }>>(`/interfaces/isp-status/bulk?device_ips=${deviceIps.join(',')}`),
 }
 
 // Discovery
