@@ -9,10 +9,12 @@ import asyncio
 import threading
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
-from pysnmp.hlapi import (
-    getCmd,
-    nextCmd,
-    bulkCmd,
+
+# pysnmp-lextudio uses v3arch.asyncio for async operations
+from pysnmp.hlapi.v3arch.asyncio import (
+    get_cmd,
+    next_cmd,
+    bulk_cmd,
     SnmpEngine,
     CommunityData,
     UdpTransportTarget,
@@ -95,7 +97,7 @@ class SNMPPoller:
             target = UdpTransportTarget((ip, port), timeout=self.timeout, retries=self.retries)
 
             # Perform GET
-            error_indication, error_status, error_index, var_binds = await getCmd(
+            error_indication, error_status, error_index, var_binds = await get_cmd(
                 SnmpEngine(),
                 auth_data,
                 target,
@@ -141,14 +143,13 @@ class SNMPPoller:
         Returns:
             List of SNMPResult objects
         """
-        def _sync_walk():
-            """Synchronous SNMP walk wrapper for thread execution"""
+        try:
             results = []
             auth_data = self._build_auth_data(credentials)
             target = UdpTransportTarget((ip, port), timeout=self.timeout, retries=self.retries)
 
-            # Use synchronous bulkCmd (works reliably)
-            for (error_indication, error_status, error_index, var_binds) in bulkCmd(
+            # Use async bulk_cmd - pysnmp-lextudio v3arch.asyncio API
+            async for (error_indication, error_status, error_index, var_binds) in bulk_cmd(
                 SnmpEngine(),
                 auth_data,
                 target,
@@ -184,11 +185,6 @@ class SNMPPoller:
             logger.info(f"SNMP WALK {ip} {oid}: {len(results)} results")
             return results
 
-        try:
-            # Run synchronous SNMP in thread pool to avoid blocking
-            results = await asyncio.to_thread(_sync_walk)
-            return results
-
         except Exception as e:
             logger.error(f"SNMP WALK exception for {ip} OID {oid}: {e}")
             return [SNMPResult(oid=oid, value=None, value_type="error", success=False, error=str(e))]
@@ -218,10 +214,10 @@ class SNMPPoller:
             # Build OID objects
             oid_objects = [ObjectType(ObjectIdentity(oid)) for oid in oids]
 
-            # Use GETBULK for SNMPv2c/v3, fall back to getCmd for SNMPv1
+            # Use GETBULK for SNMPv2c/v3, fall back to get_cmd for SNMPv1
             if credentials.version == "v1":
                 # SNMPv1 doesn't support GETBULK, use multiple GET
-                error_indication, error_status, error_index, var_binds = await getCmd(
+                error_indication, error_status, error_index, var_binds = await get_cmd(
                     SnmpEngine(),
                     auth_data,
                     target,
@@ -231,7 +227,7 @@ class SNMPPoller:
             else:
                 # SNMPv2c/v3 - use GETBULK for better performance
                 # max-repetitions: how many rows to return per OID (we want just 1 for GET-like behavior)
-                error_indication, error_status, error_index, var_binds = await bulkCmd(
+                error_indication, error_status, error_index, var_binds = await bulk_cmd(
                     SnmpEngine(),
                     auth_data,
                     target,
