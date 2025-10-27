@@ -20,77 +20,10 @@ from pydantic import BaseModel
 from database import get_db, User
 from monitoring.models import SNMPCredential, StandaloneDevice, MonitoringTemplate, MonitoringItem
 from monitoring.snmp.crypto import encrypt_credential, decrypt_credential
-from monitoring.snmp.poller import SNMPPoller, SNMPCredentialData
-from monitoring.snmp.oids import detect_vendor_from_oid
+from monitoring.snmp.poller import test_snmp_connection, detect_vendor
 from routers.auth import get_current_active_user
 
 logger = logging.getLogger(__name__)
-
-
-# Helper function to test SNMP connection
-async def test_snmp_connection(ip: str, oid: str, snmp_params: dict) -> dict:
-    """Test SNMP connection and retrieve OID value"""
-    try:
-        # Create credential object
-        cred = SNMPCredentialData(
-            version=snmp_params.get("version", "v2c"),
-            community=snmp_params.get("community"),
-            username=snmp_params.get("username"),
-            auth_protocol=snmp_params.get("auth_protocol"),
-            auth_key=snmp_params.get("auth_key"),
-            priv_protocol=snmp_params.get("priv_protocol"),
-            priv_key=snmp_params.get("priv_key"),
-            security_level=snmp_params.get("security_level")
-        )
-
-        # Poll SNMP
-        poller = SNMPPoller(timeout=5, retries=2)
-        result = await poller.get(ip, oid, cred)
-
-        return {
-            "success": result.success,
-            "value": result.value if result.success else None,
-            "error": result.error
-        }
-    except Exception as e:
-        logger.error(f"SNMP test failed for {ip}: {e}")
-        return {
-            "success": False,
-            "value": None,
-            "error": str(e)
-        }
-
-
-def detect_vendor(sys_descr: str) -> Optional[str]:
-    """Detect vendor from sysDescr string"""
-    if not sys_descr:
-        return None
-
-    sys_descr_lower = sys_descr.lower()
-
-    # Simple vendor detection from sysDescr
-    if "cisco" in sys_descr_lower:
-        return "Cisco"
-    elif "juniper" in sys_descr_lower or "junos" in sys_descr_lower:
-        return "Juniper"
-    elif "hp " in sys_descr_lower or "hewlett" in sys_descr_lower or "aruba" in sys_descr_lower:
-        return "HP"
-    elif "huawei" in sys_descr_lower:
-        return "Huawei"
-    elif "fortinet" in sys_descr_lower or "fortigate" in sys_descr_lower:
-        return "Fortinet"
-    elif "mikrotik" in sys_descr_lower:
-        return "MikroTik"
-    elif "ubiquiti" in sys_descr_lower or "unifi" in sys_descr_lower or "edgerouter" in sys_descr_lower:
-        return "Ubiquiti"
-    elif "palo alto" in sys_descr_lower:
-        return "Palo Alto"
-    elif "linux" in sys_descr_lower:
-        return "Linux"
-    elif "windows" in sys_descr_lower:
-        return "Windows"
-
-    return None
 
 # Create router
 router = APIRouter(prefix="/api/v1/snmp/credentials", tags=["snmp-credentials"])

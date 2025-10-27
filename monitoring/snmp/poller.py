@@ -8,6 +8,7 @@ import logging
 import asyncio
 import subprocess
 import re
+import threading
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
@@ -266,3 +267,123 @@ class SNMPPoller:
         # Just run multiple GET operations in parallel
         tasks = [self.get(ip, oid, credentials, port) for oid in oids]
         return await asyncio.gather(*tasks)
+
+
+# ============================================
+# Singleton Instance (Thread-Safe)
+# ============================================
+
+_snmp_poller: Optional[SNMPPoller] = None
+_snmp_poller_lock = threading.Lock()
+
+
+def get_snmp_poller() -> SNMPPoller:
+    """
+    Get or create SNMPPoller singleton (thread-safe)
+
+    Returns:
+        SNMPPoller instance
+    """
+    global _snmp_poller
+
+    # Double-checked locking pattern for thread safety
+    if _snmp_poller is None:
+        with _snmp_poller_lock:
+            if _snmp_poller is None:  # Double check inside lock
+                _snmp_poller = SNMPPoller()
+
+    return _snmp_poller
+
+
+# ============================================
+# Helper Functions for API
+# ============================================
+
+async def test_snmp_connection(ip: str, oid: str, snmp_params: dict) -> dict:
+    """
+    Test SNMP connectivity to a device
+
+    Args:
+        ip: Device IP address
+        oid: OID to query (default: sysDescr)
+        snmp_params: SNMP parameters dict
+
+    Returns:
+        dict with success, value, error
+    """
+    try:
+        # Create credential object
+        credentials = SNMPCredentialData(
+            version=snmp_params.get("version", "v2c"),
+            community=snmp_params.get("community"),
+            username=snmp_params.get("username"),
+            auth_protocol=snmp_params.get("auth_protocol"),
+            auth_key=snmp_params.get("auth_key"),
+            priv_protocol=snmp_params.get("priv_protocol"),
+            priv_key=snmp_params.get("priv_key"),
+            security_level=snmp_params.get("security_level"),
+        )
+
+        poller = get_snmp_poller()
+        result = await poller.get(ip, oid, credentials)
+
+        if result.success:
+            return {
+                "success": True,
+                "value": result.value,
+                "value_type": result.value_type,
+                "error": None
+            }
+        else:
+            return {
+                "success": False,
+                "value": None,
+                "error": result.error or "Unknown error"
+            }
+
+    except Exception as e:
+        logger.error(f"SNMP test failed for {ip}: {e}")
+        return {
+            "success": False,
+            "value": None,
+            "error": str(e)
+        }
+
+
+def detect_vendor(sys_descr: str) -> Optional[str]:
+    """
+    Detect vendor from sysDescr string
+
+    Args:
+        sys_descr: sysDescr value from device
+
+    Returns:
+        Vendor name or None
+    """
+    if not sys_descr:
+        return None
+
+    sys_descr_lower = sys_descr.lower()
+
+    # Vendor detection patterns
+    vendors = {
+        "Cisco": ["cisco", "ios", "nx-os", "asa", "catalyst"],
+        "Fortinet": ["fortinet", "fortigate", "fortios"],
+        "Juniper": ["juniper", "junos", "netscreen"],
+        "HP": ["hp", "aruba", "procurve", "comware"],
+        "Linux": ["linux", "ubuntu", "debian", "centos", "red hat", "fedora"],
+        "Windows": ["windows", "microsoft"],
+        "Dell": ["dell", "powerconnect", "force10"],
+        "Huawei": ["huawei", "vrp"],
+        "MikroTik": ["mikrotik", "routeros"],
+        "Ubiquiti": ["ubiquiti", "unifi", "edgeos"],
+        "Palo Alto": ["palo alto", "pan-os"],
+        "Check Point": ["check point", "gaia"],
+    }
+
+    for vendor, patterns in vendors.items():
+        for pattern in patterns:
+            if pattern in sys_descr_lower:
+                return vendor
+
+    return None
