@@ -363,16 +363,16 @@ docker-compose -f docker-compose.production-priority-queues.yml build --no-cache
 
 ## 🎯 NEXT STEPS / TODO
 
-### ISP Monitoring Enhancement (IN PROGRESS - Oct 27, 2025)
+### ISP Monitoring Enhancement (COMPLETED - Oct 27, 2025)
 **Goal:** Individual Magti/Silknet status tracking with independent GREEN/RED badges
 
-**Requirements:**
+**Implementation Status:**
 1. ✅ Identify ISP interfaces (Interface 4=Magti, 5=Silknet)
 2. ✅ Database infrastructure exists (`device_interfaces` table)
-3. ⏳ Run interface discovery for all 93 .5 routers
+3. ⏳ Run interface discovery for all 93 .5 routers (use `deploy-isp-monitoring.sh`)
 4. ✅ API endpoint created: `/api/v1/interfaces/isp-status/bulk` (OPTIMIZED)
-5. ⏳ Update frontend to fetch and display per-ISP status
-6. ⏳ Schedule automatic interface status polling (every 60s)
+5. ✅ Frontend updated to fetch and display per-ISP status
+6. ✅ Automatic interface status polling scheduled (every 60s)
 
 **Hybrid PostgreSQL + VictoriaMetrics Architecture:**
 - ✅ **PostgreSQL**: Source of truth for current ISP interface status
@@ -416,6 +416,38 @@ GET /api/v1/interfaces/isp-status/bulk?device_ips=10.195.57.5,10.195.110.5
 - **Before**: N queries (one per .5 router) = 93 queries
 - **After**: 1 bulk query for all routers = 1 query
 - **Improvement**: 93x reduction in database queries
+
+**Frontend Implementation:**
+- **Component**: `frontend/src/pages/Monitor.tsx`
+- **API Client**: `frontend/src/services/api.ts` - `interfacesAPI.getBulkISPStatus()`
+- **Fetching**: React Query with 30s refresh interval
+- **Badge Rendering**: Independent status for each ISP (Magti/Silknet)
+  - GREEN badges: ISP link is UP
+  - RED badges: ISP link is DOWN
+  - One can be GREEN while the other is RED
+
+**Backend Implementation:**
+- **API Endpoint**: `routers/interfaces.py:462` - `/api/v1/interfaces/isp-status/bulk`
+- **Celery Task**: `monitoring/tasks_interface_metrics.py` - `collect_all_interface_metrics_task`
+- **Schedule**: `celery_app.py:182` - Every 60 seconds via Celery Beat
+- **Interface Parser**: `monitoring/interface_parser.py` - Auto-detects ISP from ifAlias
+- **Discovery Task**: `monitoring/tasks_interface_discovery.py` - SNMP-based interface discovery
+
+**Deployment:**
+```bash
+# On production server (10.30.25.46)
+cd /home/wardops/ward-flux-credobank
+git pull origin main
+
+# Run interface discovery for all .5 routers
+./deploy-isp-monitoring.sh
+
+# Restart API and workers to load new code
+docker-compose -f docker-compose.production-priority-queues.yml stop api celery-worker-snmp celery-beat
+docker-compose -f docker-compose.production-priority-queues.yml rm -f api celery-worker-snmp celery-beat
+docker-compose -f docker-compose.production-priority-queues.yml build --no-cache api
+docker-compose -f docker-compose.production-priority-queues.yml up -d
+```
 
 ---
 

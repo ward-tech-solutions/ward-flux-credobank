@@ -177,6 +177,13 @@ app.conf.beat_schedule = {
         'schedule': 300.0,  # Every 5 minutes
     },
 
+    # ISP Interface Status Polling - Every 60 seconds (REAL-TIME ISP monitoring!)
+    # Polls operational status for ISP interfaces (Magti/Silknet) on .5 routers
+    'collect-interface-metrics': {
+        'task': 'monitoring.tasks.collect_all_interface_metrics',
+        'schedule': 60.0,  # Every 60 seconds (keeps ISP status current)
+    },
+
     # Cleanup old ping results daily at 3:00 AM
     'cleanup-old-pings': {
         'task': 'maintenance.cleanup_old_ping_results',

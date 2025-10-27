@@ -204,6 +204,16 @@ export const devicesAPI = {
   createStandalone: (device: any) => api.post('/devices/standalone', device),
 }
 
+// Interfaces - ISP Status Monitoring
+export const interfacesAPI = {
+  // Get bulk ISP status for multiple devices (optimized - single query)
+  getBulkISPStatus: (deviceIps: string[]) =>
+    api.get<Record<string, {
+      magti?: { status: string; oper_status: number; if_name: string; if_alias: string; last_seen: string };
+      silknet?: { status: string; oper_status: number; if_name: string; if_alias: string; last_seen: string };
+    }>>(`/interfaces/isp-status/bulk?device_ips=${deviceIps.join(',')}`),
+}
+
 // Discovery
 export const discoveryAPI = {
   getRules: () => api.get<DiscoveryRule[]>('/discovery/rules'),

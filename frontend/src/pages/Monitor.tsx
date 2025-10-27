@@ -9,7 +9,7 @@ import MultiSelect from '@/components/ui/MultiSelect'
 import { Button } from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import DeviceDetailsModal from '@/components/DeviceDetailsModal'
-import { devicesAPI, type Device } from '@/services/api'
+import { devicesAPI, interfacesAPI, type Device } from '@/services/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useResilientWebSocket } from '@/hooks/useResilientWebSocket'
 import { toast } from 'sonner'
@@ -347,6 +347,26 @@ export default function Monitor() {
     queryFn: () => devicesAPI.getAll(),
     refetchInterval: selectedDevice ? false : 30000, // Pause refresh when modal open
     refetchIntervalInBackground: false, // Don't refetch when tab not active
+  })
+
+  // ISP Status Query - Fetch status for all .5 routers (optimized bulk query)
+  const ispRouterIPs = useMemo(() => {
+    if (!devices?.data) return []
+    return devices.data
+      .filter((device: Device) => isISPRouter(device.ip))
+      .map((device: Device) => device.ip)
+  }, [devices])
+
+  const { data: ispStatusData } = useQuery({
+    queryKey: ['isp-status', ispRouterIPs],
+    queryFn: async () => {
+      if (ispRouterIPs.length === 0) return {}
+      const response = await interfacesAPI.getBulkISPStatus(ispRouterIPs)
+      return response.data
+    },
+    enabled: ispRouterIPs.length > 0,
+    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 25000, // Consider data stale after 25 seconds
   })
 
   // Ping mutation
@@ -770,29 +790,39 @@ export default function Monitor() {
                   SNMP
                 </span>
               )}
-              {/* ISP Indicators for .5 routers - Show BOTH Magti and Silknet */}
-              {isISPRouter(device.ip) && (
-                <>
-                  {/* Magti Badge */}
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
-                    isDown
-                      ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
-                      : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700'
-                  } border`}>
-                    <Radio className="h-3 w-3" />
-                    <span className="font-bold">Magti</span>
-                  </span>
-                  {/* Silknet Badge */}
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
-                    isDown
-                      ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
-                      : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700'
-                  } border`}>
-                    <Globe className="h-3 w-3" />
-                    <span className="font-bold">Silknet</span>
-                  </span>
-                </>
-              )}
+              {/* ISP Indicators for .5 routers - Show BOTH Magti and Silknet with INDEPENDENT status */}
+              {isISPRouter(device.ip) && (() => {
+                const ispStatus = ispStatusData?.[device.ip]
+                const magtiStatus = ispStatus?.magti?.status || 'unknown'
+                const silknetStatus = ispStatus?.silknet?.status || 'unknown'
+
+                // Determine badge colors based on INDIVIDUAL ISP status
+                const magtiIsUp = magtiStatus === 'up'
+                const silknetIsUp = silknetStatus === 'up'
+
+                return (
+                  <>
+                    {/* Magti Badge - Independent status */}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
+                      magtiIsUp
+                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700'
+                        : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
+                    } border`} title={`Magti: ${magtiStatus.toUpperCase()}${ispStatus?.magti ? ` (${ispStatus.magti.if_name})` : ''}`}>
+                      <Radio className="h-3 w-3" />
+                      <span className="font-bold">Magti</span>
+                    </span>
+                    {/* Silknet Badge - Independent status */}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
+                      silknetIsUp
+                        ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700'
+                        : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
+                    } border`} title={`Silknet: ${silknetStatus.toUpperCase()}${ispStatus?.silknet ? ` (${ispStatus.silknet.if_name})` : ''}`}>
+                      <Globe className="h-3 w-3" />
+                      <span className="font-bold">Silknet</span>
+                    </span>
+                  </>
+                )
+              })()}
             </div>
             {isDown ? (
               <div className="flex items-center gap-1 mt-2 text-red-600 dark:text-red-400">
