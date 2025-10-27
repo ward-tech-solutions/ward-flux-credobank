@@ -213,6 +213,35 @@ export const interfacesAPI = {
       magti?: { status: string; oper_status: number };
       silknet?: { status: string; oper_status: number };
     }>>(`/interfaces/isp-status/bulk?device_ips=${deviceIps.join(',')}`),
+
+  // Get ALL interfaces for devices (for topology visualization)
+  getByDevices: (deviceIps: string[]) =>
+    api.get<Record<string, Array<{
+      id: string;
+      if_index: number;
+      if_name: string;
+      if_descr?: string;
+      if_alias?: string;
+      interface_type?: string;
+      isp_provider?: string;
+      oper_status: number;
+      admin_status: number;
+      speed: number;
+      is_critical: boolean;
+    }>>>(`/interfaces/by-devices?device_ips=${deviceIps.join(',')}`),
+
+  // Get real-time bandwidth for all interfaces from VictoriaMetrics
+  getBandwidthRealtime: (deviceIps: string[]) =>
+    api.get<Record<string, Record<string, {
+      bandwidth_in_bps: number;
+      bandwidth_out_bps: number;
+      bandwidth_in_formatted: string;
+      bandwidth_out_formatted: string;
+      utilization_in_percent: number;
+      utilization_out_percent: number;
+      interface_speed_bps: number;
+      last_updated: string;
+    }>>>(`/interfaces/bandwidth/realtime?device_ips=${deviceIps.join(',')}`),
 }
 
 // Discovery

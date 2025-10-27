@@ -702,3 +702,243 @@ def update_interface(
         db.rollback()
         logger.error(f"Failed to update interface: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to update interface: {str(e)}")
+
+
+@router.get("/by-devices")
+def get_interfaces_by_devices(
+    device_ips: str = Query(..., description="Comma-separated list of device IPs"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get ALL interfaces for specified device IPs (for topology visualization)
+
+    Used by topology page to display all interfaces with bandwidth metrics.
+
+    Query: GET /api/v1/interfaces/by-devices?device_ips=10.195.57.5,10.195.110.62
+
+    Returns:
+    {
+        "10.195.57.5": [
+            {
+                "id": "uuid",
+                "if_index": 3,
+                "if_name": "FastEthernet3",
+                "if_descr": "FastEthernet3",
+                "if_alias": "ISP Magti Primary",
+                "interface_type": "isp",
+                "isp_provider": "magti",
+                "oper_status": 1,
+                "admin_status": 1,
+                "speed": 100000000,
+                "is_critical": true
+            },
+            ...
+        ]
+    }
+    """
+    try:
+        # Parse device IPs
+        ip_list = [ip.strip() for ip in device_ips.split(',') if ip.strip()]
+
+        if not ip_list:
+            raise HTTPException(status_code=400, detail="No device IPs provided")
+
+        if len(ip_list) > 200:
+            raise HTTPException(status_code=400, detail="Too many devices requested (max 200)")
+
+        # Query devices
+        devices = db.execute(
+            select(StandaloneDevice).where(StandaloneDevice.ip.in_(ip_list))
+        ).scalars().all()
+
+        result = {}
+        for device in devices:
+            # Query all interfaces for this device
+            interfaces = db.execute(
+                select(DeviceInterface).where(
+                    and_(
+                        DeviceInterface.device_id == device.id,
+                        DeviceInterface.enabled == True
+                    )
+                ).order_by(DeviceInterface.if_index)
+            ).scalars().all()
+
+            result[device.ip] = [
+                {
+                    "id": str(iface.id),
+                    "if_index": iface.if_index,
+                    "if_name": iface.if_name,
+                    "if_descr": iface.if_descr,
+                    "if_alias": iface.if_alias,
+                    "interface_type": iface.interface_type,
+                    "isp_provider": iface.isp_provider,
+                    "oper_status": iface.oper_status,
+                    "admin_status": iface.admin_status,
+                    "speed": iface.speed,
+                    "is_critical": iface.is_critical,
+                }
+                for iface in interfaces
+            ]
+
+        # Add empty arrays for devices with no interfaces discovered
+        for ip in ip_list:
+            if ip not in result:
+                result[ip] = []
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get interfaces by devices: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get interfaces by devices: {str(e)}")
+
+
+@router.get("/bandwidth/realtime")
+def get_interface_bandwidth_realtime(
+    device_ips: str = Query(..., description="Comma-separated list of device IPs"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get real-time bandwidth for all interfaces from VictoriaMetrics
+
+    Uses rate() function to calculate bytes/sec from counter metrics.
+    Queries VictoriaMetrics for interface_if_hc_in_octets and interface_if_hc_out_octets.
+
+    Query: GET /api/v1/interfaces/bandwidth/realtime?device_ips=10.195.57.5,10.195.110.62
+
+    Returns:
+    {
+        "10.195.57.5": {
+            "FastEthernet3": {
+                "bandwidth_in_bps": 15234567,
+                "bandwidth_out_bps": 8123456,
+                "bandwidth_in_formatted": "15.2 Mbps",
+                "bandwidth_out_formatted": "8.1 Mbps",
+                "utilization_in_percent": 15.2,
+                "utilization_out_percent": 8.1,
+                "interface_speed_bps": 100000000,
+                "last_updated": "2025-10-27T10:30:00Z"
+            },
+            ...
+        }
+    }
+    """
+    try:
+        from utils.victoriametrics_client import VictoriaMetricsClient
+
+        # Parse device IPs
+        ip_list = [ip.strip() for ip in device_ips.split(',') if ip.strip()]
+
+        if not ip_list:
+            raise HTTPException(status_code=400, detail="No device IPs provided")
+
+        if len(ip_list) > 200:
+            raise HTTPException(status_code=400, detail="Too many devices requested (max 200)")
+
+        # Get devices and their interfaces from PostgreSQL
+        devices = db.execute(
+            select(StandaloneDevice).where(StandaloneDevice.ip.in_(ip_list))
+        ).scalars().all()
+
+        # Initialize VictoriaMetrics client
+        vm_client = VictoriaMetricsClient()
+
+        result = {}
+        for device in devices:
+            interfaces = db.execute(
+                select(DeviceInterface).where(
+                    and_(
+                        DeviceInterface.device_id == device.id,
+                        DeviceInterface.enabled == True
+                    )
+                )
+            ).scalars().all()
+
+            device_bandwidth = {}
+            for iface in interfaces:
+                # Query VictoriaMetrics for bandwidth
+                # rate() calculates per-second change over 1 minute window
+                # Multiply by 8 to convert octets/sec to bits/sec
+                query_in = f'rate(interface_if_hc_in_octets{{device_ip="{device.ip}",if_name="{iface.if_name}"}}[1m]) * 8'
+                query_out = f'rate(interface_if_hc_out_octets{{device_ip="{device.ip}",if_name="{iface.if_name}"}}[1m]) * 8'
+
+                try:
+                    result_in = vm_client.query(query_in)
+                    result_out = vm_client.query(query_out)
+
+                    bw_in_bps = 0
+                    bw_out_bps = 0
+
+                    # Extract bandwidth values from VictoriaMetrics response
+                    if result_in and result_in.get("status") == "success":
+                        data_in = result_in.get("data", {}).get("result", [])
+                        if data_in and len(data_in) > 0:
+                            value_in = data_in[0].get("value", [None, None])
+                            if value_in[1] is not None:
+                                bw_in_bps = float(value_in[1])
+
+                    if result_out and result_out.get("status") == "success":
+                        data_out = result_out.get("data", {}).get("result", [])
+                        if data_out and len(data_out) > 0:
+                            value_out = data_out[0].get("value", [None, None])
+                            if value_out[1] is not None:
+                                bw_out_bps = float(value_out[1])
+
+                    # Calculate utilization percentage
+                    util_in = (bw_in_bps / iface.speed * 100) if iface.speed and iface.speed > 0 else 0
+                    util_out = (bw_out_bps / iface.speed * 100) if iface.speed and iface.speed > 0 else 0
+
+                    device_bandwidth[iface.if_name] = {
+                        "bandwidth_in_bps": bw_in_bps,
+                        "bandwidth_out_bps": bw_out_bps,
+                        "bandwidth_in_formatted": format_bandwidth(bw_in_bps),
+                        "bandwidth_out_formatted": format_bandwidth(bw_out_bps),
+                        "utilization_in_percent": round(util_in, 1),
+                        "utilization_out_percent": round(util_out, 1),
+                        "interface_speed_bps": iface.speed,
+                        "last_updated": datetime.utcnow().isoformat()
+                    }
+
+                except Exception as e:
+                    logger.warning(f"Failed to get bandwidth for {device.ip} {iface.if_name}: {e}")
+                    # Return zero bandwidth instead of failing
+                    device_bandwidth[iface.if_name] = {
+                        "bandwidth_in_bps": 0,
+                        "bandwidth_out_bps": 0,
+                        "bandwidth_in_formatted": "0 bps",
+                        "bandwidth_out_formatted": "0 bps",
+                        "utilization_in_percent": 0,
+                        "utilization_out_percent": 0,
+                        "interface_speed_bps": iface.speed,
+                        "last_updated": datetime.utcnow().isoformat()
+                    }
+
+            result[device.ip] = device_bandwidth
+
+        # Add empty objects for devices with no interfaces
+        for ip in ip_list:
+            if ip not in result:
+                result[ip] = {}
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get interface bandwidth: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get interface bandwidth: {str(e)}")
+
+
+def format_bandwidth(bps: float) -> str:
+    """Format bandwidth in human-readable form"""
+    if bps >= 1_000_000_000:  # Gbps
+        return f"{bps / 1_000_000_000:.1f} Gbps"
+    elif bps >= 1_000_000:  # Mbps
+        return f"{bps / 1_000_000:.1f} Mbps"
+    elif bps >= 1_000:  # Kbps
+        return f"{bps / 1_000:.1f} Kbps"
+    else:  # bps
+        return f"{bps:.0f} bps"

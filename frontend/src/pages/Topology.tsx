@@ -167,6 +167,32 @@ export default function Topology() {
     staleTime: 25000,
   })
 
+  // Fetch ALL interfaces for .5 routers (for topology visualization)
+  const { data: interfacesData } = useQuery({
+    queryKey: ['device-interfaces-topology', ispRouterIPs],
+    queryFn: async () => {
+      if (ispRouterIPs.length === 0) return {}
+      const response = await interfacesAPI.getByDevices(ispRouterIPs)
+      return response.data
+    },
+    enabled: ispRouterIPs.length > 0,
+    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 25000,
+  })
+
+  // Fetch real-time bandwidth for all interfaces from VictoriaMetrics
+  const { data: bandwidthData } = useQuery({
+    queryKey: ['interface-bandwidth-topology', ispRouterIPs],
+    queryFn: async () => {
+      if (ispRouterIPs.length === 0) return {}
+      const response = await interfacesAPI.getBandwidthRealtime(ispRouterIPs)
+      return response.data
+    },
+    enabled: ispRouterIPs.length > 0,
+    refetchInterval: 10000, // Refresh every 10 seconds for real-time bandwidth
+    staleTime: 5000,
+  })
+
   // Update node labels when ISP status changes
   useEffect(() => {
     if (!nodesRef.current || !ispStatusData) return
