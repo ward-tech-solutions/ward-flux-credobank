@@ -212,9 +212,14 @@ class InterfaceDiscovery:
             try:
                 walk_results = await self.poller.walk(device_ip, base_oid, credentials, port)
 
-                for oid, value, value_type in walk_results:
+                for result in walk_results:
+                    # Skip failed results
+                    if not result.success:
+                        logger.debug(f"Skipping failed SNMP result for {field_name}: {result.error}")
+                        continue
+
                     # Extract interface index from OID (e.g., 1.3.6.1.2.1.2.2.1.2.1 -> index=1)
-                    if_index = int(oid.split('.')[-1])
+                    if_index = int(result.oid.split('.')[-1])
 
                     # Initialize interface dict if not exists
                     if if_index not in interfaces:
@@ -222,14 +227,16 @@ class InterfaceDiscovery:
 
                     # Store value
                     if field_name == 'if_type':
-                        interfaces[if_index][field_name] = value
-                        interfaces[if_index]['if_type_name'] = IF_TYPE_NAMES.get(value, f'type-{value}')
-                    elif field_name == 'if_phys_address' and value:
+                        # Convert type to int if it's a string number
+                        type_value = int(result.value) if isinstance(result.value, str) and result.value.isdigit() else result.value
+                        interfaces[if_index][field_name] = type_value
+                        interfaces[if_index]['if_type_name'] = IF_TYPE_NAMES.get(type_value, f'type-{type_value}')
+                    elif field_name == 'if_phys_address' and result.value:
                         # Convert bytes to MAC address format
-                        mac = ':'.join(f'{b:02x}' for b in value) if isinstance(value, bytes) else str(value)
+                        mac = ':'.join(f'{b:02x}' for b in result.value) if isinstance(result.value, bytes) else str(result.value)
                         interfaces[if_index][field_name] = mac
                     else:
-                        interfaces[if_index][field_name] = value
+                        interfaces[if_index][field_name] = result.value
 
             except Exception as e:
                 logger.warning(f"Failed to walk {field_name} on {device_ip}: {str(e)}")

@@ -163,10 +163,14 @@ class TopologyDiscovery:
                 return []
 
             # Extract neighbors
-            for oid, value, value_type in sys_name_results:
+            for result in sys_name_results:
+                # Skip failed results
+                if not result.success:
+                    continue
+
                 # OID format: base_oid.timeMark.local_port.neighbor_index
                 # Example: 1.0.8802.1.1.2.1.4.1.1.9.0.1.1
-                oid_parts = oid.split('.')
+                oid_parts = result.oid.split('.')
 
                 if len(oid_parts) >= 3:
                     time_mark = oid_parts[-3]
@@ -175,7 +179,7 @@ class TopologyDiscovery:
 
                     neighbor = {
                         'local_port_index': local_port,
-                        'neighbor_name': str(value) if value else None,
+                        'neighbor_name': str(result.value) if result.value else None,
                         'neighbor_chassis_id': None,
                         'neighbor_port_id': None,
                         'neighbor_port_desc': None,
@@ -252,10 +256,14 @@ class TopologyDiscovery:
                 return []
 
             # Extract neighbors
-            for oid, value, value_type in device_id_results:
+            for result in device_id_results:
+                # Skip failed results
+                if not result.success:
+                    continue
+
                 # OID format: base_oid.if_index.cache_index
                 # Example: 1.3.6.1.4.1.9.9.23.1.2.1.1.6.10.1
-                oid_parts = oid.split('.')
+                oid_parts = result.oid.split('.')
 
                 if len(oid_parts) >= 2:
                     local_port = oid_parts[-2]
@@ -263,7 +271,7 @@ class TopologyDiscovery:
 
                     neighbor = {
                         'local_port_index': local_port,
-                        'neighbor_name': str(value) if value else None,
+                        'neighbor_name': str(result.value) if result.value else None,
                         'neighbor_chassis_id': None,
                         'neighbor_port_id': None,
                         'neighbor_port_desc': None,
