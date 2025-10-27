@@ -101,6 +101,30 @@ app.conf.task_routes = {
         'priority': 2
     },
 
+    # INTERFACE METRICS: Collect interface metrics (SNMP queue)
+    'monitoring.tasks.collect_all_interface_metrics': {
+        'queue': 'snmp',
+        'routing_key': 'snmp',
+        'priority': 3  # Slightly higher than regular SNMP
+    },
+    'monitoring.tasks.collect_device_interface_metrics': {
+        'queue': 'snmp',
+        'routing_key': 'snmp',
+        'priority': 3
+    },
+
+    # INTERFACE DISCOVERY: Discover interfaces (SNMP queue)
+    'monitoring.tasks.discover_all_interfaces': {
+        'queue': 'snmp',
+        'routing_key': 'snmp',
+        'priority': 2
+    },
+    'monitoring.tasks.discover_device_interfaces': {
+        'queue': 'snmp',
+        'routing_key': 'snmp',
+        'priority': 2
+    },
+
     # BACKGROUND: Maintenance tasks
     'maintenance.cleanup_old_ping_results': {
         'queue': 'maintenance',
