@@ -9,7 +9,7 @@ import asyncio
 import threading
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
-from pysnmp.hlapi.asyncio import (
+from pysnmp.hlapi import (
     getCmd,
     nextCmd,
     bulkCmd,
@@ -141,14 +141,14 @@ class SNMPPoller:
         Returns:
             List of SNMPResult objects
         """
-        try:
+        def _sync_walk():
+            """Synchronous SNMP walk wrapper for thread execution"""
             results = []
             auth_data = self._build_auth_data(credentials)
             target = UdpTransportTarget((ip, port), timeout=self.timeout, retries=self.retries)
 
-            # Perform WALK using bulkCmd for better performance
-            # Note: nextCmd has issues with async iteration in some pysnmp versions
-            generator = bulkCmd(
+            # Use synchronous bulkCmd (works reliably)
+            for (error_indication, error_status, error_index, var_binds) in bulkCmd(
                 SnmpEngine(),
                 auth_data,
                 target,
@@ -156,9 +156,7 @@ class SNMPPoller:
                 0, 25,  # Non-repeaters=0, Max-repetitions=25
                 ObjectType(ObjectIdentity(oid)),
                 lexicographicMode=False
-            )
-
-            async for (error_indication, error_status, error_index, var_binds) in generator:
+            ):
                 if error_indication:
                     logger.warning(f"SNMP WALK error for {ip} OID {oid}: {error_indication}")
                     break
@@ -184,6 +182,11 @@ class SNMPPoller:
                     break
 
             logger.info(f"SNMP WALK {ip} {oid}: {len(results)} results")
+            return results
+
+        try:
+            # Run synchronous SNMP in thread pool to avoid blocking
+            results = await asyncio.to_thread(_sync_walk)
             return results
 
         except Exception as e:
