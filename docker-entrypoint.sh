@@ -1,30 +1,51 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-# WARD OPS - Docker Entrypoint Script
-# Handles database migrations and application startup
-
-echo "🚀 WARD OPS Starting..."
-echo "Environment: ${ENVIRONMENT:-development}"
-echo "Python version: $(python3 --version)"
-
-# Run database migrations for API and Beat services only
-if [[ "$1" == "uvicorn" ]] || [[ "$1" == "celery" && "$2" == "-A" && "$3" == "celery_app" && "$4" == "beat" ]]; then
-    echo "📦 Running database migrations..."
-
-    # Run Alembic migrations
-    if [ -d "alembic" ]; then
-        alembic upgrade head || {
-            echo "⚠️  Migration failed, but continuing..."
-        }
-    fi
-
-    echo "✅ Migrations complete!"
+# Auto-generate security secrets if they are not provided
+if [[ -z "${SECRET_KEY:-}" ]]; then
+  SECRET_KEY="$(python - <<'PY'
+import secrets, base64
+print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())
+PY
+)"
+  export SECRET_KEY
+  echo "[entrypoint] Generated SECRET_KEY"
 fi
 
-# Print startup info
-echo "🎯 Starting command: $@"
-echo ""
+if [[ -z "${ENCRYPTION_KEY:-}" ]]; then
+  ENCRYPTION_KEY="$(python - <<'PY'
+from cryptography.fernet import Fernet
+print(Fernet.generate_key().decode())
+PY
+)"
+  export ENCRYPTION_KEY
+  echo "[entrypoint] Generated ENCRYPTION_KEY"
+fi
 
-# Execute the main command
+# Provide a default admin bootstrap password if none supplied
+if [[ -z "${DEFAULT_ADMIN_PASSWORD:-}" ]]; then
+  export DEFAULT_ADMIN_PASSWORD="admin123"
+  echo "[entrypoint] DEFAULT_ADMIN_PASSWORD not provided, using default 'admin123'"
+fi
+
+# Ensure database schema and baseline data exist before the API starts.
+cd /app
+DATABASE_URL=${DATABASE_URL:-"sqlite:////data/ward_flux.db"}
+echo "[entrypoint] Seeding database at ${DATABASE_URL}"
+
+# Run SQL migrations first (creates tables like georgian_regions, georgian_cities, etc.)
+if [[ "${DATABASE_URL}" == postgresql://* ]] || [[ "${DATABASE_URL}" == postgres://* ]]; then
+  echo "[entrypoint] Running PostgreSQL migrations..."
+  PYTHONPATH=/app python3 /app/scripts/run_sql_migrations.py
+fi
+
+# Seed core data (users, system config, monitoring profiles)
+PYTHONPATH=/app python3 /app/scripts/seed_core.py --database-url "${DATABASE_URL}" --seeds-dir "seeds/core"
+
+# Seed CredoBank data (875 devices, 128 branches, alert rules, Georgian regions/cities)
+if [[ -d "/app/seeds/credobank" ]]; then
+  echo "[entrypoint] Seeding CredoBank data (875 devices, 128 branches, alerts, Georgian regions/cities)"
+  PYTHONPATH=/app python3 /app/scripts/seed_credobank.py --database-url "${DATABASE_URL}" --seeds-dir "seeds/credobank"
+fi
+
 exec "$@"
