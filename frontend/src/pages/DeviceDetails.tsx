@@ -170,6 +170,23 @@ export default function DeviceDetails() {
                     {deviceData.enabled ? 'Enabled' : 'Disabled'}
                   </Badge>
                 </div>
+                {/* ISP Status for .5 routers */}
+                {deviceData.ip?.endsWith('.5') && deviceData.isp_interfaces && deviceData.isp_interfaces.length > 0 && (
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                    <span className="text-gray-500 dark:text-gray-400">ISP Links</span>
+                    <div className="flex gap-2">
+                      {deviceData.isp_interfaces.map((isp: any) => (
+                        <Badge
+                          key={isp.provider}
+                          variant={isp.status === 'up' ? 'success' : 'danger'}
+                          dot
+                        >
+                          {isp.provider === 'magti' ? 'Magti' : 'Silknet'}: {isp.status.toUpperCase()}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between py-2">
                   <span className="text-gray-500 dark:text-gray-400">Created At</span>
                   <span className="font-medium text-gray-900 dark:text-gray-100">

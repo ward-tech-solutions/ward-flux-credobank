@@ -26,9 +26,13 @@ declare global {
 }
 
 // Device type to icon/shape mapping for topology visualization
-const getDeviceVisualization = (deviceType: string): { shape: string; unicode: string; color: string } => {
+const getDeviceVisualization = (deviceType: string, ip?: string): { shape: string; unicode: string; color: string } => {
   const type = deviceType?.toLowerCase() || ''
 
+  // ISP Router (.5 devices) - SPECIAL HIGHLIGHTING
+  if (ip && ip.endsWith('.5')) {
+    return { shape: 'icon', unicode: '🌍', color: '#10b981' } // Earth/ISP Router (green)
+  }
   // Switch devices
   if (type.includes('switch')) {
     return { shape: 'icon', unicode: '⚡', color: '#14b8a6' } // Network/Switch
@@ -392,7 +396,6 @@ export default function Topology() {
       // Enhance nodes with device-specific icons and extract IP for label
       const enhancedNodes = filteredNodes.map((node: DeviceNode) => {
         const deviceType = node.deviceType || 'Unknown'
-        const visualization = getDeviceVisualization(deviceType)
 
         // Extract IP address from title field (format: "DeviceName\nIP\n...")
         let ipAddress = ''
@@ -402,6 +405,9 @@ export default function Topology() {
             ipAddress = titleLines[1]  // Second line is typically the IP
           }
         }
+
+        // Get visualization with IP to detect ISP routers
+        const visualization = getDeviceVisualization(deviceType, ipAddress)
 
         // Create label with device name and IP - use title's first line if label is empty
         let displayLabel = node.label || ''
@@ -1236,7 +1242,11 @@ export default function Topology() {
           <CardTitle>Legend</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-[#10b981]"></div>
+              <span className="text-sm text-gray-700 dark:text-gray-300">ISP Router (.5)</span>
+            </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-orange-500"></div>
               <span className="text-sm text-gray-700 dark:text-gray-300">Core Router</span>
