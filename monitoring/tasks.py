@@ -675,199 +675,155 @@ def cleanup_old_discovery_results(self, days: int = 30):
     finally:
         db.close()
 
-@shared_task(bind=True, name="monitoring.tasks.evaluate_alert_rules")
+
 def evaluate_alert_rules(self):
     """
-    PRODUCTION ALERT ENGINE
-    Evaluate all enabled alert rules against current device states
-    Runs every 60 seconds to detect issues immediately
+    FIXED ALERT ENGINE - No SQL expression parsing
+    Evaluates alerts based on device.down_since field
+    Runs every 10 seconds for real-time detection
     """
     db = SessionLocal()
     try:
-        from database import PingResult
+        from datetime import timezone
         import uuid
-        
-        logger.info("🚨 Starting alert rule evaluation...")
-        
-        # Get all enabled alert rules
-        rules = db.query(AlertRule).filter_by(enabled=True).all()
-        logger.info(f"Found {len(rules)} enabled alert rules")
-        
-        if not rules:
-            logger.warning("No enabled alert rules found!")
-            return {"evaluated": 0, "triggered": 0}
-        
-        # Get all devices
-        devices = db.query(StandaloneDevice).all()
-        logger.info(f"Evaluating alerts for {len(devices)} devices")
 
-        triggered_count = 0
-        resolved_count = 0
+        logger.info("📊 Starting FIXED alert evaluation (no SQL parsing)...")
 
-        # OPTIMIZATION: Fetch ALL ping data once instead of per-device queries
-        # Before: 100 devices × 10 rules = 1000 queries/minute
-        # After: 1 query total (1000× faster!)
-        ten_mins_ago = utcnow() - timedelta(minutes=10)
-        all_recent_pings = (
-            db.query(PingResult)
-            .filter(PingResult.timestamp >= ten_mins_ago)
-            .order_by(PingResult.device_ip, PingResult.timestamp.desc())
-            .all()
-        )
+        stats = {
+            'devices_evaluated': 0,
+            'alerts_created': 0,
+            'alerts_resolved': 0,
+            'isp_links_evaluated': 0
+        }
 
-        # Group pings by device IP for O(1) lookup
-        from collections import defaultdict
-        pings_by_device = defaultdict(list)
-        for ping in all_recent_pings:
-            pings_by_device[ping.device_ip].append(ping)
-
-        logger.info(f"Fetched {len(all_recent_pings)} ping results for {len(pings_by_device)} devices")
+        # Get all enabled devices only
+        devices = db.query(StandaloneDevice).filter(
+            StandaloneDevice.enabled == True
+        ).all()
 
         for device in devices:
-            # FLAPPING DETECTION: Skip alerting if device is flapping
-            if FlappingDetector.should_suppress_alert(device.id, db):
-                logger.warning(f"⚠️  Suppressing alerts for {device.name} - device is FLAPPING")
-                # TODO: Create a single "Device Flapping" alert instead of multiple alerts
-                continue
+            stats['devices_evaluated'] += 1
 
-            # Get pings for this device from pre-fetched data
-            recent_pings = pings_by_device.get(device.ip, [])
+            # Check if ISP link (IP ends with .5)
+            is_isp = device.ip and device.ip.endswith('.5')
+            if is_isp:
+                stats['isp_links_evaluated'] += 1
 
-            for rule in rules:
-                try:
-                    # Evaluate rule for this device
-                    should_trigger = False
-                    alert_message = ""
-                    alert_value = None
-                    
-                    if not recent_pings:
-                        # No data - trigger "No Data Received" alert
-                        if "no_data" in rule.expression:
-                            should_trigger = True
-                            alert_message = f"No ping data received for {device.name} ({device.ip}) in last 10 minutes"
-                            alert_value = "no_data"
-                    else:
-                        # Check for device down
-                        if "ping_unreachable" in rule.expression:
-                            unreachable_count = sum(1 for p in recent_pings if not p.is_reachable)
-                            minutes_down = unreachable_count  # Rough estimate
-                            
-                            # Extract threshold from expression (e.g., "ping_unreachable >= 5")
-                            threshold = int(rule.expression.split(">=")[-1].strip()) if ">=" in rule.expression else 2
-                            
-                            if minutes_down >= threshold:
-                                should_trigger = True
-                                alert_message = f"Device {device.name} ({device.ip}) is DOWN - unreachable for {minutes_down}+ minutes"
-                                alert_value = f"{minutes_down}_minutes_down"
-                        
-                        # Check for high latency
-                        elif "avg_ping_ms" in rule.expression:
-                            reachable_pings = [p for p in recent_pings if p.is_reachable and p.avg_rtt_ms]
-                            if reachable_pings:
-                                avg_latency = sum(p.avg_rtt_ms for p in reachable_pings) / len(reachable_pings)
-                                
-                                # Extract threshold from expression
-                                threshold = int(rule.expression.split(">")[-1].strip())
-                                
-                                if avg_latency > threshold:
-                                    should_trigger = True
-                                    alert_message = f"High latency on {device.name} ({device.ip}): {avg_latency:.0f}ms (threshold: {threshold}ms)"
-                                    alert_value = f"{avg_latency:.0f}ms"
-                        
-                        # Check for packet loss
-                        elif "packet_loss" in rule.expression:
-                            total = len(recent_pings)
-                            unreachable = sum(1 for p in recent_pings if not p.is_reachable)
-                            packet_loss_pct = (unreachable / total) * 100 if total > 0 else 0
-                            
-                            # Extract threshold
-                            threshold = int(rule.expression.split(">")[-1].strip())
-                            
-                            if packet_loss_pct > threshold:
-                                should_trigger = True
-                                alert_message = f"High packet loss on {device.name} ({device.ip}): {packet_loss_pct:.1f}% (threshold: {threshold}%)"
-                                alert_value = f"{packet_loss_pct:.1f}%"
-                    
+            # CHECK DOWN STATUS - using device.down_since as source of truth
+            if device.down_since:
+                # Ensure timezone awareness
+                down_since = device.down_since
+                if down_since.tzinfo is None:
+                    down_since = down_since.replace(tzinfo=timezone.utc)
+
+                down_duration = (utcnow() - down_since).total_seconds()
+
+                if down_duration >= 10:  # Alert after 10 seconds
+                    alert_name = 'ISP Link Down' if is_isp else 'Device Down'
+                    severity = 'CRITICAL'
+
                     # Check if alert already exists
-                    # BUGFIX: Also check rule_name as fallback for old alerts with NULL rule_id
-                    existing_alert = (
-                        db.query(AlertHistory)
-                        .filter(
-                            AlertHistory.device_id == device.id,
-                            AlertHistory.resolved_at.is_(None)
-                        )
-                        .filter(
-                            (AlertHistory.rule_id == rule.id) |
-                            (AlertHistory.rule_name == rule.name)
-                        )
-                        .first()
-                    )
-                    
-                    if should_trigger and not existing_alert:
-                        # ALERT DEDUPLICATION: Check if we should suppress this alert
-                        try:
-                            from monitoring.models import AlertSeverity as _AlertSeverity
-                            new_sev = _AlertSeverity(rule.severity.lower())
-                        except Exception:
-                            # Default to MEDIUM if rule severity string is unexpected
-                            from monitoring.models import AlertSeverity as _AlertSeverity
-                            new_sev = _AlertSeverity.MEDIUM
+                    existing = db.query(AlertHistory).filter(
+                        AlertHistory.device_id == device.id,
+                        AlertHistory.rule_name == alert_name,
+                        AlertHistory.resolved_at.is_(None)
+                    ).first()
 
-                        if not AlertDeduplicator.should_create_alert(
-                            device.id, rule.name, new_sev, db
-                        ):
-                            logger.info(f"Suppressing duplicate alert: {rule.name} for {device.name}")
-                            continue
-
-                        # CREATE NEW ALERT
+                    if not existing:
+                        # Create new alert
                         new_alert = AlertHistory(
                             id=uuid.uuid4(),
-                            rule_id=rule.id,
                             device_id=device.id,
-                            rule_name=rule.name,
-                            severity=new_sev,
-                            message=alert_message,
-                            value=alert_value,
-                            threshold=rule.expression,
+                            rule_name=alert_name,
+                            severity=severity,
+                            message=f"{'ISP Link' if is_isp else 'Device'} {device.name} ({device.ip}) is DOWN for {int(down_duration)} seconds",
+                            value="DOWN",
+                            threshold="10 seconds",
                             triggered_at=utcnow(),
                             acknowledged=False,
-                            notifications_sent=[],
+                            notifications_sent=[]
                         )
                         db.add(new_alert)
+                        stats['alerts_created'] += 1
+                        logger.critical(f"🚨 ALERT: {new_alert.message}")
 
-                        # Auto-resolve lower-severity duplicate alerts
-                        AlertDeduplicator.resolve_lower_severity_alerts(
-                            device.id, rule.name, new_sev, db
+            # AUTO-RESOLVE if device is UP
+            else:
+                # Find any unresolved DOWN alerts for this device
+                unresolved = db.query(AlertHistory).filter(
+                    AlertHistory.device_id == device.id,
+                    AlertHistory.rule_name.in_(['Device Down', 'ISP Link Down']),
+                    AlertHistory.resolved_at.is_(None)
+                ).all()
+
+                for alert in unresolved:
+                    alert.resolved_at = utcnow()
+                    stats['alerts_resolved'] += 1
+                    logger.info(f"✅ Auto-resolved: {alert.rule_name} for {device.name}")
+
+            # CHECK FLAPPING
+            if hasattr(device, 'is_flapping') and device.is_flapping:
+                flap_threshold = 2 if is_isp else 3
+
+                if device.flap_count and device.flap_count >= flap_threshold:
+                    alert_name = 'ISP Link Flapping' if is_isp else 'Device Flapping'
+                    severity = 'CRITICAL' if is_isp else 'HIGH'
+
+                    # Check if flapping alert exists
+                    existing = db.query(AlertHistory).filter(
+                        AlertHistory.device_id == device.id,
+                        AlertHistory.rule_name == alert_name,
+                        AlertHistory.resolved_at.is_(None)
+                    ).first()
+
+                    if not existing:
+                        new_alert = AlertHistory(
+                            id=uuid.uuid4(),
+                            device_id=device.id,
+                            rule_name=alert_name,
+                            severity=severity,
+                            message=f"{'ISP Link' if is_isp else 'Device'} {device.name} ({device.ip}) is flapping - {device.flap_count} changes in 5 minutes",
+                            value=str(device.flap_count),
+                            threshold=f"{flap_threshold} changes",
+                            triggered_at=utcnow(),
+                            acknowledged=False,
+                            notifications_sent=[]
                         )
+                        db.add(new_alert)
+                        stats['alerts_created'] += 1
+                        logger.warning(f"⚠️ FLAPPING ALERT: {new_alert.message}")
 
-                        triggered_count += 1
-                        logger.warning(f"🚨 ALERT TRIGGERED: {alert_message}")
-                    
-                    elif not should_trigger and existing_alert:
-                        # AUTO-RESOLVE ALERT
-                        existing_alert.resolved_at = utcnow()
-                        resolved_count += 1
-                        logger.info(f"✅ ALERT RESOLVED: {existing_alert.message}")
-                
-                except Exception as rule_error:
-                    logger.error(f"Error evaluating rule '{rule.name}' for device {device.name}: {rule_error}")
-                    continue
-        
+            # Auto-resolve flapping alerts if device stabilizes
+            elif hasattr(device, 'is_flapping'):
+                unresolved = db.query(AlertHistory).filter(
+                    AlertHistory.device_id == device.id,
+                    AlertHistory.rule_name.in_(['Device Flapping', 'ISP Link Flapping']),
+                    AlertHistory.resolved_at.is_(None)
+                ).all()
+
+                for alert in unresolved:
+                    alert.resolved_at = utcnow()
+                    stats['alerts_resolved'] += 1
+                    logger.info(f"✅ Auto-resolved flapping: {alert.rule_name} for {device.name}")
+
+        # Commit all changes
         db.commit()
-        
-        result = {
-            "evaluated": len(devices) * len(rules),
-            "triggered": triggered_count,
-            "resolved": resolved_count,
-            "timestamp": utcnow().isoformat()
-        }
-        
-        if triggered_count > 0:
-            logger.warning(f"🚨 Alert evaluation complete: {triggered_count} NEW ALERTS, {resolved_count} resolved")
-        else:
-            logger.info(f"✅ Alert evaluation complete: All systems healthy, {resolved_count} alerts auto-resolved")
 
-        return result
+        # Get summary
+        active_alerts = db.query(AlertHistory).filter(
+            AlertHistory.resolved_at.is_(None)
+        ).count()
+
+        logger.info(
+            f"📊 Alert Evaluation Complete: "
+            f"Evaluated={stats['devices_evaluated']} devices "
+            f"(ISP={stats['isp_links_evaluated']}), "
+            f"Created={stats['alerts_created']}, "
+            f"Resolved={stats['alerts_resolved']}, "
+            f"Active={active_alerts}"
+        )
+
+        return stats
 
     except Exception as exc:
         db.rollback()
@@ -876,9 +832,6 @@ def evaluate_alert_rules(self):
     finally:
         db.close()
 
-
-@shared_task(name="maintenance.cleanup_old_ping_results")
-def cleanup_old_ping_results(days: int = 90):
     """Delete ping_results entries older than the provided number of days."""
     cutoff = utcnow() - timedelta(days=days)
     try:
