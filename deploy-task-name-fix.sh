@@ -32,19 +32,19 @@ git pull origin main
 
 echo ""
 echo "[2/6] Stopping affected containers (Beat + SNMP worker)..."
-docker compose -f docker-compose.production-priority-queues.yml stop celery-beat celery-worker-snmp
+docker-compose -f docker-compose.production-priority-queues.yml stop celery-beat celery-worker-snmp
 
 echo ""
 echo "[3/6] Removing old containers..."
-docker compose -f docker-compose.production-priority-queues.yml rm -f celery-beat celery-worker-snmp
+docker-compose -f docker-compose.production-priority-queues.yml rm -f celery-beat celery-worker-snmp
 
 echo ""
 echo "[4/6] Rebuilding containers with corrected task names..."
-docker compose -f docker-compose.production-priority-queues.yml build --no-cache celery-beat celery-worker-snmp
+docker-compose -f docker-compose.production-priority-queues.yml build --no-cache celery-beat celery-worker-snmp
 
 echo ""
 echo "[5/6] Starting containers..."
-docker compose -f docker-compose.production-priority-queues.yml up -d celery-beat celery-worker-snmp
+docker-compose -f docker-compose.production-priority-queues.yml up -d celery-beat celery-worker-snmp
 
 echo ""
 echo "[6/6] Waiting 10 seconds for containers to start..."
