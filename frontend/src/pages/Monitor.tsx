@@ -52,17 +52,9 @@ const getDeviceIcon = (deviceType: string) => {
   return Server // default
 }
 
-// ISP Detection - Devices ending with .5 are ISP links
-const getISPType = (ip: string): 'magti' | 'silknet' | null => {
-  if (!ip || !ip.endsWith('.5')) return null
-
-  // Magti IP ranges: 10.195.x.5
-  if (ip.startsWith('10.195.')) return 'magti'
-
-  // Silknet IP ranges: 10.199.x.5
-  if (ip.startsWith('10.199.')) return 'silknet'
-
-  return null
+// ISP Detection - Devices ending with .5 are ISP routers with BOTH Magti and Silknet
+const isISPRouter = (ip: string): boolean => {
+  return ip && ip.endsWith('.5')
 }
 
 const calculateDowntime = (device: Device) => {
@@ -778,50 +770,29 @@ export default function Monitor() {
                   SNMP
                 </span>
               )}
-              {/* ISP Indicator for .5 IPs */}
-              {(() => {
-                const ispType = getISPType(device.ip)
-                if (!ispType) return null
-
-                const ispConfig = {
-                  magti: {
-                    name: 'Magti',
-                    Icon: Radio,
-                    bgColor: isDown
-                      ? 'bg-red-100 dark:bg-red-900/30'
-                      : 'bg-purple-100 dark:bg-purple-900/30',
-                    textColor: isDown
-                      ? 'text-red-700 dark:text-red-300'
-                      : 'text-purple-700 dark:text-purple-300',
-                    borderColor: isDown
-                      ? 'border-red-300 dark:border-red-700'
-                      : 'border-purple-300 dark:border-purple-700',
-                  },
-                  silknet: {
-                    name: 'Silknet',
-                    Icon: Globe,
-                    bgColor: isDown
-                      ? 'bg-red-100 dark:bg-red-900/30'
-                      : 'bg-orange-100 dark:bg-orange-900/30',
-                    textColor: isDown
-                      ? 'text-red-700 dark:text-red-300'
-                      : 'text-orange-700 dark:text-orange-300',
-                    borderColor: isDown
-                      ? 'border-red-300 dark:border-red-700'
-                      : 'border-orange-300 dark:border-orange-700',
-                  }
-                }
-
-                const config = ispConfig[ispType]
-                const ISPIcon = config.Icon
-                return (
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${config.bgColor} ${config.textColor} border ${config.borderColor}`}>
-                    <ISPIcon className="h-3 w-3" />
-                    <span className="font-bold">{config.name}</span>
-                    {isDown && <span className="text-[10px]">DOWN</span>}
+              {/* ISP Indicators for .5 routers - Show BOTH Magti and Silknet */}
+              {isISPRouter(device.ip) && (
+                <>
+                  {/* Magti Badge */}
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
+                    isDown
+                      ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
+                      : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700'
+                  } border`}>
+                    <Radio className="h-3 w-3" />
+                    <span className="font-bold">Magti</span>
                   </span>
-                )
-              })()}
+                  {/* Silknet Badge */}
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
+                    isDown
+                      ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
+                      : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700'
+                  } border`}>
+                    <Globe className="h-3 w-3" />
+                    <span className="font-bold">Silknet</span>
+                  </span>
+                </>
+              )}
             </div>
             {isDown ? (
               <div className="flex items-center gap-1 mt-2 text-red-600 dark:text-red-400">
