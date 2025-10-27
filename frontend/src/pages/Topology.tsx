@@ -412,15 +412,16 @@ export default function Topology() {
 
       // Build topology for each .5 router
       networkDevices.forEach((device: Device) => {
-        // Create router node (Level 0) - Modern card style
+        // Create router node (Level 0) - WARD branded card
+        const isDarkMode = document.documentElement.classList.contains('dark')
         const routerNode = {
           id: device.hostid,
           label: `🌍\n${device.display_name}\n${device.ip}`,
           title: `${device.display_name}\n${device.ip}\nType: ${device.device_type || 'Router'}`,
           shape: 'box',
           color: {
-            background: '#1e293b',  // Dark slate background
-            border: '#0ea5e9',  // Bright blue border
+            background: isDarkMode ? '#2C3E50' : '#5EBBA8',  // WARD dark / WARD green
+            border: '#5EBBA8',  // WARD green border
           },
           borderWidth: 3,
           level: 0,
@@ -428,14 +429,14 @@ export default function Topology() {
             size: 15,
             multi: 'html',
             bold: true,
-            color: '#ffffff',  // White text
+            color: '#ffffff',  // White text always
             align: 'center',
           },
           margin: 15,
           widthConstraint: { minimum: 180, maximum: 220 },
           shadow: {
             enabled: true,
-            color: 'rgba(14, 165, 233, 0.4)',  // Blue glow
+            color: 'rgba(94, 187, 168, 0.4)',  // WARD green glow
             size: 12,
             x: 0,
             y: 0
@@ -487,14 +488,25 @@ export default function Topology() {
             bandwidth ? `Bandwidth Out: ${bandwidth.bandwidth_out_formatted} (${bandwidth.utilization_out_percent}%)` : '',
           ].filter(Boolean).join('\n')
 
+          // Interface colors - adapting for dark/light mode
+          const ifaceColors = status === 'UP' ? {
+            background: isDarkMode ? '#4A9D8A' : '#5EBBA8',  // WARD green dark / WARD green
+            border: '#5EBBA8',  // WARD green
+            shadowColor: 'rgba(94, 187, 168, 0.3)',  // WARD green shadow
+          } : {
+            background: '#ef4444',  // Red for DOWN
+            border: '#dc2626',
+            shadowColor: 'rgba(239, 68, 68, 0.3)',
+          }
+
           const ifaceNode = {
             id: `${device.hostid}-iface-${iface.if_index}`,
             label: ifaceLabel,
             title: ifaceTitle,
             shape: 'box',
             color: {
-              background: status === 'UP' ? '#10b981' : '#ef4444',  // Solid green/red
-              border: status === 'UP' ? '#059669' : '#dc2626',  // Darker border
+              background: ifaceColors.background,
+              border: ifaceColors.border,
             },
             borderWidth: 2,
             level: 1,
@@ -502,14 +514,14 @@ export default function Topology() {
               size: 13,
               multi: 'html',
               align: 'center',
-              color: '#ffffff',  // WHITE TEXT on colored background
+              color: '#ffffff',  // WHITE TEXT always for high contrast
               bold: true,
             },
             margin: 12,
             widthConstraint: { minimum: 140, maximum: 180 },
             shadow: {
               enabled: true,
-              color: 'rgba(0,0,0,0.2)',
+              color: ifaceColors.shadowColor,
               size: 8,
               x: 2,
               y: 2
@@ -517,15 +529,15 @@ export default function Topology() {
           }
           allNodes.push(ifaceNode)
 
-          // Create edge from router to interface - Modern style
+          // Create edge from router to interface - WARD branded
           const edge = {
             id: `edge-${device.hostid}-${iface.if_index}`,
             from: device.hostid,
             to: `${device.hostid}-iface-${iface.if_index}`,
             arrows: '',
             color: {
-              color: status === 'UP' ? '#06b6d4' : '#f87171',  // Cyan for UP, light red for DOWN
-              opacity: 0.6
+              color: status === 'UP' ? '#5EBBA8' : '#f87171',  // WARD green for UP, light red for DOWN
+              opacity: 0.7
             },
             width: 2,
             smooth: {
