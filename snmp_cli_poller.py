@@ -48,11 +48,12 @@ class SNMPCLIPoller:
                 if not line:
                     continue
 
-                # Format: .1.3.6.1.2.1.2.2.1.2.1 = STRING: "FastEthernet0/0"
-                match = re.match(r'^(\.[\d\.]+)\s*=\s*\w+:\s*(.+)$', line)
+                # Format: .1.3.6.1.2.1.2.2.1.2.1 = "FastEthernet0"
+                # or: .1.3.6.1.2.1.2.2.1.2.1 = STRING: "FastEthernet0"
+                match = re.match(r'^(\.[\d\.]+)\s*=\s*(?:\w+:\s*)?(.+)$', line)
                 if match:
                     oid_result = match.group(1)
-                    value = match.group(2).strip('"')
+                    value = match.group(2).strip().strip('"')
                     results.append({'oid': oid_result, 'value': value})
 
             return results
@@ -107,7 +108,7 @@ if __name__ == '__main__':
     else:
         print("❌ Failed")
 
-    print("\nTesting SNMP WALK for interfaces...")
+    print("\nTesting SNMP WALK for interface descriptions (ifDescr)...")
     interfaces = poller.walk('10.195.57.5', '1.3.6.1.2.1.2.2.1.2', 'XoNaz-<h')
     print(f"✅ Found {len(interfaces)} interfaces:")
     for iface in interfaces[:10]:
@@ -115,3 +116,14 @@ if __name__ == '__main__':
 
     if len(interfaces) > 10:
         print(f"  ... and {len(interfaces) - 10} more")
+
+    print("\nTesting SNMP WALK for interface aliases (ifAlias - WHERE ISP NAMES ARE!)...")
+    aliases = poller.walk('10.195.57.5', '1.3.6.1.2.1.31.1.1.1.18', 'XoNaz-<h')
+    print(f"✅ Found {len(aliases)} interface aliases:")
+    for alias in aliases:
+        if 'magti' in alias['value'].lower() or 'silknet' in alias['value'].lower():
+            print(f"  🎯 {alias['oid']} = {alias['value']} *** ISP INTERFACE ***")
+        elif alias['value'].strip():
+            print(f"  {alias['oid']} = {alias['value']}")
+
+    print(f"\nTotal aliases with ISP keywords: {sum(1 for a in aliases if 'magti' in a['value'].lower() or 'silknet' in a['value'].lower())}")
