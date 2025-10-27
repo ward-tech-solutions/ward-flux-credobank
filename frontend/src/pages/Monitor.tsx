@@ -1257,16 +1257,41 @@ export default function Monitor() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700">
-                              <Activity className="h-3 w-3" />
-                              ICMP
-                            </span>
                             {device.snmp_community && device.snmp_community.trim() !== '' && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700">
                                 <Network className="h-3 w-3" />
                                 SNMP
                               </span>
                             )}
+                            {/* ISP badges for .5 routers in table view */}
+                            {isISPRouter(device.ip) && (() => {
+                              const ispStatus = ispStatusData?.[device.ip]
+                              const magtiStatus = ispStatus?.magti?.status || 'unknown'
+                              const silknetStatus = ispStatus?.silknet?.status || 'unknown'
+                              const magtiIsUp = magtiStatus === 'up'
+                              const silknetIsUp = silknetStatus === 'up'
+
+                              return (
+                                <>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
+                                    magtiIsUp
+                                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700'
+                                      : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
+                                  } border`} title={`Magti: ${magtiStatus.toUpperCase()}`}>
+                                    <Radio className="h-3 w-3" />
+                                    Magti
+                                  </span>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
+                                    silknetIsUp
+                                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700'
+                                      : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
+                                  } border`} title={`Silknet: ${silknetStatus.toUpperCase()}`}>
+                                    <Globe className="h-3 w-3" />
+                                    Silknet
+                                  </span>
+                                </>
+                              )
+                            })()}
                           </div>
                         </td>
                         <td className="px-4 py-3">
