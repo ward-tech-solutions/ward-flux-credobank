@@ -46,12 +46,17 @@ echo ""
 echo "Step 7: Testing SNMP imports..."
 docker exec wardops-worker-snmp-prod python3 -c "
 import sys
+import warnings
 sys.path.insert(0, '/app')
 
-print('Testing pysnmp-lextudio imports...')
+# Suppress deprecation warnings for cleaner output
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+
+print('Testing pysnmp asyncio imports (2025)...')
 try:
-    from pysnmp.hlapi.v3arch.asyncio import get_cmd, bulk_cmd, next_cmd
-    print('✅ SUCCESS: pysnmp.hlapi.v3arch.asyncio imports work!')
+    from pysnmp.hlapi.asyncio import getCmd, bulkCmd, nextCmd
+    print('✅ SUCCESS: pysnmp.hlapi.asyncio imports work!')
+    print('   Functions: getCmd, bulkCmd, nextCmd (CamelCase)')
 except Exception as e:
     print(f'❌ FAILED: {e}')
     sys.exit(1)
@@ -63,10 +68,21 @@ try:
     print('✅ SUCCESS: SNMPPoller imports successfully!')
 except Exception as e:
     print(f'❌ FAILED: {e}')
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 
 print('')
-print('All imports successful!')
+print('Testing SNMP poller instantiation...')
+try:
+    poller = SNMPPoller(timeout=5, retries=2)
+    print('✅ SUCCESS: SNMPPoller can be instantiated!')
+except Exception as e:
+    print(f'❌ FAILED: {e}')
+    sys.exit(1)
+
+print('')
+print('🎉 All imports and tests successful!')
 "
 
 echo ""
