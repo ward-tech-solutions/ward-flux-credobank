@@ -91,24 +91,26 @@ app.conf.task_routes = {
     },
 
     # INTERFACE METRICS: Collect interface metrics (SNMP queue)
-    'monitoring.tasks_interface_metrics.collect_all_interface_metrics_task': {
+    # NOTE: Task names use monitoring.tasks.* prefix (hardcoded in @shared_task decorators)
+    'monitoring.tasks.collect_all_interface_metrics': {
         'queue': 'snmp',
         'routing_key': 'snmp',
         'priority': 3  # Slightly higher than regular SNMP
     },
-    'monitoring.tasks_interface_metrics.collect_device_interface_metrics_task': {
+    'monitoring.tasks.collect_device_interface_metrics': {
         'queue': 'snmp',
         'routing_key': 'snmp',
         'priority': 3
     },
 
     # INTERFACE DISCOVERY: Discover interfaces (SNMP queue)
-    'monitoring.tasks_interface_discovery.discover_all_interfaces_task': {
+    # NOTE: Task names use monitoring.tasks.* prefix (hardcoded in @shared_task decorators)
+    'monitoring.tasks.discover_all_interfaces': {
         'queue': 'snmp',
         'routing_key': 'snmp',
         'priority': 2
     },
-    'monitoring.tasks_interface_discovery.discover_device_interfaces_task': {
+    'monitoring.tasks.discover_device_interfaces': {
         'queue': 'snmp',
         'routing_key': 'snmp',
         'priority': 2
@@ -210,20 +212,23 @@ app.conf.beat_schedule = {
     },
 
     # 🌐 ISP INTERFACE MONITORING - Collect interface metrics every 60 seconds
+    # NOTE: Task name matches @shared_task(name="...") in monitoring/tasks_interface_metrics.py
     'collect-interface-metrics': {
-        'task': 'monitoring.tasks_interface_metrics.collect_all_interface_metrics_task',
+        'task': 'monitoring.tasks.collect_all_interface_metrics',
         'schedule': 60.0,  # Every 60 seconds (real-time ISP link status)
     },
 
     # 🔍 INTERFACE DISCOVERY - Discover interfaces daily at 2:30 AM
+    # NOTE: Task name matches @shared_task(name="...") in monitoring/tasks_interface_discovery.py
     'discover-all-interfaces': {
-        'task': 'monitoring.tasks_interface_discovery.discover_all_interfaces_task',
+        'task': 'monitoring.tasks.discover_all_interfaces',
         'schedule': crontab(hour=2, minute=30),  # Daily at 2:30 AM
     },
 
     # 🧹 CLEANUP - Remove stale interfaces weekly
+    # NOTE: Task name matches @shared_task(name="...") in monitoring/tasks_interface_discovery.py
     'cleanup-old-interfaces': {
-        'task': 'monitoring.tasks_interface_discovery.cleanup_old_interfaces_task',
+        'task': 'monitoring.tasks.cleanup_old_interfaces',
         'schedule': crontab(hour=4, minute=0, day_of_week=0),  # Weekly on Sunday at 4:00 AM
         'kwargs': {'days_threshold': 7}
     },
