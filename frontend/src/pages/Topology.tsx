@@ -278,6 +278,7 @@ export default function Topology() {
   useEffect(() => {
     if (visJsLoading) return
     if (!window.vis) return
+    if (!networkDevices || networkDevices.length === 0) return
 
     // Retry mechanism to wait for canvas
     let retries = 0
@@ -301,7 +302,7 @@ export default function Topology() {
     const timer = setTimeout(attemptLoad, 50)
 
     return () => clearTimeout(timer)
-  }, [visJsLoading, selectedDeviceId])
+  }, [visJsLoading, selectedDeviceId, networkDevices, interfacesData, bandwidthData])
 
   // Focus and highlight selected device when selection changes
   useEffect(() => {
@@ -393,203 +394,148 @@ export default function Topology() {
     try {
       setLoading(true)
 
-      // Load topology via authenticated API client
-      const { api } = await import('@/api/client')
-      const res = await api.getTopology({ view: 'hierarchical', limit: 200 })
-      const data: TopologyData = res.data as any
-      // Data loaded successfully
-
       if (!window.vis) {
         console.error('[Topology] vis.js not available')
         setTimeout(loadTopologyData, 500)
         return
       }
 
-      // Initialize DataSets
-      let filteredNodes = data.nodes || []
-      let filteredEdges = data.edges || []
+      // BUILD TOPOLOGY FROM DEVICE + INTERFACE DATA (NOT API CALL)
+      const allNodes: any[] = []
+      const allEdges: any[] = []
 
-      // Processing network data
-
-      // Filter nodes and edges based on selected device
-      if (selectedDeviceId) {
-        // Filtering topology for selected device
-
-        // Find all directly connected nodes (neighbors)
-        const connectedNodeIds = new Set<string>()
-        connectedNodeIds.add(selectedDeviceId) // Add the selected device itself
-        connectedNodeIds.add(String(selectedDeviceId)) // Also add string version for matching
-
-        // Find all edges connected to the selected device
-        const relevantEdges = filteredEdges.filter((edge: DeviceEdge) => {
-          // Convert IDs to strings for consistent comparison
-          const fromId = String(edge.from)
-          const toId = String(edge.to)
-          const selectedId = String(selectedDeviceId)
-          const matches = fromId === selectedId || toId === selectedId
-
-          if (matches) {
-            // Found matching edge
-          }
-
-          return matches
-        })
-
-        // Found edges connected to device
-
-        // Add all neighbor node IDs
-        relevantEdges.forEach((edge: DeviceEdge) => {
-          const fromId = String(edge.from)
-          const toId = String(edge.to)
-          const selectedId = String(selectedDeviceId)
-
-          if (fromId === selectedId) {
-            connectedNodeIds.add(edge.to)
-            connectedNodeIds.add(String(edge.to))
-            // Added neighbor node
-          }
-          if (toId === selectedId) {
-            connectedNodeIds.add(edge.from)
-            connectedNodeIds.add(String(edge.from))
-            // Added neighbor node
-          }
-        })
-
-        // Filter nodes to show selected device and its neighbors (exclude only core routers)
-        filteredNodes = filteredNodes.filter((node: DeviceNode) => {
-          const nodeId = String(node.id)
-          const isConnected = connectedNodeIds.has(node.id) || connectedNodeIds.has(nodeId)
-          const deviceType = (node.deviceType || '').toLowerCase()
-          const isCoreRouter = deviceType.includes('core')
-
-          // If it's the selected device, always include it
-          if (nodeId === String(selectedDeviceId)) {
-            return true
-          }
-
-          // For neighbors: include all except core routers
-          const shouldInclude = isConnected && !isCoreRouter
-          if (isConnected) {
-          }
-
-          return shouldInclude
-        })
-
-        // Use the relevant edges
-        filteredEdges = relevantEdges
-
-      }
-
-      // Enhance nodes with device-specific icons and ISP status
-      const enhancedNodes = filteredNodes.map((node: DeviceNode) => {
-        const deviceType = node.deviceType || 'Unknown'
-
-        // Extract IP address from title field (format: "DeviceName\nIP\n...")
-        let ipAddress = ''
-        if (node.title) {
-          const titleLines = node.title.split('\n')
-          if (titleLines.length > 1) {
-            ipAddress = titleLines[1]  // Second line is typically the IP
-          }
-        }
-
-        // Get visualization with IP to detect ISP routers
-        const visualization = getDeviceVisualization(deviceType, ipAddress)
-
-        // Create label with device name and IP - use title's first line if label is empty
-        let displayLabel = node.label || ''
-        if (!displayLabel && node.title) {
-          displayLabel = node.title.split('\n')[0]  // Use first line from title if label is empty
-        }
-
-        // Add ISP interface status to label for .5 routers
-        let enhancedLabel = ipAddress ? `${displayLabel}\n${ipAddress}` : displayLabel
-        let enhancedTitle = node.title || ''
-
-        // If this is an ISP router (.5), add Magti/Silknet status
-        if (ipAddress && ipAddress.endsWith('.5') && ispStatusData?.[ipAddress]) {
-          const ispStatus = ispStatusData[ipAddress]
-          const statusLines: string[] = []
-
-          // Magti status
-          if (ispStatus.magti) {
-            const icon = ispStatus.magti.status === 'up' ? '🟢' : '🔴'
-            statusLines.push(`${icon} Magti: ${ispStatus.magti.status.toUpperCase()}`)
-          }
-
-          // Silknet status
-          if (ispStatus.silknet) {
-            const icon = ispStatus.silknet.status === 'up' ? '🟢' : '🔴'
-            statusLines.push(`${icon} Silknet: ${ispStatus.silknet.status.toUpperCase()}`)
-          }
-
-          // Add to label and title
-          if (statusLines.length > 0) {
-            enhancedLabel += '\n' + statusLines.join(' | ')
-            enhancedTitle += '\n\nISP Links:\n' + statusLines.join('\n')
-          }
-        }
-
-        return {
-          ...node,
-          label: enhancedLabel,
-          title: enhancedTitle,
-          shape: visualization.shape,
+      // Build topology for each .5 router
+      networkDevices.forEach((device: Device) => {
+        // Create router node (Level 0)
+        const routerNode = {
+          id: device.hostid,
+          label: `${device.display_name}\n${device.ip}`,
+          title: `${device.display_name}\n${device.ip}\nType: ${device.device_type || 'Router'}`,
+          shape: 'icon',
           icon: {
-            code: visualization.unicode,
-            size: 60,  // Larger icon size for better visibility
-            color: node.color || visualization.color
+            code: '🌍', // ISP Router icon
+            size: 60,
+            color: '#10b981'
           },
+          level: 0,
           font: {
-            ...node.font,
-            size: 16,  // Larger font for better readability
-            multi: 'html',
+            size: 16,
+            multi: true,
             bold: true
           },
-          size: 40  // Increase node size
+          deviceType: device.device_type,
         }
-      })
+        allNodes.push(routerNode)
 
-      // Enhance edges with bandwidth-based width
-      const enhancedEdges = filteredEdges.map((edge: DeviceEdge) => {
-        let width = edge.width || 2
+        // Create interface nodes (Level 1 - children of router)
+        const interfaces = interfacesData?.[device.ip] || []
 
-        // Parse bandwidth from label if available (format: "↓123.4M ↑56.7M")
-        if (edge.label) {
-          const match = edge.label.match(/↓(\d+\.?\d*)M/)
-          if (match) {
-            const bandwidthMbps = parseFloat(match[1])
-            // Scale width based on bandwidth: 0-100 Mbps = 2-4px, 100-500 Mbps = 4-6px, 500+ Mbps = 6-10px
-            if (bandwidthMbps > 500) {
-              width = 8
-            } else if (bandwidthMbps > 100) {
-              width = 5
-            } else if (bandwidthMbps > 10) {
-              width = 3
-            } else {
-              width = 2
-            }
+        interfaces.forEach((iface: any) => {
+          const bandwidth = bandwidthData?.[device.ip]?.[iface.if_name]
+          const status = iface.oper_status === 1 ? 'UP' : 'DOWN'
+          const statusIcon = status === 'UP' ? '🟢' : '🔴'
+
+          // Determine interface label type
+          let ispOrType = 'LAN'
+          if (iface.isp_provider) {
+            ispOrType = `ISP: ${iface.isp_provider.toUpperCase()}`
+          } else if (iface.interface_type) {
+            ispOrType = iface.interface_type.toUpperCase()
           }
-        }
 
-        return {
-          ...edge,
-          width,
-          selectionWidth: 2, // Additional width when selected
-          hoverWidth: 1.5 // Additional width multiplier on hover
-        }
+          // Build interface label with bandwidth
+          const ifaceLabel = [
+            `${statusIcon} ${iface.if_name}`,
+            ispOrType,
+            bandwidth ? `↓ ${bandwidth.bandwidth_in_formatted}` : '↓ --',
+            bandwidth ? `↑ ${bandwidth.bandwidth_out_formatted}` : '↑ --',
+          ].join('\n')
+
+          // Build interface title (tooltip)
+          const ifaceTitle = [
+            `Interface: ${iface.if_name}`,
+            `Alias: ${iface.if_alias || 'N/A'}`,
+            `Status: ${status}`,
+            `Type: ${iface.interface_type || 'unknown'}`,
+            iface.isp_provider ? `ISP: ${iface.isp_provider}` : '',
+            `Speed: ${iface.speed ? (iface.speed / 1000000).toFixed(0) + ' Mbps' : 'Unknown'}`,
+            bandwidth ? `\nBandwidth In: ${bandwidth.bandwidth_in_formatted} (${bandwidth.utilization_in_percent}%)` : '',
+            bandwidth ? `Bandwidth Out: ${bandwidth.bandwidth_out_formatted} (${bandwidth.utilization_out_percent}%)` : '',
+          ].filter(Boolean).join('\n')
+
+          const ifaceNode = {
+            id: `${device.hostid}-iface-${iface.if_index}`,
+            label: ifaceLabel,
+            title: ifaceTitle,
+            shape: 'ellipse',
+            color: {
+              background: status === 'UP' ? '#dcfce7' : '#fee2e2',
+              border: status === 'UP' ? '#10b981' : '#ef4444',
+            },
+            level: 1,
+            font: {
+              size: 12,
+              multi: true,
+            },
+            size: 30,
+          }
+          allNodes.push(ifaceNode)
+
+          // Create edge from router to interface
+          const edge = {
+            id: `edge-${device.hostid}-${iface.if_index}`,
+            from: device.hostid,
+            to: `${device.hostid}-iface-${iface.if_index}`,
+            arrows: '',
+            color: { color: '#94a3b8' },
+            width: 1,
+          }
+          allEdges.push(edge)
+        })
       })
 
-      nodesRef.current = new window.vis.DataSet(enhancedNodes)
-      edgesRef.current = new window.vis.DataSet(enhancedEdges)
+      // Filter based on selected device if needed
+      let filteredNodes = allNodes
+      let filteredEdges = allEdges
+
+      if (selectedDeviceId) {
+        // Show only selected router and its interfaces
+        filteredNodes = allNodes.filter((node: any) => {
+          const nodeId = String(node.id)
+          const selectedId = String(selectedDeviceId)
+
+          // Include the selected router
+          if (nodeId === selectedId) return true
+
+          // Include interfaces of the selected router
+          if (nodeId.startsWith(`${selectedId}-iface-`)) return true
+
+          return false
+        })
+
+        // Filter edges to only those connected to visible nodes
+        const visibleNodeIds = new Set(filteredNodes.map(n => n.id))
+        filteredEdges = allEdges.filter((edge: any) =>
+          visibleNodeIds.has(edge.from) && visibleNodeIds.has(edge.to)
+        )
+      }
+
+      // Create vis.js DataSets
+      nodesRef.current = new window.vis.DataSet(filteredNodes)
+      edgesRef.current = new window.vis.DataSet(filteredEdges)
 
       // Update statistics
-      updateStatistics(data.stats)
+      updateStatistics({
+        total_devices: networkDevices.length,
+        total_routers: networkDevices.length,
+        total_interfaces: allNodes.filter(n => n.id.includes('-iface-')).length,
+        total_edges: allEdges.length,
+      })
 
       // Create network visualization
       createNetworkVisualization()
 
-      // Force fit after data loads (especially important for small filtered views)
+      // Force fit after data loads
       setTimeout(() => {
         if (networkRef.current) {
           networkRef.current.fit({
