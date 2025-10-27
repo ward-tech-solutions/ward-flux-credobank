@@ -71,11 +71,16 @@ class SNMPPoller:
     Supports SNMPv2c and SNMPv3 with automatic vendor detection.
     """
 
-    def __init__(self):
-        """Initialize SNMP poller"""
-        self.timeout = 5  # seconds
-        self.retries = 2
-        logger.info("SNMP Poller initialized")
+    def __init__(self, timeout: int = 5, retries: int = 2):
+        """Initialize SNMP poller
+
+        Args:
+            timeout: SNMP timeout in seconds (default: 5)
+            retries: Number of retries (default: 2)
+        """
+        self.timeout = timeout
+        self.retries = retries
+        logger.info(f"SNMP Poller initialized (timeout={timeout}s, retries={retries})")
 
     async def get(
         self, ip: str, oid: str, credentials: SNMPCredentialData, port: int = 161
