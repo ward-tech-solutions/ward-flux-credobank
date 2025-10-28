@@ -965,7 +965,6 @@ async def get_isp_interface_history(
         Dictionary with magti and silknet interface history data
     """
     from datetime import timedelta
-    from monitoring.models import InterfaceMetrics
 
     # Validate .5 device
     if not device_ip.endswith('.5'):
@@ -1006,46 +1005,87 @@ async def get_isp_interface_history(
         logger.warning(f"No ISP interfaces found for device {device_ip}")
         return {"magti": None, "silknet": None}
 
+    # Initialize VictoriaMetrics client for time-series queries
+    from utils.victoriametrics_client import VictoriaMetricsClient
+    vm_client = VictoriaMetricsClient()
+
     result = {"magti": None, "silknet": None}
 
     for iface in isp_interfaces:
-        # Get historical metrics
-        metrics = db.query(InterfaceMetrics).filter(
-            InterfaceMetrics.interface_id == iface.id,
-            InterfaceMetrics.timestamp >= cutoff
-        ).order_by(InterfaceMetrics.timestamp.asc()).limit(1000).all()
+        # Query VictoriaMetrics for historical interface metrics (NOT PostgreSQL!)
+        # Your VM has: interface_oper_status, interface_if_in_errors, interface_if_out_errors, etc.
 
-        if not metrics:
-            logger.info(f"No metrics found for interface {iface.if_name} in time range {time_range}")
-            continue
+        # Build PromQL queries for this interface
+        device_filter = f'device_ip="{device_ip}",if_name="{iface.if_name}"'
 
-        # Transform metrics to history format
+        # Query oper_status for time-series data
+        start_time = f"-{time_range}"
+        query = f'interface_oper_status{{{device_filter}}}'
+
+        result_vm = vm_client.query_range(
+            query=query,
+            start=start_time,
+            end="now",
+            step="1m"  # 1-minute resolution
+        )
+
         history = []
-        for m in metrics:
-            history.append({
-                "timestamp": int(m.timestamp.timestamp()),
-                "status": 1 if m.if_oper_status == 'up' else 0,
-                "in_octets": m.if_in_octets or 0,
-                "out_octets": m.if_out_octets or 0,
-                "in_errors": m.if_in_errors or 0,
-                "out_errors": m.if_out_errors or 0,
-                "in_discards": m.if_in_discards or 0,
-                "out_discards": m.if_out_discards or 0,
-                "in_ucast_pkts": m.if_in_ucast_pkts or 0,
-                "out_ucast_pkts": m.if_out_ucast_pkts or 0,
-                # Calculate bandwidth in Mbps
-                "bandwidth_in_mbps": round((m.if_in_octets or 0) * 8 / 1_000_000, 2),
-                "bandwidth_out_mbps": round((m.if_out_octets or 0) * 8 / 1_000_000, 2),
-            })
+        if result_vm.get("status") == "success":
+            data = result_vm.get("data", {}).get("result", [])
+            if data and len(data) > 0:
+                # Extract values array [[timestamp, value], [timestamp, value], ...]
+                values = data[0].get("values", [])
+
+                # Query errors and discards for the same time range
+                error_queries = {
+                    "in_errors": f'interface_if_in_errors{{{device_filter}}}',
+                    "out_errors": f'interface_if_out_errors{{{device_filter}}}',
+                    "in_discards": f'interface_if_in_discards{{{device_filter}}}',
+                    "out_discards": f'interface_if_out_discards{{{device_filter}}}',
+                }
+
+                error_data = {}
+                for metric_name, error_query in error_queries.items():
+                    error_result = vm_client.query_range(
+                        query=error_query,
+                        start=start_time,
+                        end="now",
+                        step="1m"
+                    )
+                    if error_result.get("status") == "success":
+                        error_results = error_result.get("data", {}).get("result", [])
+                        if error_results:
+                            error_data[metric_name] = {str(t): float(v) for t, v in error_results[0].get("values", [])}
+
+                # Transform to history format
+                for timestamp, status_value in values:
+                    timestamp_str = str(timestamp)
+                    history.append({
+                        "timestamp": int(timestamp),
+                        "status": 1 if int(float(status_value)) == 1 else 0,  # 1=up, 2=down
+                        "in_errors": int(error_data.get("in_errors", {}).get(timestamp_str, 0)),
+                        "out_errors": int(error_data.get("out_errors", {}).get(timestamp_str, 0)),
+                        "in_discards": int(error_data.get("in_discards", {}).get(timestamp_str, 0)),
+                        "out_discards": int(error_data.get("out_discards", {}).get(timestamp_str, 0)),
+                    })
+
+        if not history:
+            logger.info(f"No VictoriaMetrics data found for interface {iface.if_name} in time range {time_range}")
+            continue
 
         # Store in result
         isp_name = iface.isp_name.lower() if iface.isp_name else 'unknown'
+
+        # Map status integers to strings (1=up, 2=down)
+        oper_status_map = {1: 'up', 2: 'down', 3: 'testing', 4: 'unknown', 5: 'dormant', 6: 'notPresent', 7: 'lowerLayerDown'}
+        admin_status_map = {1: 'up', 2: 'down', 3: 'testing'}
+
         result[isp_name] = {
             "interface_name": iface.if_name,
             "interface_description": iface.if_descr,
             "interface_alias": iface.if_alias,
-            "current_status": iface.if_oper_status,
-            "current_admin_status": iface.if_admin_status,
+            "current_status": oper_status_map.get(iface.oper_status, 'unknown'),
+            "current_admin_status": admin_status_map.get(iface.admin_status, 'unknown'),
             "total_points": len(history),
             "time_range": time_range,
             "history": history
