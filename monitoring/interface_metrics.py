@@ -50,17 +50,19 @@ class InterfaceMetricsCollector:
     - Discards: Input/output discards
     """
 
-    def __init__(self, victoriametrics_url: str = "http://localhost:8428"):
+    def __init__(self, victoriametrics_url: str = None):
         """
         Initialize metrics collector
 
         Args:
-            victoriametrics_url: VictoriaMetrics API endpoint
+            victoriametrics_url: VictoriaMetrics API endpoint (defaults to VICTORIA_URL env or victoriametrics:8428)
         """
+        import os
         self.poller = SNMPPoller()
         self.poller.timeout = 3
         self.poller.retries = 1
-        self.vm_url = victoriametrics_url
+        # CRITICAL FIX: Use Docker network hostname, not localhost!
+        self.vm_url = victoriametrics_url or os.getenv("VICTORIA_URL", "http://victoriametrics:8428")
 
     async def collect_interface_metrics(
         self,
