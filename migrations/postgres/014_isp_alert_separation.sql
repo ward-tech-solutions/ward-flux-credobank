@@ -39,74 +39,6 @@ CREATE INDEX IF NOT EXISTS idx_alert_history_isp_active
 ON alert_history(isp_provider, resolved_at)
 WHERE resolved_at IS NULL;
 
--- Seed default ISP alert rules
--- Note: Using expression column instead of metric_name (matches AlertRule model)
-INSERT INTO alert_rules (
-    name,
-    description,
-    expression,
-    severity,
-    enabled,
-    scope,
-    isp_provider,
-    interface_filter,
-    created_at,
-    updated_at
-) VALUES
--- Magti Link Down
-(
-    'Magti Link Down',
-    'Alert when Magti ISP interface goes down on .5 routers',
-    'if_oper_status == "down"',
-    'CRITICAL',
-    true,
-    'isp',
-    'magti',
-    'Fa3',
-    NOW(),
-    NOW()
-),
--- Silknet Link Down
-(
-    'Silknet Link Down',
-    'Alert when Silknet ISP interface goes down on .5 routers',
-    'if_oper_status == "down"',
-    'CRITICAL',
-    true,
-    'isp',
-    'silknet',
-    'Fa4',
-    NOW(),
-    NOW()
-),
--- Magti High Error Rate
-(
-    'Magti High Error Rate',
-    'Alert when Magti interface has high input errors (>1000)',
-    'if_in_errors > 1000',
-    'HIGH',
-    true,
-    'isp',
-    'magti',
-    'Fa3',
-    NOW(),
-    NOW()
-),
--- Silknet High Error Rate
-(
-    'Silknet High Error Rate',
-    'Alert when Silknet interface has high input errors (>1000)',
-    'if_in_errors > 1000',
-    'HIGH',
-    true,
-    'isp',
-    'silknet',
-    'Fa4',
-    NOW(),
-    NOW()
-)
-ON CONFLICT DO NOTHING;
-
 -- Output confirmation
 DO $$
 BEGIN
@@ -114,5 +46,12 @@ BEGIN
     RAISE NOTICE '   - Added isp_provider, scope, interface_filter to alert_rules';
     RAISE NOTICE '   - Added isp_provider, interface_id, fault_classification to alert_history';
     RAISE NOTICE '   - Created performance indexes';
-    RAISE NOTICE '   - Seeded 4 default ISP alert rules (Magti & Silknet)';
+    RAISE NOTICE '';
+    RAISE NOTICE '📝 Note: ISP alert rules NOT seeded automatically.';
+    RAISE NOTICE '   The current alert system uses hardcoded logic in tasks.py.';
+    RAISE NOTICE '   These schema changes prepare the database for future ISP alert functionality.';
+    RAISE NOTICE '   To enable ISP alerts, you will need to:';
+    RAISE NOTICE '   1. Modify evaluate_alert_rules() in monitoring/tasks.py';
+    RAISE NOTICE '   2. Query interface metrics from VictoriaMetrics';
+    RAISE NOTICE '   3. Use ISPFaultClassifier for fault detection';
 END $$;
