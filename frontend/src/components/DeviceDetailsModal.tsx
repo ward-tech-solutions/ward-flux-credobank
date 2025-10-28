@@ -872,6 +872,137 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                       )}
                     </div>
 
+                    {/* Link Status & Bandwidth Charts */}
+                    {(ispInterfaceData.data.magti?.history?.length > 0 || ispInterfaceData.data.silknet?.history?.length > 0) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        {/* Magti Link Status & Bandwidth */}
+                        {ispInterfaceData.data.magti?.history && ispInterfaceData.data.magti.history.length > 0 && (
+                          <>
+                            {/* Link Status Timeline */}
+                            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-xl p-3 border border-gray-200/50 dark:border-gray-700/50">
+                              <h6 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-gradient-to-br from-orange-400 to-red-500"></div>
+                                Magti - Link Status
+                              </h6>
+                              <ResponsiveContainer width="100%" height={90}>
+                                <AreaChart data={ispInterfaceData.data.magti.history.map(h => ({
+                                  time: new Date(h.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                  status: h.status,
+                                }))}>
+                                  <defs>
+                                    <linearGradient id="magtiStatusUp" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                  <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                  <YAxis domain={[0, 1]} ticks={[0, 1]} stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} tickFormatter={(v) => v === 1 ? 'UP' : 'DOWN'} />
+                                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px', color: '#f3f4f6' }} formatter={(value: any) => [value === 1 ? 'UP' : 'DOWN', 'Status']} />
+                                  <Area type="stepAfter" dataKey="status" stroke="#10b981" strokeWidth={2} fill="url(#magtiStatusUp)" />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            </div>
+
+                            {/* Bandwidth Chart */}
+                            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-xl p-3 border border-gray-200/50 dark:border-gray-700/50">
+                              <h6 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-gradient-to-br from-orange-400 to-red-500"></div>
+                                Magti - Bandwidth {ispInterfaceData.data.magti.interface_speed_mbps && `(${ispInterfaceData.data.magti.interface_speed_mbps} Mbps)`}
+                              </h6>
+                              <ResponsiveContainer width="100%" height={90}>
+                                <AreaChart data={ispInterfaceData.data.magti.history.map(h => ({
+                                  time: new Date(h.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                  in_mbps: h.in_mbps || 0,
+                                  out_mbps: h.out_mbps || 0,
+                                }))}>
+                                  <defs>
+                                    <linearGradient id="magtiInGradient" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                                    </linearGradient>
+                                    <linearGradient id="magtiOutGradient" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                  <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                  <YAxis stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px', color: '#f3f4f6' }} formatter={(value: any, name: string) => [`${value} Mbps`, name === 'in_mbps' ? '↓ In' : '↑ Out']} />
+                                  <Area type="monotone" dataKey="in_mbps" stroke="#3b82f6" fill="url(#magtiInGradient)" />
+                                  <Area type="monotone" dataKey="out_mbps" stroke="#8b5cf6" fill="url(#magtiOutGradient)" />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Silknet Link Status & Bandwidth */}
+                        {ispInterfaceData.data.silknet?.history && ispInterfaceData.data.silknet.history.length > 0 && (
+                          <>
+                            {/* Link Status Timeline */}
+                            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-xl p-3 border border-gray-200/50 dark:border-gray-700/50">
+                              <h6 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-gradient-to-br from-blue-400 to-purple-500"></div>
+                                Silknet - Link Status
+                              </h6>
+                              <ResponsiveContainer width="100%" height={90}>
+                                <AreaChart data={ispInterfaceData.data.silknet.history.map(h => ({
+                                  time: new Date(h.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                  status: h.status,
+                                }))}>
+                                  <defs>
+                                    <linearGradient id="silknetStatusUp" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                  <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                  <YAxis domain={[0, 1]} ticks={[0, 1]} stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} tickFormatter={(v) => v === 1 ? 'UP' : 'DOWN'} />
+                                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px', color: '#f3f4f6' }} formatter={(value: any) => [value === 1 ? 'UP' : 'DOWN', 'Status']} />
+                                  <Area type="stepAfter" dataKey="status" stroke="#10b981" strokeWidth={2} fill="url(#silknetStatusUp)" />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            </div>
+
+                            {/* Bandwidth Chart */}
+                            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-xl p-3 border border-gray-200/50 dark:border-gray-700/50">
+                              <h6 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-gradient-to-br from-blue-400 to-purple-500"></div>
+                                Silknet - Bandwidth {ispInterfaceData.data.silknet.interface_speed_mbps && `(${ispInterfaceData.data.silknet.interface_speed_mbps} Mbps)`}
+                              </h6>
+                              <ResponsiveContainer width="100%" height={90}>
+                                <AreaChart data={ispInterfaceData.data.silknet.history.map(h => ({
+                                  time: new Date(h.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                  in_mbps: h.in_mbps || 0,
+                                  out_mbps: h.out_mbps || 0,
+                                }))}>
+                                  <defs>
+                                    <linearGradient id="silknetInGradient" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                                    </linearGradient>
+                                    <linearGradient id="silknetOutGradient" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                  <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                  <YAxis stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px', color: '#f3f4f6' }} formatter={(value: any, name: string) => [`${value} Mbps`, name === 'in_mbps' ? '↓ In' : '↑ Out']} />
+                                  <Area type="monotone" dataKey="in_mbps" stroke="#3b82f6" fill="url(#silknetInGradient)" />
+                                  <Area type="monotone" dataKey="out_mbps" stroke="#8b5cf6" fill="url(#silknetOutGradient)" />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
                     {/* Interface Error/Discard Charts - Separated Input/Output */}
                     {(ispInterfaceData.data.magti?.history?.length > 0 || ispInterfaceData.data.silknet?.history?.length > 0) && (
                       <div className="space-y-4 mt-4">
