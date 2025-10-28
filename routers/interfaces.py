@@ -1036,26 +1036,29 @@ async def get_isp_interface_history(
                 # Extract values array [[timestamp, value], [timestamp, value], ...]
                 values = data[0].get("values", [])
 
-                # Query errors and discards for the same time range
-                error_queries = {
+                # Query errors, discards, and bandwidth for the same time range
+                metric_queries = {
                     "in_errors": f'interface_if_in_errors{{{device_filter}}}',
                     "out_errors": f'interface_if_out_errors{{{device_filter}}}',
                     "in_discards": f'interface_if_in_discards{{{device_filter}}}',
                     "out_discards": f'interface_if_out_discards{{{device_filter}}}',
+                    # Bandwidth metrics (convert octets/sec to Mbps)
+                    "in_bps": f'rate(interface_if_hc_in_octets{{{device_filter}}}[1m]) * 8',
+                    "out_bps": f'rate(interface_if_hc_out_octets{{{device_filter}}}[1m]) * 8',
                 }
 
-                error_data = {}
-                for metric_name, error_query in error_queries.items():
-                    error_result = vm_client.query_range(
-                        query=error_query,
+                metric_data = {}
+                for metric_name, metric_query in metric_queries.items():
+                    metric_result = vm_client.query_range(
+                        query=metric_query,
                         start=start_time,
                         end="now",
                         step="1m"
                     )
-                    if error_result.get("status") == "success":
-                        error_results = error_result.get("data", {}).get("result", [])
-                        if error_results:
-                            error_data[metric_name] = {str(t): float(v) for t, v in error_results[0].get("values", [])}
+                    if metric_result.get("status") == "success":
+                        metric_results = metric_result.get("data", {}).get("result", [])
+                        if metric_results:
+                            metric_data[metric_name] = {str(t): float(v) for t, v in metric_results[0].get("values", [])}
 
                 # Transform to history format
                 for timestamp, status_value in values:
@@ -1063,10 +1066,12 @@ async def get_isp_interface_history(
                     history.append({
                         "timestamp": int(timestamp),
                         "status": 1 if int(float(status_value)) == 1 else 0,  # 1=up, 2=down
-                        "in_errors": int(error_data.get("in_errors", {}).get(timestamp_str, 0)),
-                        "out_errors": int(error_data.get("out_errors", {}).get(timestamp_str, 0)),
-                        "in_discards": int(error_data.get("in_discards", {}).get(timestamp_str, 0)),
-                        "out_discards": int(error_data.get("out_discards", {}).get(timestamp_str, 0)),
+                        "in_errors": int(metric_data.get("in_errors", {}).get(timestamp_str, 0)),
+                        "out_errors": int(metric_data.get("out_errors", {}).get(timestamp_str, 0)),
+                        "in_discards": int(metric_data.get("in_discards", {}).get(timestamp_str, 0)),
+                        "out_discards": int(metric_data.get("out_discards", {}).get(timestamp_str, 0)),
+                        "in_mbps": round(metric_data.get("in_bps", {}).get(timestamp_str, 0) / 1_000_000, 2),  # Convert bps to Mbps
+                        "out_mbps": round(metric_data.get("out_bps", {}).get(timestamp_str, 0) / 1_000_000, 2),  # Convert bps to Mbps
                     })
 
         if not history:
@@ -1086,6 +1091,7 @@ async def get_isp_interface_history(
             "interface_alias": iface.if_alias,
             "current_status": oper_status_map.get(iface.oper_status, 'unknown'),
             "current_admin_status": admin_status_map.get(iface.admin_status, 'unknown'),
+            "interface_speed_mbps": round(iface.speed / 1_000_000, 0) if iface.speed else None,  # Convert bps to Mbps
             "total_points": len(history),
             "time_range": time_range,
             "history": history
