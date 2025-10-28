@@ -997,7 +997,7 @@ async def get_isp_interface_history(
     # Get ISP interfaces
     isp_interfaces = db.query(DeviceInterface).filter(
         DeviceInterface.device_id == device.id,
-        DeviceInterface.isp_name.in_(['magti', 'silknet']),
+        DeviceInterface.isp_provider.in_(['magti', 'silknet']),
         DeviceInterface.enabled == True
     ).all()
 
@@ -1074,7 +1074,7 @@ async def get_isp_interface_history(
             continue
 
         # Store in result
-        isp_name = iface.isp_name.lower() if iface.isp_name else 'unknown'
+        isp_name = iface.isp_provider.lower() if iface.isp_provider else 'unknown'
 
         # Map status integers to strings (1=up, 2=down)
         oper_status_map = {1: 'up', 2: 'down', 3: 'testing', 4: 'unknown', 5: 'dormant', 6: 'notPresent', 7: 'lowerLayerDown'}
