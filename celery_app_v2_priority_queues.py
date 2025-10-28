@@ -211,11 +211,11 @@ app.conf.beat_schedule = {
         'kwargs': {'days': 30}
     },
 
-    # 🌐 ISP INTERFACE MONITORING - Collect interface metrics every 60 seconds
+    # 🌐 ISP INTERFACE MONITORING - Collect interface metrics every 30 seconds
     # NOTE: Task name matches @shared_task(name="...") in monitoring/tasks_interface_metrics.py
     'collect-interface-metrics': {
         'task': 'monitoring.tasks.collect_all_interface_metrics',
-        'schedule': 60.0,  # Every 60 seconds (real-time ISP link status)
+        'schedule': 30.0,  # Every 30 seconds (real-time ISP link status)
     },
 
     # 🔍 INTERFACE DISCOVERY - Discover interfaces daily at 2:30 AM
