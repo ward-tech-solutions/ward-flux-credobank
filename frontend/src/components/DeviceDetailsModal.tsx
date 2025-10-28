@@ -4,7 +4,7 @@ import { Modal, ModalHeader, ModalTitle, ModalContent } from '@/components/ui/Mo
 import { Skeleton } from '@/components/ui/Loading'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import { devicesAPI } from '@/services/api'
+import { devicesAPI, interfacesAPI } from '@/services/api'
 import { toast } from 'sonner'
 import {
   Globe,
@@ -108,6 +108,15 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
     queryKey: ['device-alerts', hostid],
     queryFn: () => devicesAPI.getDeviceAlerts(hostid, 50),
     enabled: open && !!hostid,
+    refetchInterval: 30000,
+  })
+
+  // Fetch ISP interface history for .5 routers (Magti/Silknet)
+  const is5Router = deviceData?.ip?.endsWith('.5')
+  const { data: ispInterfaceData, isLoading: ispInterfaceLoading } = useQuery({
+    queryKey: ['isp-interface-history', deviceData?.ip, timeRange],
+    queryFn: () => interfacesAPI.getISPInterfaceHistory(deviceData!.ip, timeRange),
+    enabled: open && !!deviceData?.ip && is5Router,
     refetchInterval: 30000,
   })
 
@@ -774,6 +783,164 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                 </div>
               )}
             </div>
+
+            {/* ISP Interfaces Section (only for .5 routers) */}
+            {is5Router && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <Network className="h-5 w-5 text-ward-green" />
+                  ISP Interfaces (Magti & Silknet)
+                </h3>
+
+                {ispInterfaceLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Skeleton className="h-32" />
+                    <Skeleton className="h-32" />
+                  </div>
+                ) : ispInterfaceData?.data ? (
+                  <div className="space-y-4">
+                    {/* ISP Status Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Magti Card */}
+                      {ispInterfaceData.data.magti && (
+                        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-4 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="p-2 rounded-lg bg-gradient-to-br from-orange-400 to-red-500">
+                                <Wifi className="h-4 w-4 text-white" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-gray-900 dark:text-gray-100">Magti</h4>
+                                <p className="text-xs text-gray-500">{ispInterfaceData.data.magti.interface_name}</p>
+                              </div>
+                            </div>
+                            <Badge variant={ispInterfaceData.data.magti.current_status === 'up' ? 'success' : 'danger'}>
+                              {ispInterfaceData.data.magti.current_status === 'up' ? 'UP' : 'DOWN'}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="flex flex-col">
+                              <span className="text-gray-500 text-xs">Interface</span>
+                              <span className="font-medium text-gray-900 dark:text-gray-100">{ispInterfaceData.data.magti.interface_name}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-gray-500 text-xs">Status</span>
+                              <span className="font-medium text-gray-900 dark:text-gray-100">{ispInterfaceData.data.magti.current_status}</span>
+                            </div>
+                          </div>
+                          {ispInterfaceData.data.magti.interface_alias && (
+                            <div className="mt-2 text-xs text-gray-500">
+                              {ispInterfaceData.data.magti.interface_alias}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Silknet Card */}
+                      {ispInterfaceData.data.silknet && (
+                        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-4 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-400 to-purple-500">
+                                <Wifi className="h-4 w-4 text-white" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-gray-900 dark:text-gray-100">Silknet</h4>
+                                <p className="text-xs text-gray-500">{ispInterfaceData.data.silknet.interface_name}</p>
+                              </div>
+                            </div>
+                            <Badge variant={ispInterfaceData.data.silknet.current_status === 'up' ? 'success' : 'danger'}>
+                              {ispInterfaceData.data.silknet.current_status === 'up' ? 'UP' : 'DOWN'}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="flex flex-col">
+                              <span className="text-gray-500 text-xs">Interface</span>
+                              <span className="font-medium text-gray-900 dark:text-gray-100">{ispInterfaceData.data.silknet.interface_name}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-gray-500 text-xs">Status</span>
+                              <span className="font-medium text-gray-900 dark:text-gray-100">{ispInterfaceData.data.silknet.current_status}</span>
+                            </div>
+                          </div>
+                          {ispInterfaceData.data.silknet.interface_alias && (
+                            <div className="mt-2 text-xs text-gray-500">
+                              {ispInterfaceData.data.silknet.interface_alias}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Interface Error/Discard Charts */}
+                    {(ispInterfaceData.data.magti?.history?.length > 0 || ispInterfaceData.data.silknet?.history?.length > 0) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        {/* Magti Chart */}
+                        {ispInterfaceData.data.magti?.history && ispInterfaceData.data.magti.history.length > 0 && (
+                          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-4 border border-gray-200/50 dark:border-gray-700/50">
+                            <h5 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Magti - Errors & Discards</h5>
+                            <ResponsiveContainer width="100%" height={150}>
+                              <AreaChart data={ispInterfaceData.data.magti.history.map(h => ({
+                                time: new Date(h.timestamp * 1000).toLocaleTimeString(),
+                                errors: h.in_errors + h.out_errors,
+                                discards: h.in_discards + h.out_discards,
+                              }))}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 10 }} />
+                                <YAxis stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 10 }} />
+                                <Tooltip
+                                  contentStyle={{
+                                    backgroundColor: '#1f2937',
+                                    border: '1px solid #374151',
+                                    borderRadius: '8px',
+                                    fontSize: '11px'
+                                  }}
+                                />
+                                <Area type="monotone" dataKey="errors" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
+                                <Area type="monotone" dataKey="discards" stackId="1" stroke="#f97316" fill="#f97316" fillOpacity={0.6} />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          </div>
+                        )}
+
+                        {/* Silknet Chart */}
+                        {ispInterfaceData.data.silknet?.history && ispInterfaceData.data.silknet.history.length > 0 && (
+                          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-4 border border-gray-200/50 dark:border-gray-700/50">
+                            <h5 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Silknet - Errors & Discards</h5>
+                            <ResponsiveContainer width="100%" height={150}>
+                              <AreaChart data={ispInterfaceData.data.silknet.history.map(h => ({
+                                time: new Date(h.timestamp * 1000).toLocaleTimeString(),
+                                errors: h.in_errors + h.out_errors,
+                                discards: h.in_discards + h.out_discards,
+                              }))}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 10 }} />
+                                <YAxis stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 10 }} />
+                                <Tooltip
+                                  contentStyle={{
+                                    backgroundColor: '#1f2937',
+                                    border: '1px solid #374151',
+                                    borderRadius: '8px',
+                                    fontSize: '11px'
+                                  }}
+                                />
+                                <Area type="monotone" dataKey="errors" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
+                                <Area type="monotone" dataKey="discards" stackId="1" stroke="#f97316" fill="#f97316" fillOpacity={0.6} />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 text-center">
+                    <Network className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">No ISP interface data available</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Device Information */}
             <div>
