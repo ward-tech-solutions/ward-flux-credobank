@@ -942,3 +942,115 @@ def format_bandwidth(bps: float) -> str:
         return f"{bps / 1_000:.1f} Kbps"
     else:  # bps
         return f"{bps:.0f} bps"
+
+
+@router.get("/isp-interface-history/{device_ip}")
+async def get_isp_interface_history(
+    device_ip: str,
+    time_range: str = Query("1h", regex="^(30m|1h|3h|6h|12h|24h|7d|30d)$"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get historical metrics for ISP interfaces (Magti, Silknet) on .5 routers
+
+    This endpoint retrieves historical interface metrics for ISP connections
+    to help identify ISP-side vs customer-side issues.
+
+    Args:
+        device_ip: IP address of the .5 router
+        time_range: Time range for historical data (30m, 1h, 3h, 6h, 12h, 24h, 7d, 30d)
+
+    Returns:
+        Dictionary with magti and silknet interface history data
+    """
+    from datetime import timedelta
+    from monitoring.models import InterfaceMetrics
+
+    # Validate .5 device
+    if not device_ip.endswith('.5'):
+        raise HTTPException(
+            status_code=400,
+            detail="Only .5 routers have ISP interfaces. This device does not end with .5"
+        )
+
+    # Time range mapping
+    time_deltas = {
+        '30m': timedelta(minutes=30),
+        '1h': timedelta(hours=1),
+        '3h': timedelta(hours=3),
+        '6h': timedelta(hours=6),
+        '12h': timedelta(hours=12),
+        '24h': timedelta(hours=24),
+        '7d': timedelta(days=7),
+        '30d': timedelta(days=30),
+    }
+    cutoff = datetime.utcnow() - time_deltas.get(time_range, timedelta(hours=1))
+
+    # Find device
+    device = db.query(StandaloneDevice).filter_by(ip=device_ip).first()
+    if not device:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Device with IP {device_ip} not found"
+        )
+
+    # Get ISP interfaces
+    isp_interfaces = db.query(DeviceInterface).filter(
+        DeviceInterface.device_id == device.id,
+        DeviceInterface.isp_name.in_(['magti', 'silknet']),
+        DeviceInterface.enabled == True
+    ).all()
+
+    if not isp_interfaces:
+        logger.warning(f"No ISP interfaces found for device {device_ip}")
+        return {"magti": None, "silknet": None}
+
+    result = {"magti": None, "silknet": None}
+
+    for iface in isp_interfaces:
+        # Get historical metrics
+        metrics = db.query(InterfaceMetrics).filter(
+            InterfaceMetrics.interface_id == iface.id,
+            InterfaceMetrics.timestamp >= cutoff
+        ).order_by(InterfaceMetrics.timestamp.asc()).limit(1000).all()
+
+        if not metrics:
+            logger.info(f"No metrics found for interface {iface.if_name} in time range {time_range}")
+            continue
+
+        # Transform metrics to history format
+        history = []
+        for m in metrics:
+            history.append({
+                "timestamp": int(m.timestamp.timestamp()),
+                "status": 1 if m.if_oper_status == 'up' else 0,
+                "in_octets": m.if_in_octets or 0,
+                "out_octets": m.if_out_octets or 0,
+                "in_errors": m.if_in_errors or 0,
+                "out_errors": m.if_out_errors or 0,
+                "in_discards": m.if_in_discards or 0,
+                "out_discards": m.if_out_discards or 0,
+                "in_ucast_pkts": m.if_in_ucast_pkts or 0,
+                "out_ucast_pkts": m.if_out_ucast_pkts or 0,
+                # Calculate bandwidth in Mbps
+                "bandwidth_in_mbps": round((m.if_in_octets or 0) * 8 / 1_000_000, 2),
+                "bandwidth_out_mbps": round((m.if_out_octets or 0) * 8 / 1_000_000, 2),
+            })
+
+        # Store in result
+        isp_name = iface.isp_name.lower() if iface.isp_name else 'unknown'
+        result[isp_name] = {
+            "interface_name": iface.if_name,
+            "interface_description": iface.if_descr,
+            "interface_alias": iface.if_alias,
+            "current_status": iface.if_oper_status,
+            "current_admin_status": iface.if_admin_status,
+            "total_points": len(history),
+            "time_range": time_range,
+            "history": history
+        }
+
+    logger.info(f"Retrieved ISP interface history for {device_ip}: Magti={result['magti'] is not None}, Silknet={result['silknet'] is not None}")
+
+    return result

@@ -242,6 +242,10 @@ export const interfacesAPI = {
       interface_speed_bps: number;
       last_updated: string;
     }>>>(`/interfaces/bandwidth/realtime?device_ips=${deviceIps.join(',')}`),
+
+  // Get historical ISP interface metrics for .5 routers
+  getISPInterfaceHistory: (deviceIP: string, timeRange: string = '1h') =>
+    api.get(`/interfaces/isp-interface-history/${deviceIP}?time_range=${timeRange}`),
 }
 
 // Discovery

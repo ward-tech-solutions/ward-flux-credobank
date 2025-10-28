@@ -86,6 +86,7 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
   const [copiedIP, setCopiedIP] = useState(false)
   const [timeRange, setTimeRange] = useState<TimeRange>('1h')
   const [isPinging, setIsPinging] = useState(false)
+  const [showResolvedAlerts, setShowResolvedAlerts] = useState(true)
   const queryClient = useQueryClient()
 
   const { data: device, isLoading, refetch } = useQuery({
@@ -191,6 +192,13 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
     }).reverse() // Reverse to show oldest to newest
   }, [historyData, timeRange])
 
+  // Filter alerts based on toggle
+  const filteredAlerts = useMemo(() => {
+    if (!alertsData?.data?.alerts) return []
+    if (showResolvedAlerts) return alertsData.data.alerts
+    return alertsData.data.alerts.filter((alert: any) => !alert.resolved_at)
+  }, [alertsData, showResolvedAlerts])
+
   // Calculate uptime percentage and incidents
   const uptimeStats = useMemo(() => {
     if (statusHistory.length === 0) {
@@ -198,7 +206,7 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
     }
 
     const totalPoints = statusHistory.length
-    const upPoints = statusHistory.filter(p => p.status === 1).length
+    const upPoints = statusHistory.filter((p: any) => p.status === 1).length
     const uptime = ((upPoints / totalPoints) * 100).toFixed(2)
 
     // Count incidents (transitions from up to down)
@@ -209,8 +217,35 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
       }
     }
 
-    return { uptime, incidents, mttr: 'N/A' }
-  }, [statusHistory])
+    // Calculate MTTR from resolved alerts
+    let mttr = 'N/A'
+    if (alertsData?.data?.alerts) {
+      const resolvedAlerts = alertsData.data.alerts.filter(
+        (alert: any) => alert.resolved_at && alert.duration_seconds
+      )
+
+      if (resolvedAlerts.length > 0) {
+        const totalDuration = resolvedAlerts.reduce(
+          (sum: number, alert: any) => sum + alert.duration_seconds,
+          0
+        )
+        const avgSeconds = totalDuration / resolvedAlerts.length
+
+        // Format MTTR nicely
+        if (avgSeconds < 60) {
+          mttr = `${Math.round(avgSeconds)}s`
+        } else if (avgSeconds < 3600) {
+          mttr = `${Math.round(avgSeconds / 60)}m`
+        } else {
+          const hours = Math.floor(avgSeconds / 3600)
+          const minutes = Math.round((avgSeconds % 3600) / 60)
+          mttr = `${hours}h ${minutes}m`
+        }
+      }
+    }
+
+    return { uptime, incidents, mttr }
+  }, [statusHistory, alertsData])
 
   const copyIP = () => {
     if (!deviceData?.ip) return
@@ -763,20 +798,28 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
 
             {/* Alert History Timeline - Modern */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-400 to-red-500">
-                  <AlertTriangle className="h-4 w-4 text-white" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-400 to-red-500">
+                    <AlertTriangle className="h-4 w-4 text-white" />
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                    Alert History ({filteredAlerts.length})
+                  </h4>
                 </div>
-                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                  Alert History
-                </h4>
+                <button
+                  onClick={() => setShowResolvedAlerts(!showResolvedAlerts)}
+                  className="text-sm px-3 py-1.5 rounded-lg transition-colors font-medium bg-ward-green/10 text-ward-green hover:bg-ward-green hover:text-white"
+                >
+                  {showResolvedAlerts ? 'Hide Resolved' : 'Show All'}
+                </button>
               </div>
 
               {alertsLoading ? (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading alert history...</div>
-              ) : alertsData?.data?.alerts && alertsData.data.alerts.length > 0 ? (
+              ) : filteredAlerts.length > 0 ? (
                 <div className="space-y-3">
-                  {alertsData.data.alerts.map((alert: any) => {
+                  {filteredAlerts.map((alert: any) => {
                     const triggeredAt = new Date(alert.triggered_at)
                     const resolvedAt = alert.resolved_at ? new Date(alert.resolved_at) : null
                     const isActive = !alert.resolved_at

@@ -15,10 +15,12 @@ import {
   Calendar,
   Server,
   Percent,
-  AlertTriangle
+  AlertTriangle,
+  FileDown
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import api from '@/services/api'
+import { PDFExportService } from '@/services/pdfExport'
 
 type ReportTab = 'downtime' | 'mttr' | 'sla'
 
@@ -145,10 +147,23 @@ export default function Reports() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Reports & Analytics</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Comprehensive network performance reports</p>
         </div>
-        <Button onClick={loadDowntimeReport}>
-          <Clock className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => {
+              const date = new Date().toISOString().split('T')[0]
+              const filename = `ward-${activeTab}-report-${period}-${date}.pdf`
+              PDFExportService.exportToPDF('report-content', filename)
+            }}
+            className="bg-ward-green hover:bg-ward-green-dark"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            Export PDF
+          </Button>
+          <Button onClick={loadDowntimeReport} variant="outline">
+            <Clock className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Report Tabs */}
@@ -192,9 +207,11 @@ export default function Reports() {
         </CardContent>
       </Card>
 
-      {/* Downtime Report */}
-      {activeTab === 'downtime' && (
-        <>
+      {/* Report Content Wrapper for PDF Export */}
+      <div id="report-content">
+        {/* Downtime Report */}
+        {activeTab === 'downtime' && (
+          <>
           {/* Filters */}
           <Card>
             <CardContent className="py-4">
@@ -529,6 +546,8 @@ export default function Reports() {
           </CardContent>
         </Card>
       )}
+      </div>
+      {/* End Report Content Wrapper */}
     </div>
   )
 }

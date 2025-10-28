@@ -299,6 +299,9 @@ export default function Monitor() {
   // Ping state
   const [pingLoading, setPingLoading] = useState<Set<string>>(new Set())
 
+  // Recently resolved devices state (for green glow effect)
+  const [recentlyResolvedDevices, setRecentlyResolvedDevices] = useState<Set<string>>(new Set())
+
   // WebSocket state
   // Filter states with localStorage persistence
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>(() => {
@@ -416,8 +419,30 @@ export default function Monitor() {
         return
       }
       if (data?.type === 'device_status_update') {
+        const { hostid, previous_status, current_status, device_name } = data
+
+        // 🎉 Detect DOWN -> UP transition (device recovered!)
+        if (previous_status === 'Down' && current_status === 'Up') {
+          // Add to recently resolved set
+          setRecentlyResolvedDevices(prev => new Set(prev).add(hostid))
+
+          // Show success toast
+          toast.success('🎉 Device Recovered!', {
+            description: `${device_name} is back online`,
+            duration: 5000,
+          })
+
+          // Remove from set after 5 seconds (animation duration)
+          setTimeout(() => {
+            setRecentlyResolvedDevices(prev => {
+              const next = new Set(prev)
+              next.delete(hostid)
+              return next
+            })
+          }, 5000)
+        }
+
         queryClient.invalidateQueries({ queryKey: ['devices'] })
-        toast.info(`Device Update: ${data.device_name} status changed`)
       }
     } catch (error) {
       console.error('Failed to parse WebSocket message:', error)
@@ -725,6 +750,7 @@ export default function Monitor() {
   const renderDeviceCard = (device: Device) => {
     const isDown = device.ping_status === 'Down'
     const recentlyDown = isRecentlyDown(device)
+    const recentlyResolved = recentlyResolvedDevices.has(device.hostid) // 🎉 NEW: Check if recently recovered
     const DeviceIcon = getDeviceIcon(device.device_type)
     const isPinging = pingLoading.has(device.hostid)
 
@@ -733,7 +759,9 @@ export default function Monitor() {
         key={device.hostid}
         onClick={() => setSelectedDevice(device)}
         className={`relative bg-white dark:bg-gray-800 rounded-lg p-4 border-l-4 cursor-pointer transition-all duration-300 ${
-          recentlyDown
+          recentlyResolved // 🎉 NEW: Green glow for recovered devices (priority!)
+            ? 'border-green-600 shadow-2xl shadow-green-500/50 animate-pulse-success-glow'
+            : recentlyDown
             ? 'border-red-600 shadow-lg shadow-red-500/30 animate-pulse-glow'
             : isDown
             ? 'border-red-500 hover:shadow-lg'
@@ -742,7 +770,15 @@ export default function Monitor() {
       >
         {/* Status indicator with stronger pulse for recently down */}
         <div className="absolute top-3 right-3">
-          {isDown ? (
+          {recentlyResolved ? ( // 🎉 NEW: Success indicator for recovered devices
+            <div className="relative flex items-center justify-center w-6 h-6">
+              <span className="absolute inline-flex h-8 w-8 rounded-full bg-green-400 opacity-75 animate-ping"></span>
+              <span className="absolute inline-flex h-6 w-6 rounded-full bg-green-300 opacity-60 animate-pulse"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500 shadow-lg shadow-green-500/50">
+                <CheckCircle className="h-3 w-3 text-white absolute inset-0 m-auto" />
+              </span>
+            </div>
+          ) : isDown ? (
             <div className="relative flex items-center justify-center w-5 h-5">
               {recentlyDown && (
                 <>
@@ -756,6 +792,15 @@ export default function Monitor() {
             <span className="inline-flex rounded-full h-3 w-3 bg-green-500 shadow-sm"></span>
           )}
         </div>
+
+        {/* 🎉 NEW: "RECOVERED!" badge for recently resolved devices */}
+        {recentlyResolved && (
+          <div className="absolute top-3 left-3 z-10">
+            <Badge className="bg-green-500 text-white animate-bounce shadow-lg">
+              ✅ RECOVERED!
+            </Badge>
+          </div>
+        )}
 
         {/* Device content */}
         <div className="flex items-start gap-3">

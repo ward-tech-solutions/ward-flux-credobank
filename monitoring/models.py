@@ -199,6 +199,11 @@ class AlertRule(Base):
     device_group = Column(String(100))
     monitoring_item_id = Column(SQLAlchemyUUID(as_uuid=True))
 
+    # ISP-specific fields (NEW)
+    isp_provider = Column(String(50), nullable=True)  # 'magti', 'silknet', or NULL for non-ISP
+    scope = Column(String(50), nullable=False, default='global')  # 'global', 'isp', 'device', 'branch'
+    interface_filter = Column(String(255), nullable=True)  # Interface name pattern (e.g., 'Fa3', 'Fa4')
+
     # Rule behavior
     enabled = Column(Boolean, nullable=False, default=True)
 
@@ -220,6 +225,11 @@ class AlertHistory(Base):
     message = Column(Text, nullable=False)
     value = Column(String(100))  # Value that triggered the alert
     threshold = Column(String(500))
+
+    # ISP-specific fields (NEW)
+    isp_provider = Column(String(50), nullable=True)  # ISP provider if this is an ISP alert
+    interface_id = Column(SQLAlchemyUUID(as_uuid=True), ForeignKey("device_interfaces.id"), nullable=True)  # Interface if interface-specific
+    fault_classification = Column(JSON, nullable=True)  # Fault analysis data: {type, confidence, reason, action}
 
     # Alert lifecycle
     triggered_at = Column(DateTime, nullable=False, default=datetime.utcnow)
