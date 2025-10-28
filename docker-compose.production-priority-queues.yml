@@ -218,20 +218,6 @@ services:
       - ./logs:/app/logs
     restart: unless-stopped
 
-  # Frontend
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: wardops-frontend-prod
-    environment:
-      VITE_API_URL: http://localhost:5001
-    ports:
-      - "5173:80"
-    depends_on:
-      - api
-    restart: unless-stopped
-
 volumes:
   postgres_prod_data:
   redis_prod_data:
