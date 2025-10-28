@@ -872,62 +872,126 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
                       )}
                     </div>
 
-                    {/* Interface Error/Discard Charts */}
+                    {/* Interface Error/Discard Charts - Separated Input/Output */}
                     {(ispInterfaceData.data.magti?.history?.length > 0 || ispInterfaceData.data.silknet?.history?.length > 0) && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        {/* Magti Chart */}
+                      <div className="space-y-4 mt-4">
+                        {/* Magti Charts */}
                         {ispInterfaceData.data.magti?.history && ispInterfaceData.data.magti.history.length > 0 && (
-                          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-4 border border-gray-200/50 dark:border-gray-700/50">
-                            <h5 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Magti - Errors & Discards</h5>
-                            <ResponsiveContainer width="100%" height={150}>
-                              <AreaChart data={ispInterfaceData.data.magti.history.map(h => ({
-                                time: new Date(h.timestamp * 1000).toLocaleTimeString(),
-                                errors: h.in_errors + h.out_errors,
-                                discards: h.in_discards + h.out_discards,
-                              }))}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-                                <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 10 }} />
-                                <YAxis stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 10 }} />
-                                <Tooltip
-                                  contentStyle={{
-                                    backgroundColor: '#1f2937',
-                                    border: '1px solid #374151',
-                                    borderRadius: '8px',
-                                    fontSize: '11px'
-                                  }}
-                                />
-                                <Area type="monotone" dataKey="errors" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
-                                <Area type="monotone" dataKey="discards" stackId="1" stroke="#f97316" fill="#f97316" fillOpacity={0.6} />
-                              </AreaChart>
-                            </ResponsiveContainer>
+                          <div className="space-y-2">
+                            <h5 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-orange-400 to-red-500"></div>
+                              Magti ({ispInterfaceData.data.magti.interface_name}) - {ispInterfaceData.data.magti.interface_alias || 'ISP Link'}
+                            </h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {/* Input */}
+                              <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-xl p-3 border border-gray-200/50 dark:border-gray-700/50">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h6 className="text-xs font-semibold text-gray-700 dark:text-gray-300">↓ Input (Inbound)</h6>
+                                  <div className="flex gap-2 text-xs text-gray-500">
+                                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div>Errors</span>
+                                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"></div>Discards</span>
+                                  </div>
+                                </div>
+                                <ResponsiveContainer width="100%" height={110}>
+                                  <AreaChart data={ispInterfaceData.data.magti.history.map(h => ({
+                                    time: new Date(h.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                    in_errors: h.in_errors,
+                                    in_discards: h.in_discards,
+                                  }))}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                    <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                    <YAxis stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px', color: '#f3f4f6' }} formatter={(value: any, name: string) => [value, name === 'in_errors' ? 'In Errors' : 'In Discards']} />
+                                    <Area type="monotone" dataKey="in_errors" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
+                                    <Area type="monotone" dataKey="in_discards" stackId="1" stroke="#f97316" fill="#f97316" fillOpacity={0.6} />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </div>
+                              {/* Output */}
+                              <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-xl p-3 border border-gray-200/50 dark:border-gray-700/50">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h6 className="text-xs font-semibold text-gray-700 dark:text-gray-300">↑ Output (Outbound)</h6>
+                                  <div className="flex gap-2 text-xs text-gray-500">
+                                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div>Errors</span>
+                                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"></div>Discards</span>
+                                  </div>
+                                </div>
+                                <ResponsiveContainer width="100%" height={110}>
+                                  <AreaChart data={ispInterfaceData.data.magti.history.map(h => ({
+                                    time: new Date(h.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                    out_errors: h.out_errors,
+                                    out_discards: h.out_discards,
+                                  }))}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                    <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                    <YAxis stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px', color: '#f3f4f6' }} formatter={(value: any, name: string) => [value, name === 'out_errors' ? 'Out Errors' : 'Out Discards']} />
+                                    <Area type="monotone" dataKey="out_errors" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
+                                    <Area type="monotone" dataKey="out_discards" stackId="1" stroke="#f97316" fill="#f97316" fillOpacity={0.6} />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
                           </div>
                         )}
 
-                        {/* Silknet Chart */}
+                        {/* Silknet Charts */}
                         {ispInterfaceData.data.silknet?.history && ispInterfaceData.data.silknet.history.length > 0 && (
-                          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-4 border border-gray-200/50 dark:border-gray-700/50">
-                            <h5 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Silknet - Errors & Discards</h5>
-                            <ResponsiveContainer width="100%" height={150}>
-                              <AreaChart data={ispInterfaceData.data.silknet.history.map(h => ({
-                                time: new Date(h.timestamp * 1000).toLocaleTimeString(),
-                                errors: h.in_errors + h.out_errors,
-                                discards: h.in_discards + h.out_discards,
-                              }))}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-                                <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 10 }} />
-                                <YAxis stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 10 }} />
-                                <Tooltip
-                                  contentStyle={{
-                                    backgroundColor: '#1f2937',
-                                    border: '1px solid #374151',
-                                    borderRadius: '8px',
-                                    fontSize: '11px'
-                                  }}
-                                />
-                                <Area type="monotone" dataKey="errors" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
-                                <Area type="monotone" dataKey="discards" stackId="1" stroke="#f97316" fill="#f97316" fillOpacity={0.6} />
-                              </AreaChart>
-                            </ResponsiveContainer>
+                          <div className="space-y-2">
+                            <h5 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-400 to-purple-500"></div>
+                              Silknet ({ispInterfaceData.data.silknet.interface_name}) - {ispInterfaceData.data.silknet.interface_alias || 'ISP Link'}
+                            </h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {/* Input */}
+                              <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-xl p-3 border border-gray-200/50 dark:border-gray-700/50">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h6 className="text-xs font-semibold text-gray-700 dark:text-gray-300">↓ Input (Inbound)</h6>
+                                  <div className="flex gap-2 text-xs text-gray-500">
+                                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div>Errors</span>
+                                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"></div>Discards</span>
+                                  </div>
+                                </div>
+                                <ResponsiveContainer width="100%" height={110}>
+                                  <AreaChart data={ispInterfaceData.data.silknet.history.map(h => ({
+                                    time: new Date(h.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                    in_errors: h.in_errors,
+                                    in_discards: h.in_discards,
+                                  }))}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                    <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                    <YAxis stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px', color: '#f3f4f6' }} formatter={(value: any, name: string) => [value, name === 'in_errors' ? 'In Errors' : 'In Discards']} />
+                                    <Area type="monotone" dataKey="in_errors" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
+                                    <Area type="monotone" dataKey="in_discards" stackId="1" stroke="#f97316" fill="#f97316" fillOpacity={0.6} />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </div>
+                              {/* Output */}
+                              <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-xl p-3 border border-gray-200/50 dark:border-gray-700/50">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h6 className="text-xs font-semibold text-gray-700 dark:text-gray-300">↑ Output (Outbound)</h6>
+                                  <div className="flex gap-2 text-xs text-gray-500">
+                                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div>Errors</span>
+                                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"></div>Discards</span>
+                                  </div>
+                                </div>
+                                <ResponsiveContainer width="100%" height={110}>
+                                  <AreaChart data={ispInterfaceData.data.silknet.history.map(h => ({
+                                    time: new Date(h.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                    out_errors: h.out_errors,
+                                    out_discards: h.out_discards,
+                                  }))}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                                    <XAxis dataKey="time" stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                    <YAxis stroke="#6b7280" tick={{ fill: '#6b7280', fontSize: 9 }} />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px', color: '#f3f4f6' }} formatter={(value: any, name: string) => [value, name === 'out_errors' ? 'Out Errors' : 'Out Discards']} />
+                                    <Area type="monotone" dataKey="out_errors" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
+                                    <Area type="monotone" dataKey="out_discards" stackId="1" stroke="#f97316" fill="#f97316" fillOpacity={0.6} />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
