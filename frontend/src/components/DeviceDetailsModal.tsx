@@ -111,15 +111,6 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
     refetchInterval: 30000,
   })
 
-  // Fetch ISP interface history for .5 routers (Magti/Silknet)
-  const is5Router = deviceData?.ip?.endsWith('.5')
-  const { data: ispInterfaceData, isLoading: ispInterfaceLoading } = useQuery({
-    queryKey: ['isp-interface-history', deviceData?.ip, timeRange],
-    queryFn: () => interfacesAPI.getISPInterfaceHistory(deviceData!.ip, timeRange),
-    enabled: open && !!deviceData?.ip && is5Router,
-    refetchInterval: 30000,
-  })
-
   useEffect(() => {
     if (open && hostid) {
       refetch()
@@ -127,6 +118,15 @@ export default function DeviceDetailsModal({ open, onClose, hostid, onOpenSSH }:
   }, [open, hostid, refetch])
 
   const deviceData = device?.data
+
+  // Fetch ISP interface history for .5 routers (Magti/Silknet) - Must be after deviceData definition
+  const is5Router = deviceData?.ip?.endsWith('.5')
+  const { data: ispInterfaceData, isLoading: ispInterfaceLoading } = useQuery({
+    queryKey: ['isp-interface-history', deviceData?.ip, timeRange],
+    queryFn: () => interfacesAPI.getISPInterfaceHistory(deviceData!.ip, timeRange),
+    enabled: open && !!deviceData?.ip && is5Router,
+    refetchInterval: 30000,
+  })
 
   const isOnline = deviceData?.ping_status === 'Up' || deviceData?.available === 'Available'
   const statusText = deviceData?.ping_status || deviceData?.available || 'Unknown'
