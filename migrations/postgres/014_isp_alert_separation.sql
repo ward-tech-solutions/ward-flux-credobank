@@ -40,72 +40,68 @@ ON alert_history(isp_provider, resolved_at)
 WHERE resolved_at IS NULL;
 
 -- Seed default ISP alert rules
+-- Note: Using expression column instead of metric_name (matches AlertRule model)
 INSERT INTO alert_rules (
     name,
     description,
-    metric_name,
-    condition,
-    threshold_value,
+    expression,
     severity,
     enabled,
     scope,
     isp_provider,
+    interface_filter,
     created_at,
     updated_at
 ) VALUES
 -- Magti Link Down
 (
     'Magti Link Down',
-    'Alert when Magti ISP interface goes down',
-    'if_oper_status',
-    'equals',
-    'down',
+    'Alert when Magti ISP interface goes down on .5 routers',
+    'if_oper_status == "down"',
     'CRITICAL',
     true,
     'isp',
     'magti',
+    'Fa3',
     NOW(),
     NOW()
 ),
 -- Silknet Link Down
 (
     'Silknet Link Down',
-    'Alert when Silknet ISP interface goes down',
-    'if_oper_status',
-    'equals',
-    'down',
+    'Alert when Silknet ISP interface goes down on .5 routers',
+    'if_oper_status == "down"',
     'CRITICAL',
     true,
     'isp',
     'silknet',
+    'Fa4',
     NOW(),
     NOW()
 ),
 -- Magti High Error Rate
 (
     'Magti High Error Rate',
-    'Alert when Magti interface has high input errors',
-    'if_in_errors',
-    'greater_than',
-    '1000',
+    'Alert when Magti interface has high input errors (>1000)',
+    'if_in_errors > 1000',
     'HIGH',
     true,
     'isp',
     'magti',
+    'Fa3',
     NOW(),
     NOW()
 ),
 -- Silknet High Error Rate
 (
     'Silknet High Error Rate',
-    'Alert when Silknet interface has high input errors',
-    'if_oper_status',
-    'greater_than',
-    '1000',
+    'Alert when Silknet interface has high input errors (>1000)',
+    'if_in_errors > 1000',
     'HIGH',
     true,
     'isp',
     'silknet',
+    'Fa4',
     NOW(),
     NOW()
 )
