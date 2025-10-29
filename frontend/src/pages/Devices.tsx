@@ -11,7 +11,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import DeviceDetailsModal from '@/components/DeviceDetailsModal'
 import SSHTerminalModal from '@/components/SSHTerminalModal'
 import { devicesAPI, branchesAPI } from '@/services/api'
-import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus, MapPin, Info, Activity, Trash2 } from 'lucide-react'
+import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus, MapPin, Info, Activity, Trash2, ArrowUpDown } from 'lucide-react'
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/Modal'
 import { toast } from 'sonner'
 
@@ -28,6 +28,9 @@ export default function Devices() {
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '')
   const [regionFilter, setRegionFilter] = useState(searchParams.get('region') || '')
+  const [sortBy, setSortBy] = useState<'default' | 'name-asc' | 'name-desc' | 'status-up' | 'status-down' | 'ip-asc' | 'branch-asc'>(() => {
+    return (localStorage.getItem('devices_sortBy') as any) || 'default'
+  })
 
   // Modal states
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
@@ -148,6 +151,11 @@ export default function Devices() {
     localStorage.setItem('devices-view-mode', viewMode)
   }, [viewMode])
 
+  // Save sortBy to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('devices_sortBy', sortBy)
+  }, [sortBy])
+
   // Auto-extract city/branch from hostname
   useEffect(() => {
     if (addDeviceForm.hostname && !addDeviceForm.branch) {
@@ -180,7 +188,7 @@ export default function Devices() {
   const filteredDevices = useMemo(() => {
     if (!devices?.data) return []
 
-    return devices.data.filter((device: any) => {
+    const filtered = devices.data.filter((device: any) => {
       const name = device.display_name || device.hostname || ''
       const host = device.ip || ''
       const branch = device.branch || ''
@@ -202,7 +210,34 @@ export default function Devices() {
 
       return matchesSearch && matchesStatus && matchesType && matchesRegion
     })
-  }, [devices, searchQuery, statusFilter, typeFilter, regionFilter])
+
+    // Sort based on user selection
+    return filtered.sort((a: any, b: any) => {
+      if (sortBy === 'name-asc') {
+        return (a.display_name || a.hostname || '').localeCompare(b.display_name || b.hostname || '')
+      } else if (sortBy === 'name-desc') {
+        return (b.display_name || b.hostname || '').localeCompare(a.display_name || a.hostname || '')
+      } else if (sortBy === 'status-up') {
+        // UP first, then DOWN
+        const aUp = a.ping_status === 'Up' ? 1 : 0
+        const bUp = b.ping_status === 'Up' ? 1 : 0
+        if (aUp !== bUp) return bUp - aUp
+        return (a.display_name || a.hostname || '').localeCompare(b.display_name || b.hostname || '')
+      } else if (sortBy === 'status-down') {
+        // DOWN first, then UP
+        const aDown = a.ping_status === 'Down' ? 1 : 0
+        const bDown = b.ping_status === 'Down' ? 1 : 0
+        if (aDown !== bDown) return bDown - aDown
+        return (a.display_name || a.hostname || '').localeCompare(b.display_name || b.hostname || '')
+      } else if (sortBy === 'ip-asc') {
+        return (a.ip || '').localeCompare(b.ip || '', undefined, { numeric: true })
+      } else if (sortBy === 'branch-asc') {
+        return (a.branch || '').localeCompare(b.branch || '')
+      }
+      // Default: no special sorting, keep original order
+      return 0
+    })
+  }, [devices, searchQuery, statusFilter, typeFilter, regionFilter, sortBy])
 
   const handleViewDevice = (hostid: string) => {
     setSelectedDeviceId(hostid)
@@ -489,16 +524,40 @@ export default function Devices() {
                 ]}
                 fullWidth
               />
-              {hasActiveFilters && (
+              <Select
+                label={
+                  <span className="flex items-center gap-1.5">
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    Sort By
+                  </span>
+                }
+                value={sortBy}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSortBy(e.target.value as any)}
+                options={[
+                  { value: 'default', label: 'Default' },
+                  { value: 'name-asc', label: 'Name (A → Z)' },
+                  { value: 'name-desc', label: 'Name (Z → A)' },
+                  { value: 'status-up', label: 'Status (UP first)' },
+                  { value: 'status-down', label: 'Status (DOWN first)' },
+                  { value: 'ip-asc', label: 'IP Address' },
+                  { value: 'branch-asc', label: 'Branch/City' },
+                ]}
+                fullWidth
+              />
+            </div>
+
+            {/* Clear Filters Button */}
+            {hasActiveFilters && (
+              <div className="mt-3">
                 <Button
                   variant="outline"
                   onClick={handleClearFilters}
-                  className="w-full"
+                  className="w-full md:w-auto"
                 >
                   Clear Filters
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
