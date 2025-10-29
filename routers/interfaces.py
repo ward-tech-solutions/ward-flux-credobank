@@ -994,11 +994,12 @@ async def get_isp_interface_history(
             detail=f"Device with IP {device_ip} not found"
         )
 
-    # Get ISP interfaces
+    # Get ISP interfaces - Exclude VLANs (prefer physical interfaces like Fa3, Fa4)
     isp_interfaces = db.query(DeviceInterface).filter(
         DeviceInterface.device_id == device.id,
         DeviceInterface.isp_provider.in_(['magti', 'silknet']),
-        DeviceInterface.enabled == True
+        DeviceInterface.enabled == True,
+        ~DeviceInterface.if_name.startswith('Vl')  # Exclude VLAN interfaces (Vl50, Vl100, etc.)
     ).all()
 
     if not isp_interfaces:
