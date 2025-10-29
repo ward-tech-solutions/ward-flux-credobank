@@ -4,6 +4,7 @@ REST API for network interface discovery and monitoring
 """
 
 import logging
+import math
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -1064,6 +1065,21 @@ async def get_isp_interface_history(
                 # Transform to history format
                 for timestamp, status_value in values:
                     timestamp_str = str(timestamp)
+
+                    # Get bandwidth values and handle NaN/Infinity
+                    in_bps_raw = metric_data.get("in_bps", {}).get(timestamp_str, 0)
+                    out_bps_raw = metric_data.get("out_bps", {}).get(timestamp_str, 0)
+
+                    # Convert to Mbps and handle invalid floats
+                    in_mbps = in_bps_raw / 1_000_000 if in_bps_raw else 0
+                    out_mbps = out_bps_raw / 1_000_000 if out_bps_raw else 0
+
+                    # Replace NaN/Infinity with 0
+                    if not math.isfinite(in_mbps):
+                        in_mbps = 0
+                    if not math.isfinite(out_mbps):
+                        out_mbps = 0
+
                     history.append({
                         "timestamp": int(timestamp),
                         "status": 1 if int(float(status_value)) == 1 else 0,  # 1=up, 2=down
@@ -1071,8 +1087,8 @@ async def get_isp_interface_history(
                         "out_errors": int(metric_data.get("out_errors", {}).get(timestamp_str, 0)),
                         "in_discards": int(metric_data.get("in_discards", {}).get(timestamp_str, 0)),
                         "out_discards": int(metric_data.get("out_discards", {}).get(timestamp_str, 0)),
-                        "in_mbps": round(metric_data.get("in_bps", {}).get(timestamp_str, 0) / 1_000_000, 2),  # Convert bps to Mbps
-                        "out_mbps": round(metric_data.get("out_bps", {}).get(timestamp_str, 0) / 1_000_000, 2),  # Convert bps to Mbps
+                        "in_mbps": round(in_mbps, 2),
+                        "out_mbps": round(out_mbps, 2),
                     })
 
         if not history:
