@@ -839,7 +839,7 @@ export default function Devices() {
                     <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Basic Information</h3>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <Input
                       label="Device Name"
                       value={editForm.name}
@@ -894,7 +894,7 @@ export default function Devices() {
                     <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Location</h3>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                         Region
@@ -961,7 +961,7 @@ export default function Devices() {
                     <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">SSH Configuration</h3>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <Input
                       label="SSH Port"
                       type="number"
@@ -1040,7 +1040,7 @@ export default function Devices() {
                   <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Basic Information</h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <Input
                     label="Device Name"
                     value={addDeviceForm.name}
