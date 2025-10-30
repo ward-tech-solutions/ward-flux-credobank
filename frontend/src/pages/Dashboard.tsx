@@ -6,6 +6,7 @@ import Badge from '@/components/ui/Badge'
 import Select from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { devicesAPI } from '@/services/api'
+import { useAuth } from '@/contexts/AuthContext'
 import ActiveAlertsTable from '@/components/ActiveAlertsTable'
 import {
   Activity,
@@ -27,6 +28,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 // Device type icons mapping
 const deviceIcons: Record<string, any> = {
@@ -45,7 +47,11 @@ type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info'
 
 export default function DashboardEnhanced() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [selectedSeverity, setSelectedSeverity] = useState('')
+
+  // Helper function: Check if user can navigate to Devices page
+  const canAccessDevices = user?.role !== 'viewer'
 
   const { data: statsResponse, isLoading: statsLoading } = useQuery({
     queryKey: ['device-stats'],
@@ -117,21 +123,21 @@ export default function DashboardEnhanced() {
       value: stats?.total_devices || 0,
       icon: Server,
       badgeVariant: 'info' as const,
-      onClick: () => navigate('/devices'),
+      onClick: canAccessDevices ? () => navigate('/devices') : () => toast.error('Access Denied', { description: 'Viewers cannot access Devices page' }),
     },
     {
       title: 'Online',
       value: stats?.online_devices || 0,
       icon: CheckCircle,
       badgeVariant: 'success' as const,
-      onClick: () => navigate('/devices?status=up'),
+      onClick: canAccessDevices ? () => navigate('/devices?status=up') : () => toast.error('Access Denied', { description: 'Viewers cannot access Devices page' }),
     },
     {
       title: 'Offline',
       value: stats?.offline_devices || 0,
       icon: XCircle,
       badgeVariant: 'danger' as const,
-      onClick: () => navigate('/devices?status=down'),
+      onClick: canAccessDevices ? () => navigate('/devices?status=down') : () => toast.error('Access Denied', { description: 'Viewers cannot access Devices page' }),
     },
     {
       title: 'System Uptime',
@@ -234,7 +240,7 @@ export default function DashboardEnhanced() {
                   return (
                     <div
                       key={region}
-                      onClick={() => navigate(`/devices?region=${encodeURIComponent(region)}`)}
+                      onClick={() => canAccessDevices ? navigate(`/devices?region=${encodeURIComponent(region)}`) : toast.error('Access Denied', { description: 'Viewers cannot access Devices page' })}
                       className="p-4 bg-gradient-to-br from-ward-green/5 to-ward-green/10 dark:from-ward-green/10 dark:to-ward-green/20 rounded-lg border border-ward-green/20 dark:border-ward-green/30 hover:shadow-md transition-shadow cursor-pointer"
                     >
                       <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">{region}</h4>
@@ -277,7 +283,7 @@ export default function DashboardEnhanced() {
               return (
                 <div
                   key={type}
-                  onClick={() => navigate(`/devices?device_type=${encodeURIComponent(type)}`)}
+                  onClick={() => canAccessDevices ? navigate(`/devices?device_type=${encodeURIComponent(type)}`) : toast.error('Access Denied', { description: 'Viewers cannot access Devices page' })}
                   className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
                 >
                   <div className="flex items-center gap-2 mb-3">
@@ -376,7 +382,7 @@ export default function DashboardEnhanced() {
                       <tr
                         key={device.hostid}
                         className="hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
-                        onClick={() => (window.location.href = `/devices/${device.hostid}`)}
+                        onClick={() => canAccessDevices ? (window.location.href = `/devices/${device.hostid}`) : toast.error('Access Denied', { description: 'Viewers cannot access Devices page' })}
                       >
                         <td className="px-4 py-3 whitespace-nowrap">
                           <Badge variant={isOnline ? 'success' : 'danger'} dot>
