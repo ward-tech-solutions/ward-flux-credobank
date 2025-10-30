@@ -828,10 +828,10 @@ export default function Devices() {
         {editingDevice && (
           <div className="flex flex-col" style={{ minHeight: '600px', maxHeight: 'calc(85vh - 120px)' }}>
             {/* Scrollable Body */}
-            <div className="overflow-y-auto flex-1 pr-3" style={{ paddingBottom: '1rem' }}>
-              <div className="space-y-5">
+            <div className="overflow-y-auto flex-1 pr-4" style={{ paddingBottom: '2rem' }}>
+              <div className="space-y-6">
                 {/* Basic Information Section */}
-                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500">
                       <Wifi className="h-4 w-4 text-white" />
@@ -886,7 +886,7 @@ export default function Devices() {
                 </div>
 
                 {/* Location Section */}
-                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="p-1.5 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500">
                       <MapPin className="h-4 w-4 text-white" />
@@ -930,7 +930,7 @@ export default function Devices() {
                 </div>
 
                 {/* Description Section */}
-                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-400 to-pink-500">
                       <Info className="h-4 w-4 text-white" />
@@ -953,7 +953,7 @@ export default function Devices() {
                 </div>
 
                 {/* SSH Configuration Section */}
-                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-400 to-red-500">
                       <Terminal className="h-4 w-4 text-white" />
@@ -996,7 +996,7 @@ export default function Devices() {
             </div>
 
             {/* Fixed Footer */}
-            <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+            <div className="flex gap-4 pt-6 mt-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1004,14 +1004,14 @@ export default function Devices() {
                   setEditingDevice(null)
                 }}
                 disabled={savingDevice}
-                className="flex-1"
+                className="flex-1 py-3"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleSaveDeviceEdit}
                 disabled={savingDevice}
-                className="flex-1 bg-ward-green hover:bg-ward-green-dark"
+                className="flex-1 py-3 bg-ward-green hover:bg-ward-green-dark"
               >
                 {savingDevice ? 'Saving...' : 'Save Changes'}
               </Button>
