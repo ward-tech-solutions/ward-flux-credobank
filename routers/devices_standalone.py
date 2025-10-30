@@ -382,6 +382,8 @@ def create_device(
     current_user: User = Depends(get_current_active_user),
 ):
     """Create a new standalone device"""
+    from database import UserRole
+    import json as json_lib
 
     # Check if device with same IP already exists
     existing = db.query(StandaloneDevice).filter_by(ip=device.ip).first()
@@ -390,6 +392,40 @@ def create_device(
             status_code=400,
             detail=f"Device with IP {device.ip} already exists"
         )
+
+    # RBAC: Regional Managers can only create devices in their assigned regions
+    if current_user.role == UserRole.REGIONAL_MANAGER:
+        # Get user's allowed regions
+        user_regions = []
+        if current_user.regions:
+            try:
+                user_regions = json_lib.loads(current_user.regions) if isinstance(current_user.regions, str) else current_user.regions
+            except (json_lib.JSONDecodeError, TypeError):
+                pass
+        if not user_regions and current_user.region:
+            user_regions = [current_user.region]
+
+        # Check if device has region in custom_fields
+        device_region = None
+        if device.custom_fields and 'region' in device.custom_fields:
+            device_region = device.custom_fields['region']
+
+        # Enforce region restriction
+        if not user_regions:
+            raise HTTPException(
+                status_code=403,
+                detail="Regional Manager must have assigned regions"
+            )
+        if not device_region:
+            raise HTTPException(
+                status_code=400,
+                detail="Device must have a region assigned"
+            )
+        if device_region not in user_regions:
+            raise HTTPException(
+                status_code=403,
+                detail=f"You do not have permission to create devices in region '{device_region}'. Your allowed regions: {', '.join(user_regions)}"
+            )
 
     # Create new device
     new_device = StandaloneDevice(

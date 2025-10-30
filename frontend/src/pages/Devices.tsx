@@ -14,8 +14,10 @@ import { devicesAPI, branchesAPI } from '@/services/api'
 import { Wifi, Search, List, Eye, LayoutGrid, Terminal, Edit, Plus, MapPin, Info, Activity, Trash2, ArrowUpDown } from 'lucide-react'
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/Modal'
 import { toast } from 'sonner'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function Devices() {
+  const { user, isRegionalManager, userRegions } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Get initial view mode from localStorage or default to 'grid'
@@ -144,7 +146,20 @@ export default function Devices() {
     }
   })
 
-  const availableRegions = regionsData?.regions || []
+  // Filter regions based on user role
+  // Regional Managers can only see their assigned regions
+  // Admins and other roles see all regions
+  const availableRegions = useMemo(() => {
+    const allRegions = regionsData?.regions || []
+
+    if (isRegionalManager && userRegions.length > 0) {
+      // Regional Manager: filter to only their assigned regions
+      return allRegions.filter(region => userRegions.includes(region))
+    }
+
+    // Admin and other roles: show all regions
+    return allRegions
+  }, [regionsData, isRegionalManager, userRegions])
 
   // Save view mode to localStorage whenever it changes
   useEffect(() => {

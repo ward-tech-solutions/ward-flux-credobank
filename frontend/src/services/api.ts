@@ -72,7 +72,8 @@ export interface User {
   full_name: string
   role: string
   is_active: boolean
-  region?: string
+  region?: string  // Legacy single region
+  regions?: string[]  // Multi-region support (JSON array)
   branches?: string
 }
 

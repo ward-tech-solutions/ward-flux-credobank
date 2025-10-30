@@ -18,10 +18,10 @@ import { useFeatures } from '@/contexts/FeatureContext'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin', 'regional_manager', 'technician', 'viewer'], feature: null },
+  { name: 'Monitor', href: '/monitor', icon: Activity, roles: ['admin', 'regional_manager', 'technician', 'viewer'], feature: null },
   { name: 'Discovery', href: '/discovery', icon: Scan, roles: ['admin', 'technician'], feature: 'discovery' },
-  { name: 'Devices', href: '/devices', icon: Wifi, roles: ['admin', 'regional_manager', 'technician', 'viewer'], feature: null },
-  { name: 'Monitor', href: '/monitor', icon: Activity, roles: ['admin', 'regional_manager', 'technician'], feature: null },
-  { name: 'Map', href: '/map', icon: MapIcon, roles: ['admin', 'regional_manager', 'technician', 'viewer'], feature: 'map' },
+  { name: 'Devices', href: '/devices', icon: Wifi, roles: ['admin', 'regional_manager', 'technician'], feature: null },
+  { name: 'Map', href: '/map', icon: MapIcon, roles: ['admin', 'regional_manager', 'technician'], feature: 'map' },
   { name: 'Topology', href: '/topology', icon: Network, roles: ['admin', 'regional_manager', 'technician'], feature: 'topology' },
   { name: 'Diagnostics', href: '/diagnostics', icon: Stethoscope, roles: ['admin', 'regional_manager', 'technician'], feature: 'diagnostics' },
   { name: 'Reports', href: '/reports', icon: BarChart3, roles: ['admin', 'regional_manager'], feature: 'reports' },

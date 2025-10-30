@@ -6,7 +6,8 @@ interface AuthContextType {
   isLoading: boolean
   isAdmin: boolean
   isRegionalManager: boolean
-  userRegion: string | null
+  userRegion: string | null  // Single region (legacy)
+  userRegions: string[]  // Multi-region support
   logout: () => void
   refreshUser: () => Promise<void>
 }
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin: user?.role === 'admin',
     isRegionalManager: user?.role === 'regional_manager',
     userRegion: user?.region || null,
+    userRegions: user?.regions || (user?.region ? [user.region] : []),  // Use regions array or fallback to single region
     logout,
     refreshUser,
   }
