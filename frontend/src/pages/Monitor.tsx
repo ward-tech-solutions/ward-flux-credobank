@@ -671,6 +671,8 @@ export default function Monitor() {
       const bRecentlyDown = isRecentlyDown(b)
       const aDown = a.ping_status === 'Down'
       const bDown = b.ping_status === 'Down'
+      const aRecentlyResolved = recentlyResolvedDevices.has(a.hostid)
+      const bRecentlyResolved = recentlyResolvedDevices.has(b.hostid)
 
       // Priority 1: Down devices first
       if (aDown && !bDown) return -1
@@ -692,8 +694,12 @@ export default function Monitor() {
         return bDowntime - aDowntime // Later timestamp = more recent = higher priority
       }
 
-      // Priority 4: Up devices - sort by response time (slower = lower quality)
+      // Priority 4: Among UP devices, recently resolved devices go to the BOTTOM (for visibility after glow)
       if (!aDown && !bDown) {
+        if (aRecentlyResolved && !bRecentlyResolved) return 1  // a goes down
+        if (!aRecentlyResolved && bRecentlyResolved) return -1 // b goes down
+
+        // Priority 5: Normal UP devices - sort by response time (slower = lower quality)
         const aResponse = a.ping_response_time || 0
         const bResponse = b.ping_response_time || 0
         if (aResponse !== bResponse) return bResponse - aResponse
@@ -702,7 +708,7 @@ export default function Monitor() {
       // Final: Alphabetical
       return a.display_name.localeCompare(b.display_name)
     })
-  }, [devices, isRegionalManager, userRegion, statusFilter, regionFilters, branchFilters, typeFilters, searchQuery])
+  }, [devices, isRegionalManager, userRegion, statusFilter, regionFilters, branchFilters, typeFilters, searchQuery, recentlyResolvedDevices])
 
   // Group devices by region
   const devicesByRegion = useMemo(() => {
