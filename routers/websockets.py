@@ -136,8 +136,6 @@ async def monitor_device_changes(_app: FastAPI):
                     logger.error(f"WebSocket: Failed to query VictoriaMetrics: {e}")
                     ping_lookup = {}
 
-                changes = []
-
                 for device in devices:
                     device_id = str(device.id)
                     # Skip devices without IP addresses
@@ -155,24 +153,23 @@ async def monitor_device_changes(_app: FastAPI):
 
                     if device_id in last_state:
                         if last_state[device_id] != current_status:
-                            changes.append(
-                                {
-                                    "hostid": device_id,
-                                    "hostname": device.name,
-                                    "old_status": last_state[device_id],
-                                    "new_status": current_status,
-                                    "timestamp": datetime.now().isoformat(),
-                                }
-                            )
+                            # Broadcast immediately when status changes (don't batch)
+                            await manager.broadcast({
+                                "type": "device_status_update",
+                                "hostid": device_id,
+                                "device_name": device.normalized_name or device.name,
+                                "previous_status": last_state[device_id],
+                                "current_status": current_status,
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                            }, endpoint=UPDATES_ENDPOINT_LABEL)
+
+                            logger.info(f"📡 WebSocket: Device {device.name} status changed: {last_state[device_id]} → {current_status}")
 
                     last_state[device_id] = current_status
             finally:
                 session.close()
 
-            # Broadcast changes to all connected clients
-            if changes:
-                await manager.broadcast({"type": "status_change", "changes": changes}, endpoint=UPDATES_ENDPOINT_LABEL)
-
+            # Check every 30 seconds for status changes
             await asyncio.sleep(30)
         except asyncio.CancelledError:
             break
