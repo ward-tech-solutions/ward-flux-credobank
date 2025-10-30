@@ -377,6 +377,32 @@ def ping_devices_batch(device_ids: list[str], device_ips: list[str]):
                 logger.warning(f"⚠️  Device {device.name} ({device_ip}) is DOWN but down_since was NULL - setting timestamp")
                 status_changed = True
 
+                # CRITICAL FIX: Create alert for DOWN device that has no down_since
+                # This handles devices that were DOWN before monitoring started
+                if should_create_alert and not is_flapping:
+                    # Check if there's already an active alert for this device
+                    existing_alert = db.query(AlertHistory).filter(
+                        AlertHistory.device_id == device_uuid,
+                        AlertHistory.resolved_at.is_(None),
+                        AlertHistory.rule_name == "Device Unreachable"
+                    ).first()
+
+                    if not existing_alert:
+                        logger.warning(f"🚨 Creating missing alert for DOWN device {device.name}")
+                        new_alert = AlertHistory(
+                            id=uuid.uuid4(),
+                            device_id=device_uuid,
+                            rule_name="Device Unreachable",
+                            severity=AlertSeverity.CRITICAL,
+                            message=f"Device {device.name} is not responding to ICMP ping",
+                            value="0",
+                            threshold="1",
+                            triggered_at=utcnow(),
+                            acknowledged=False,
+                            notifications_sent=[]
+                        )
+                        db.add(new_alert)
+
             # Clear device list cache if status changed
             if status_changed:
                 cache_clear_needed = True
