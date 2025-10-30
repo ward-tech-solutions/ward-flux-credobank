@@ -18,7 +18,7 @@ echo "Running diagnostic queries..."
 echo ""
 
 # Execute the SQL file
-docker exec -i wardops-postgres-prod psql -U wardops -d wardflux < diagnose-alerts.sql
+docker exec -i wardops-postgres-prod psql -U ward_admin -d ward_ops < diagnose-alerts.sql
 
 echo ""
 echo "================================================"
