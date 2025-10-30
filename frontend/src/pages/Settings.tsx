@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -11,8 +12,10 @@ import Switch from '@/components/ui/Switch'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { Server, Bell, Mail, Shield, Users as UsersIcon, Plus, Edit2, Trash2, Search, Eye, EyeOff, Wrench, Save, MapPin, ToggleLeft, Scan, Map as MapIcon, Network, Stethoscope, BarChart3, AlertCircle, X } from 'lucide-react'
 import api, { authAPI } from '@/services/api'
+import { useAuth } from '@/contexts/AuthContext'
 import { useFeatures } from '@/contexts/FeatureContext'
 import axios from 'axios'
+import { toast } from 'sonner'
 
 interface User {
   id: string | number
@@ -58,8 +61,25 @@ const GEORGIAN_REGIONS = [
 ]
 
 export default function Settings() {
+  const navigate = useNavigate()
+  const { user, isAdmin } = useAuth()
   const { features, toggleFeature, resetFeatures } = useFeatures()
   const [activeSection, setActiveSection] = useState('notifications')
+
+  // RBAC: Only admins can access Settings page
+  useEffect(() => {
+    if (!isAdmin) {
+      toast.error('Access Denied', {
+        description: 'You do not have permission to access Settings. Admin role required.',
+      })
+      navigate('/')
+    }
+  }, [isAdmin, navigate])
+
+  // Show nothing while redirecting
+  if (!isAdmin) {
+    return null
+  }
   const [emailSettings, setEmailSettings] = useState({
     smtp_server: '',
     smtp_port: '587',

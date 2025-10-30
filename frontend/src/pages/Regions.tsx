@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Loading'
@@ -9,7 +10,9 @@ import Input from '@/components/ui/Input'
 import DeviceDetailsModal from '@/components/DeviceDetailsModal'
 import SSHTerminalModal from '@/components/SSHTerminalModal'
 import { devicesAPI, Device } from '@/services/api'
+import { useAuth } from '@/contexts/AuthContext'
 import { MapPin, ChevronRight, Wifi, Filter, Search, Eye, Terminal } from 'lucide-react'
+import { toast } from 'sonner'
 
 type RegionStats = {
   total: number
@@ -25,9 +28,26 @@ type CityStats = {
 }
 
 export default function Regions() {
+  const navigate = useNavigate()
+  const { user, isAdmin, isRegionalManager } = useAuth()
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [showAllDevicesInRegion, setShowAllDevicesInRegion] = useState(false)
+
+  // RBAC: Only admins and regional managers can access Regions page
+  useEffect(() => {
+    if (!isAdmin && !isRegionalManager) {
+      toast.error('Access Denied', {
+        description: 'You do not have permission to access Regions. Admin or Regional Manager role required.',
+      })
+      navigate('/')
+    }
+  }, [isAdmin, isRegionalManager, navigate])
+
+  // Show nothing while redirecting
+  if (!isAdmin && !isRegionalManager) {
+    return null
+  }
   const [deviceTypeFilter, setDeviceTypeFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')

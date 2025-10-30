@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import Select from '@/components/ui/Select'
@@ -20,7 +21,9 @@ import {
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import api from '@/services/api'
+import { useAuth } from '@/contexts/AuthContext'
 import { PDFExportService } from '@/services/pdfExport'
+import { toast } from 'sonner'
 
 type ReportTab = 'downtime' | 'mttr' | 'sla'
 
@@ -62,11 +65,28 @@ interface MTTRReport {
 }
 
 export default function Reports() {
+  const navigate = useNavigate()
+  const { user, isAdmin, isRegionalManager } = useAuth()
   const [activeTab, setActiveTab] = useState<ReportTab>('downtime')
   const [period, setPeriod] = useState('weekly')
   const [region, setRegion] = useState('')
   const [loading, setLoading] = useState(false)
   const [downtimeReport, setDowntimeReport] = useState<DowntimeReport | null>(null)
+
+  // RBAC: Only admins and regional managers can access Reports page
+  useEffect(() => {
+    if (!isAdmin && !isRegionalManager) {
+      toast.error('Access Denied', {
+        description: 'You do not have permission to access Reports. Admin or Regional Manager role required.',
+      })
+      navigate('/')
+    }
+  }, [isAdmin, isRegionalManager, navigate])
+
+  // Show nothing while redirecting
+  if (!isAdmin && !isRegionalManager) {
+    return null
+  }
   const [mttrReport, setMTTRReport] = useState<MTTRReport | null>(null)
 
   useEffect(() => {
