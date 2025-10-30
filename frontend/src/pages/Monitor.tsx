@@ -421,18 +421,12 @@ export default function Monitor() {
       if (data?.type === 'device_status_update') {
         const { hostid, previous_status, current_status, device_name } = data
 
-        // 🎉 Detect DOWN -> UP transition (device recovered!)
+        // Detect DOWN -> UP transition (device recovered!)
         if (previous_status === 'Down' && current_status === 'Up') {
-          // Add to recently resolved set
+          // Add to recently resolved set - shows green glow + pulsing green dot
           setRecentlyResolvedDevices(prev => new Set(prev).add(hostid))
 
-          // Show success toast
-          toast.success('🎉 Device Recovered!', {
-            description: `${device_name} is back online`,
-            duration: 5000,
-          })
-
-          // Remove from set after 5 seconds (animation duration)
+          // Remove from set after 5 seconds (green glow animation duration)
           setTimeout(() => {
             setRecentlyResolvedDevices(prev => {
               const next = new Set(prev)
@@ -798,15 +792,6 @@ export default function Monitor() {
             <span className="inline-flex rounded-full h-3 w-3 bg-green-500 shadow-sm"></span>
           )}
         </div>
-
-        {/* 🎉 NEW: "RECOVERED!" badge for recently resolved devices */}
-        {recentlyResolved && (
-          <div className="absolute top-3 left-3 z-10">
-            <Badge className="bg-green-500 text-white animate-bounce shadow-lg">
-              ✅ RECOVERED!
-            </Badge>
-          </div>
-        )}
 
         {/* Device content */}
         <div className="flex items-start gap-3">
