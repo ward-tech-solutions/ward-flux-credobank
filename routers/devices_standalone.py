@@ -7,13 +7,13 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, distinct
 from pydantic import BaseModel, Field, IPvAnyAddress
 
 from database import PingResult, get_db, User
-from auth import get_current_active_user
+from auth import get_current_active_user, require_manager_or_admin
 from monitoring.models import StandaloneDevice
 
 logger = logging.getLogger(__name__)
@@ -244,6 +244,26 @@ class StandaloneDeviceResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+def _ip_is_dot5(ip: Optional[str]) -> bool:
+    try:
+        if not ip:
+            return False
+        parts = ip.strip().split('.')
+        return len(parts) == 4 and parts[-1] == '5'
+    except Exception:
+        return False
+
+
+def _strip_881_suffix(value: str) -> str:
+    return value[:-4] if value and value.endswith('-881') else value
+
+
+def _ensure_881_suffix(value: str) -> str:
+    if not value:
+        return value
+    return value if value.endswith('-881') else f"{value}-881"
 
 
 def _latest_ping_lookup(db: Session, ips: List[str]) -> Dict[str, Dict[str, Any]]:
@@ -554,6 +574,106 @@ def delete_device(
 # ============================================
 # Bulk Operations
 # ============================================
+
+@router.post("/normalize/881")
+def normalize_881_naming(
+    apply: bool = Query(False, description="If true, apply changes; otherwise return a dry-run"),
+    update_hostname: bool = Query(True, description="Attempt to update hostname using the same rule"),
+    region: Optional[str] = Query(None, description="Optional filter by region (custom_fields.region)"),
+    branch: Optional[str] = Query(None, description="Optional filter by branch (custom_fields.branch)"),
+    limit: Optional[int] = Query(None, description="Limit number of devices processed"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager_or_admin),
+):
+    """Enforce naming rule for '-881':
+    - Devices with IP ending in .5 MUST have '-881' suffix in name (and normalized_name)
+    - Devices with IP NOT ending in .5 MUST NOT have '-881' suffix in name (and normalized_name)
+    - Optionally adjust hostname using the same simple suffix rule
+
+    Returns a report and optionally applies changes.
+    """
+    query = db.query(StandaloneDevice)
+    if region is not None:
+        query = query.filter(StandaloneDevice.custom_fields['region'].astext == region)
+    if branch is not None:
+        query = query.filter(StandaloneDevice.custom_fields['branch'].astext == branch)
+
+    devices = query.all()
+    if limit is not None:
+        devices = devices[: max(0, int(limit))]
+
+    changes = []
+    updated = 0
+    skipped = 0
+
+    for d in devices:
+        try:
+            ip_dot5 = _ip_is_dot5(d.ip)
+            old_name = d.name or ''
+            old_norm = d.normalized_name
+            new_name = old_name
+
+            if ip_dot5:
+                # Ensure '-881' suffix present
+                new_name = _ensure_881_suffix(old_name)
+            else:
+                # Ensure '-881' suffix absent
+                new_name = _strip_881_suffix(old_name)
+
+            # Hostname adjustments (conservative)
+            old_hostname = d.hostname
+            new_hostname = old_hostname
+            if update_hostname and old_hostname:
+                if ip_dot5:
+                    # Add suffix only if hostname exactly equals the (soon-to-be) base name
+                    # or equals current name without suffix
+                    base_by_name = _strip_881_suffix(old_name)
+                    if old_hostname == base_by_name and not old_hostname.endswith('-881'):
+                        new_hostname = _ensure_881_suffix(old_hostname)
+                else:
+                    # Remove suffix if present at the end
+                    if old_hostname.endswith('-881'):
+                        new_hostname = _strip_881_suffix(old_hostname)
+
+            # Prepare change record
+            if new_name != old_name or new_hostname != old_hostname:
+                changes.append({
+                    "device_id": str(d.id),
+                    "ip": d.ip,
+                    "old_name": old_name,
+                    "new_name": new_name,
+                    "old_hostname": old_hostname,
+                    "new_hostname": new_hostname,
+                    "dot5": ip_dot5,
+                })
+
+                if apply:
+                    d.name = new_name
+                    d.normalized_name = new_name  # keep display consistent
+                    if update_hostname and new_hostname != old_hostname:
+                        d.hostname = new_hostname
+                    d.updated_at = utcnow()
+                    db.add(d)
+                    updated += 1
+            else:
+                skipped += 1
+        except Exception as e:
+            logger.error(f"Failed to evaluate 881 normalization for {d.id} ({d.ip}): {e}")
+
+    if apply and updated:
+        db.commit()
+
+    return {
+        "apply": apply,
+        "update_hostname": update_hostname,
+        "filtered_region": region,
+        "filtered_branch": branch,
+        "total_considered": len(devices),
+        "updated": updated if apply else 0,
+        "pending_updates": len(changes) if not apply else 0,
+        "skipped": skipped,
+        "changes": changes[:1000],  # cap details for response
+    }
 
 @router.post("/bulk", response_model=List[StandaloneDeviceResponse], status_code=status.HTTP_201_CREATED)
 def bulk_create_devices(
