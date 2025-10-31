@@ -498,17 +498,28 @@ def update_device(
 
     # Update custom_fields with region/branch if provided
     if region is not None or branch is not None:
-        custom_fields = device.custom_fields or {}
+        # Use a NEW dict to guarantee SQLAlchemy detects the change even without MutableDict
+        custom_fields = dict(device.custom_fields or {})
         if region is not None:
             custom_fields['region'] = region
         if branch is not None:
             custom_fields['branch'] = branch
         device.custom_fields = custom_fields
 
+    # Keep old values for display name sync logic
+    old_name = device.name
+    old_normalized = device.normalized_name
+
     # Update remaining fields
     for field, value in update_data.items():
         if hasattr(device, field):
             setattr(device, field, value)
+
+    # If client changed 'name' but didn't explicitly set 'normalized_name',
+    # keep display name in sync when normalized_name previously mirrored name.
+    if 'name' in update_data and 'normalized_name' not in update_data:
+        if old_normalized is None or old_normalized == old_name:
+            device.normalized_name = device.name
 
     device.updated_at = utcnow()
     db.commit()

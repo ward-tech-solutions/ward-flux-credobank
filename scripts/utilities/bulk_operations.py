@@ -113,9 +113,8 @@ async def process_bulk_import(df: pd.DataFrame, db: Session) -> BulkOperationRes
                 enabled = enabled_raw
 
             existing = db.query(StandaloneDevice).filter(StandaloneDevice.ip == ip).first()
-            custom_fields = existing.custom_fields if existing else {}
-            if custom_fields is None:
-                custom_fields = {}
+            # Work on a fresh copy to ensure SQLAlchemy detects change reliably
+            custom_fields = dict((existing.custom_fields or {}) if existing else {})
             if region:
                 custom_fields["region"] = region
             if branch:
@@ -137,7 +136,7 @@ async def process_bulk_import(df: pd.DataFrame, db: Session) -> BulkOperationRes
                 existing.device_type = device_type
                 existing.location = location
                 existing.enabled = enabled
-                existing.custom_fields = custom_fields
+                existing.custom_fields = dict(custom_fields)
                 db.add(existing)
                 action = "updated"
             else:
@@ -149,7 +148,7 @@ async def process_bulk_import(df: pd.DataFrame, db: Session) -> BulkOperationRes
                     device_type=device_type,
                     location=location,
                     enabled=enabled,
-                    custom_fields=custom_fields,
+                    custom_fields=dict(custom_fields),
                 )
                 db.add(device)
                 action = "created"
@@ -188,7 +187,7 @@ async def bulk_update_devices(host_ids: List[str], update_data: Dict[str, Any], 
             if not device:
                 raise ValueError("Device not found")
 
-            fields = device.custom_fields or {}
+            fields = dict(device.custom_fields or {})
             for key, value in update_data.items():
                 if key in {"name", "hostname"}:
                     device.name = value
@@ -208,7 +207,7 @@ async def bulk_update_devices(host_ids: List[str], update_data: Dict[str, Any], 
                     # store any other custom field
                     fields[key] = value
 
-            device.custom_fields = fields
+            device.custom_fields = dict(fields)
             db.add(device)
             successful += 1
             details.append({"hostid": hostid, "status": "success"})

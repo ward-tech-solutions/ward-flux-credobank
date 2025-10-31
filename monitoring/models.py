@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, JSON, UUID as SQLAlchemyUUID, Enum as SQLAlchemyEnum, func, Float, BigInteger, ARRAY
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from database import Base
 
 
@@ -66,8 +67,9 @@ class StandaloneDevice(Base):
     last_seen = Column(DateTime)
 
     # Organization/grouping
-    tags = Column(JSON)  # ["production", "core", "datacenter-1"]
-    custom_fields = Column(JSON)  # Flexible key-value storage
+    # IMPORTANT: use MutableList/MutableDict so in-place changes are tracked
+    tags = Column(MutableList.as_mutable(JSON))  # ["production", "core", "datacenter-1"]
+    custom_fields = Column(MutableDict.as_mutable(JSON))  # Flexible key-value storage
 
     # Branch relationship and normalized naming
     branch_id = Column(String(36))  # Foreign key to branches table
@@ -371,8 +373,9 @@ class DeviceInterface(Base):
     monitoring_enabled = Column(Boolean, default=True)  # Whether to collect metrics for this interface
 
     # Tags and custom fields
-    tags = Column(JSON)  # ["critical", "isp", "primary-uplink"]
-    custom_fields = Column(JSON)  # Flexible key-value storage
+    # Track in-place mutations for JSON fields
+    tags = Column(MutableList.as_mutable(JSON))  # ["critical", "isp", "primary-uplink"]
+    custom_fields = Column(MutableDict.as_mutable(JSON))  # Flexible key-value storage
 
     # Notes
     notes = Column(Text)  # User notes about this interface

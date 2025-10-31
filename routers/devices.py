@@ -127,12 +127,15 @@ async def update_device(
         return JSONResponse(status_code=404, content={"error": "Device not found"})
 
     try:
-        fields = device.custom_fields or {}
+        # Work on a fresh copy to ensure change tracking
+        fields = dict(device.custom_fields or {})
         if update_data.region is not None:
             fields["region"] = update_data.region
         if update_data.branch is not None:
             fields["branch"] = update_data.branch
         device.custom_fields = fields
+        # Touch updated_at to force row update across all DB backends
+        device.updated_at = datetime.utcnow()
         db.commit()
 
         return {
