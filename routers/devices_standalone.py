@@ -207,7 +207,7 @@ class StandaloneDeviceResponse(BaseModel):
 
         data = {
             'id': str(obj.id),
-            'name': obj.normalized_name or obj.name,
+            'name': obj.name,
             'display_name': obj.normalized_name or obj.name,
             'original_name': obj.original_name or obj.name,
             'ip': obj.ip,
@@ -515,11 +515,10 @@ def update_device(
         if hasattr(device, field):
             setattr(device, field, value)
 
-    # If client changed 'name' but didn't explicitly set 'normalized_name',
-    # keep display name in sync when normalized_name previously mirrored name.
+    # If client changed 'name' and didn't explicitly set 'normalized_name',
+    # update normalized_name to match so the list display updates consistently.
     if 'name' in update_data and 'normalized_name' not in update_data:
-        if old_normalized is None or old_normalized == old_name:
-            device.normalized_name = device.name
+        device.normalized_name = device.name
 
     device.updated_at = utcnow()
     db.commit()
