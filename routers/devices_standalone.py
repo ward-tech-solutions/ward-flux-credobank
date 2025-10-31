@@ -582,6 +582,7 @@ def normalize_881_naming(
     region: Optional[str] = Query(None, description="Optional filter by region (custom_fields.region)"),
     branch: Optional[str] = Query(None, description="Optional filter by branch (custom_fields.branch)"),
     limit: Optional[int] = Query(None, description="Limit number of devices processed"),
+    require_existing_881: bool = Query(True, description="Only apply '-881' for .5 IPs if original_name or hostname already contained '881'"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_manager_or_admin),
 ):
@@ -612,26 +613,44 @@ def normalize_881_naming(
             old_name = d.name or ''
             old_norm = d.normalized_name
             new_name = old_name
+            orig_name = d.original_name or old_name
 
             if ip_dot5:
-                # Ensure '-881' suffix present
-                new_name = _ensure_881_suffix(old_name)
+                # Two-step condition:
+                # - If require_existing_881, only keep/apply '-881' when original_name or hostname contained '881'
+                # - Otherwise do NOT add '-881' to names that never had it; also revert tool-added '-881'
+                has_881_original = ('881' in (orig_name or '')) or ('881' in (d.hostname or ''))
+
+                if require_existing_881 and not has_881_original:
+                    # Revert any trailing '-881' previously appended
+                    new_name = _strip_881_suffix(old_name)
+                else:
+                    # Do NOT append a new '-881'; just leave as-is.
+                    # However, if our tool appended exactly one '-881' to the original, revert to original to avoid duplicates like '_881-881'
+                    if old_name == f"{orig_name}-881":
+                        new_name = orig_name
+                    else:
+                        new_name = old_name
             else:
                 # Ensure '-881' suffix absent
-                new_name = _strip_881_suffix(old_name)
+                # Prefer reverting to original name if it matches pattern original+'-881'
+                if old_name == f"{orig_name}-881":
+                    new_name = orig_name
+                else:
+                    new_name = _strip_881_suffix(old_name)
 
             # Hostname adjustments (conservative)
             old_hostname = d.hostname
             new_hostname = old_hostname
             if update_hostname and old_hostname:
                 if ip_dot5:
-                    # Add suffix only if hostname exactly equals the (soon-to-be) base name
-                    # or equals current name without suffix
-                    base_by_name = _strip_881_suffix(old_name)
-                    if old_hostname == base_by_name and not old_hostname.endswith('-881'):
-                        new_hostname = _ensure_881_suffix(old_hostname)
+                    # Do not append new '-881' to hostname; only revert if appended by tool earlier
+                    if require_existing_881:
+                        has_881_original = ('881' in (orig_name or '')) or ('881' in (old_hostname or ''))
+                        if not has_881_original and old_hostname.endswith('-881'):
+                            new_hostname = _strip_881_suffix(old_hostname)
                 else:
-                    # Remove suffix if present at the end
+                    # Remove trailing '-881' if present
                     if old_hostname.endswith('-881'):
                         new_hostname = _strip_881_suffix(old_hostname)
 
